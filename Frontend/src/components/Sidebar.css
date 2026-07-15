@@ -18,6 +18,8 @@
   padding: 4px 8px 22px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 18px;
+  text-decoration: none;
+  color: inherit;
 }
 
 .tooth-mark {
@@ -91,6 +93,7 @@
   font-size: 13.5px;
   font-weight: 500;
   text-align: left;
+  text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
@@ -123,12 +126,64 @@
   color: var(--danger);
 }
 
+.sidebar__profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.sidebar__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent-deep);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.sidebar__profile-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.sidebar__profile-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sidebar__profile-role {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
 .sidebar-scrim {
   display: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .sidebar {
+    width: 220px;
+  }
+
+  .sidebar__link {
+    padding: 11px 10px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 250px;
     position: fixed;
     z-index: 40;
     left: 0;

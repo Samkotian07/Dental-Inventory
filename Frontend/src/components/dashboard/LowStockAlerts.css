@@ -1,0 +1,72 @@
+.alerts-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #E7A02B;
+  margin-bottom: 12px;
+}
+
+.alerts-card__head h2 {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.alerts-card__empty {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.alerts-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alerts-card__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #FDF6E7;
+  border: 1px solid #F5E4BA;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.alerts-card__list li.is-severe {
+  background: #FDEDEA;
+  border-color: #F5C7BC;
+}
+
+.alerts-card__list p {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.alerts-card__list span {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.alerts-card__pill {
+  background: #E7A02B;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.is-severe .alerts-card__pill {
+  background: var(--danger);
+}

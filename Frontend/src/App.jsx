@@ -1,37 +1,27 @@
-import { useState } from "react";
-import Sidebar from "./components/Sidebar.jsx";
-import Topbar from "./components/Topbar.jsx";
-import Carousel from "./components/Carousel.jsx";
-import "./App.css";
+import { Routes, Route, Navigate } from "react-router-dom";
+import Layout from "./components/Layout.jsx";
+import Landing from "./pages/Landing.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import ComingSoon from "./pages/ComingSoon.jsx";
 
 export default function App() {
-  const [active, setActive] = useState("Dashboard");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   return (
-    <div className="app">
-      <Sidebar
-        active={active}
-        onNavigate={(label) => {
-          setActive(label);
-          setSidebarOpen(false);
-        }}
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
-
-      <div className="app__main">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} />
-
-        <main className="app__content">
-          <div className="app__intro">
-            <h1>Welcome back</h1>
-            <p>Jump into issued items, active exchanges, or the full inventory.</p>
-          </div>
-
-          <Carousel />
-        </main>
-      </div>
-    </div>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/stock" element={<ComingSoon />} />
+        <Route path="/students" element={<ComingSoon />} />
+        <Route path="/issued" element={<ComingSoon />} />
+        <Route path="/failed-inventory" element={<ComingSoon />} />
+        <Route path="/track-exchange" element={<ComingSoon />} />
+        <Route path="/stock-insertion" element={<ComingSoon />} />
+        <Route path="/inventory-updation" element={<ComingSoon />} />
+        <Route path="/stock-deletion" element={<ComingSoon />} />
+        <Route path="/settings" element={<ComingSoon />} />
+        <Route path="/staff-manager" element={<ComingSoon />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
   );
 }

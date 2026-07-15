@@ -1,0 +1,118 @@
+.donut-card__body {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.donut-card__chart {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.donut-card__total {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.donut-card__total strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.donut-card__total span {
+  font-size: 10.5px;
+  color: var(--ink-soft);
+}
+
+.donut-card__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.donut-card__legend button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.donut-card__legend button:hover {
+  background: var(--bg);
+}
+
+.donut-card__legend button.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.donut-card__swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.donut-card__value {
+  color: var(--ink-soft);
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.donut-card__clear {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px dashed var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+}
+
+.donut-tip {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  box-shadow: 0 10px 24px rgba(23, 36, 51, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.donut-tip strong {
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.donut-tip span {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+@media (max-width: 520px) {
+  .donut-card__body {
+    flex-direction: column;
+  }
+}

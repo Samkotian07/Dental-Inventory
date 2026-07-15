@@ -1,0 +1,58 @@
+.dashboard {
+  padding: 24px 28px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dashboard__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+.dashboard__col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.dashboard__row {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 20px;
+}
+
+@media (max-width: 1080px) {
+  .dashboard__grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .dashboard__col--side {
+    order: 0;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard {
+    padding: 18px 20px 48px;
+  }
+
+  .dashboard__row {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard__col--side {
+    gap: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 16px 12px 40px;
+  }
+}

@@ -1,0 +1,234 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 20px;
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.card__head h2 {
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+  margin-right: auto;
+}
+
+.inv-table__controls {
+  display: flex;
+  gap: 8px;
+}
+
+.inv-table__search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  color: var(--ink-soft);
+}
+
+.inv-table__search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12.5px;
+  width: 140px;
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+.inv-table__controls select {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 12.5px;
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+.inv-table__expand {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.inv-table__expand:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+.inv-table__scroll {
+  overflow-x: auto;
+}
+
+.inv-table__grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.inv-table__grid th {
+  text-align: left;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 700;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.inv-table__grid td {
+  padding: 11px 12px;
+  font-size: 13px;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.inv-table__grid tr:last-child td {
+  border-bottom: none;
+}
+
+.inv-table__ref {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.inv-table__tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.inv-table__tag--consumables,
+.inv-table__tag--equipment,
+.inv-table__tag--xyxx {
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.inv-table__empty {
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 13px;
+  padding: 30px 0;
+}
+
+.inv-table__more {
+  width: 100%;
+  margin-top: 12px;
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--accent-deep);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 9px;
+  border-radius: var(--radius-sm);
+}
+
+.inv-table__more:hover {
+  background: var(--accent-soft);
+}
+
+.inv-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 36, 51, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.inv-modal__panel {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  width: min(920px, 100%);
+  max-height: min(720px, 90vh);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 30px 60px rgba(23, 36, 51, 0.3);
+}
+
+.inv-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.inv-modal__head h2 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  margin: 0;
+}
+
+.inv-modal__head button {
+  border: 1px solid var(--line);
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink-soft);
+}
+
+.inv-modal__head button:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.inv-modal__controls {
+  padding: 14px 22px 0;
+}
+
+.inv-modal__scroll {
+  overflow: auto;
+  padding: 16px 22px 22px;
+}
+
+@media (max-width: 640px) {
+  .inv-table__search input {
+    width: 90px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .inv-table__search,
+  .inv-table__controls select {
+    padding: 9px 12px;
+  }
+
+  .inv-table__expand {
+    width: 38px;
+    height: 38px;
+  }
+
+  .inv-table__grid td,
+  .inv-table__grid th {
+    padding: 13px 12px;
+  }
+}
