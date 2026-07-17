@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ChevronsDown } from "lucide-react";
 import businessStat from "../assets/business-stat.svg";
 import "./Carousel.css";
@@ -8,24 +9,32 @@ const slides = [
     key: "issued",
     title: "Issued",
     copy: "See what's checked out to students right now.",
+    to: "/issued",
   },
   {
     key: "exchange",
     title: "Exchange",
     copy: "Track items moving between departments and suppliers.",
+    to: "/track-exchange",
   },
   {
     key: "inventory",
     title: "Inventory",
     copy: "The full stock count, updated as items move.",
+    to: "/dashboard",
   },
 ];
 
 export default function Carousel() {
   const [index, setIndex] = useState(0);
+  const navigate = useNavigate();
 
   const prev = () => setIndex((i) => (i === 0 ? slides.length - 1 : i - 1));
   const next = () => setIndex((i) => (i === slides.length - 1 ? 0 : i + 1));
+  const handleCardClick = (slide, i) => {
+    setIndex(i);
+    navigate(slide.to);
+  };
 
   return (
     <section className="carousel" aria-label="Quick access shortcuts">
@@ -44,10 +53,8 @@ export default function Carousel() {
             <article
               key={slide.key}
               className={`carousel__card carousel__card--${state}`}
-              onClick={() => setIndex(i)}
+              onClick={() => handleCardClick(slide, i)}
             >
-              <span className="carousel__pill">Know more</span>
-
               <div className="carousel__illustration">
                 <img src={businessStat} alt="Business statistics illustration" />
               </div>
