@@ -3,6 +3,7 @@ import Layout from "./components/Layout.jsx";
 import Landing from "./pages/Landing.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import IssuedItems from "./pages/IssuedItems.jsx";
+import TrackExchange from "./pages/TrackExchange.jsx";
 import ComingSoon from "./pages/ComingSoon.jsx";
 
 export default function App() {
@@ -15,7 +16,7 @@ export default function App() {
         <Route path="/students" element={<ComingSoon />} />
         <Route path="/issued" element={<IssuedItems />} />
         <Route path="/failed-inventory" element={<ComingSoon />} />
-        <Route path="/track-exchange" element={<ComingSoon />} />
+        <Route path="/Track-exchange" element={<TrackExchange />} />
         <Route path="/stock-insertion" element={<ComingSoon />} />
         <Route path="/inventory-updation" element={<ComingSoon />} />
         <Route path="/stock-deletion" element={<ComingSoon />} />
