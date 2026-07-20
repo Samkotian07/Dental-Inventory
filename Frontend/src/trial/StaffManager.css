@@ -1,0 +1,434 @@
+/* Staff Manager - White & Black Theme */
+.staff-manager {
+  padding: 1.5rem;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Controls Section */
+.staff-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  align-items: center;
+}
+
+.staff-search {
+  flex: 1;
+  min-width: 200px;
+}
+
+.staff-search input {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #000000;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.staff-search input:focus {
+  border-color: #000000;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.staff-search input::placeholder {
+  color: #9ca3af;
+}
+
+.staff-filter-select {
+  width: 160px;
+}
+
+.staff-filter-select select {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #000000;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.staff-filter-select select:focus {
+  border-color: #000000;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.staff-export-btn {
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.staff-export-btn:hover {
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.staff-add-btn {
+  background: #000000;
+  color: #ffffff;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.staff-add-btn:hover {
+  background: #1a1a1a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Table Wrapper */
+.staff-table-wrapper {
+  overflow-x: auto;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Table Styles */
+.staff-table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.staff-table-wrapper thead {
+  background: #f8f9fa;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.staff-table-wrapper th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+
+.staff-table-wrapper td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+  color: #000000;
+}
+
+.staff-table-wrapper tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.staff-id {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.staff-name {
+  font-weight: 500;
+  color: #000000;
+}
+
+/* Action Buttons */
+.staff-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.staff-action-btn {
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.staff-action-btn:hover {
+  transform: scale(1.05);
+}
+
+.staff-action-edit {
+  color: #6b7280;
+}
+
+.staff-action-edit:hover {
+  color: #000000;
+  background: #f3f4f6;
+}
+
+.staff-action-deactivate {
+  color: #6b7280;
+}
+
+.staff-action-deactivate:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.staff-action-activate {
+  color: #6b7280;
+}
+
+.staff-action-activate:hover {
+  color: #10b981;
+  background: #f0fdf4;
+}
+
+.staff-action-delete {
+  color: #6b7280;
+}
+
+.staff-action-delete:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+/* Modal Styles */
+.staff-modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.staff-modal-footer button {
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.staff-modal-footer button:first-child {
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #e5e7eb;
+}
+
+.staff-modal-footer button:first-child:hover {
+  background: #f8f9fa;
+}
+
+.staff-modal-footer button:last-child {
+  background: #000000;
+  color: #ffffff;
+  border: none;
+}
+
+.staff-modal-footer button:last-child:hover {
+  background: #1a1a1a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Form Styles */
+.staff-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.staff-form label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.25rem;
+}
+
+.staff-form input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #000000;
+  transition: all 0.2s ease;
+}
+
+.staff-form input:focus {
+  border-color: #000000;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.staff-form input::placeholder {
+  color: #9ca3af;
+}
+
+.staff-role-hint {
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.staff-role-hint p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .staff-manager {
+    padding: 1rem;
+  }
+
+  .staff-controls {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .staff-search {
+    width: 100%;
+  }
+
+  .staff-filter-select {
+    width: 100%;
+  }
+
+  .staff-export-btn,
+  .staff-add-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .staff-actions {
+    flex-wrap: wrap;
+    gap: 0.125rem;
+  }
+
+  .staff-action-btn {
+    padding: 0.375rem;
+  }
+
+  .staff-modal-footer {
+    flex-direction: column;
+  }
+
+  .staff-modal-footer button {
+    width: 100%;
+  }
+}
+
+/* Dark Mode Support - Optional */
+@media (prefers-color-scheme: dark) {
+  .staff-manager {
+    background: #1a1a1a;
+    border-color: #2d2d2d;
+  }
+
+  .staff-search input,
+  .staff-filter-select select,
+  .staff-export-btn {
+    background: #1a1a1a;
+    border-color: #2d2d2d;
+    color: #ffffff;
+  }
+
+  .staff-search input::placeholder {
+    color: #6b7280;
+  }
+
+  .staff-table-wrapper {
+    background: #1a1a1a;
+    border-color: #2d2d2d;
+  }
+
+  .staff-table-wrapper thead {
+    background: #0d0d0d;
+    border-bottom-color: #2d2d2d;
+  }
+
+  .staff-table-wrapper th {
+    color: #9ca3af;
+  }
+
+  .staff-table-wrapper td {
+    color: #ffffff;
+    border-bottom-color: #2d2d2d;
+  }
+
+  .staff-table-wrapper tbody tr:hover {
+    background: #0d0d0d;
+  }
+
+  .staff-form input {
+    background: #1a1a1a;
+    border-color: #2d2d2d;
+    color: #ffffff;
+  }
+
+  .staff-role-hint {
+    background: #0d0d0d;
+    border-color: #2d2d2d;
+  }
+
+  .staff-role-hint p {
+    color: #9ca3af;
+  }
+
+  .staff-modal-footer {
+    border-top-color: #2d2d2d;
+  }
+
+  .staff-modal-footer button:first-child {
+    background: #1a1a1a;
+    color: #ffffff;
+    border-color: #2d2d2d;
+  }
+
+  .staff-modal-footer button:first-child:hover {
+    background: #0d0d0d;
+  }
+
+  .staff-add-btn {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .staff-add-btn:hover {
+    background: #e5e7eb;
+  }
+
+  .staff-export-btn {
+    background: #1a1a1a;
+    color: #ffffff;
+    border-color: #2d2d2d;
+  }
+
+  .staff-export-btn:hover {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .staff-action-edit:hover {
+    background: #2d2d2d;
+  }
+
+  .staff-id {
+    color: #9ca3af;
+  }
+
+  .staff-name {
+    color: #ffffff;
+  }
+}
