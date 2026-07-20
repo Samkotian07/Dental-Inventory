@@ -13,16 +13,20 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Landing />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/stock" element={<ComingSoon />} />
         <Route path="/students" element={<StudentDetails />} />
         <Route path="/issued" element={<IssuedItems />} />
-        <Route path="/failed-inventory" element={<ComingSoon />} />
         <Route path="/Track-exchange" element={<TrackExchange />} />
+
+        {/* Placeholder routes for features still under development */}
+        <Route path="/stock" element={<ComingSoon />} />
+        <Route path="/failed-inventory" element={<ComingSoon />} />
         <Route path="/stock-insertion" element={<ComingSoon />} />
         <Route path="/inventory-updation" element={<ComingSoon />} />
         <Route path="/stock-deletion" element={<ComingSoon />} />
         <Route path="/settings" element={<ComingSoon />} />
         <Route path="/staff-manager" element={<ComingSoon />} />
+        <Route path="/coming-soon" element={<ComingSoon />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
