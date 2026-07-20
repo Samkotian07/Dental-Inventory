@@ -12,10 +12,12 @@ import {
   Settings,
   UserCog,
   LogOut,
+  HomeIcon,
 } from "lucide-react";
 import "./Sidebar.css";
 
 const navItems = [
+  { label: "Home", to: "/dashboard", icon: HomeIcon },
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
   { label: "Stock", to: "/stock", icon: Boxes },
   { label: "Student Details", to: "/students", icon: Users },
