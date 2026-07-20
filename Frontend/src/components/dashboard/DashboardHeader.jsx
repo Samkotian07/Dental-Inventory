@@ -6,7 +6,7 @@ import "./DashboardHeader.css";
 const pills = [
   { label: "Inventory", icon: Boxes, tone: "blue", to: "/dashboard" },
   { label: "Issue", icon: ClipboardList, tone: "green", to: "/issued" },
-  { label: "Exchange", icon: Repeat, tone: "purple", to: "/track-exchange" },
+  { label: "Exchange", icon: Repeat, tone: "purple", to: "/Track-exchange" },
 ];
 
 export default function DashboardHeader({ title = "Dashboard", onMenuClick }) {
