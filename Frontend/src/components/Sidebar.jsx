@@ -12,21 +12,24 @@ import {
   Settings,
   UserCog,
   LogOut,
+  HomeIcon,
 } from "lucide-react";
 import "./Sidebar.css";
 
 const navItems = [
+  { label: "Home", to: "/dashboard", icon: HomeIcon },
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard },
   { label: "Stock", to: "/stock", icon: Boxes },
   { label: "Student Details", to: "/students", icon: Users },
   { label: "Issued", to: "/issued", icon: ClipboardList },
   { label: "Failed Inventory", to: "/failed-inventory", icon: AlertTriangle },
   { label: "Track Exchange", to: "/track-exchange", icon: Repeat },
-  { label: "Stock Insertion", to: "/stock-insertion", icon: PackagePlus },
   { label: "Inventory Updation", to: "/inventory-updation", icon: PencilLine },
+  { label: "Stock Insertion", to: "/stock-insertion", icon: PackagePlus },
   { label: "Stock Deletion", to: "/stock-deletion", icon: PackageMinus },
-  { label: "Settings", to: "/settings", icon: Settings },
+  { label: "Low stock", to: "/inventory-updation", icon: PencilLine },
   { label: "Staff Manager", to: "/staff-manager", icon: UserCog },
+  { label: "Settings", to: "/settings", icon: Settings },
 ];
 
 export default function Sidebar({ open, onClose }) {
