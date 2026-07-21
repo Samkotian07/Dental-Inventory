@@ -1,12 +1,11 @@
 import { useState, useMemo } from "react";
 import { Sliders, Search, AlertTriangle, TrendingDown } from "lucide-react";
-import { useData } from "../../context/DataContext";
-import { useAuth } from "../../context/AuthContext";
-import Button from "../../components/common/Button";
-import Input from "../../components/common/Input";
+import { useData } from "../context/DataContext";
+import { useAuth } from "../context/AuthContext";
+import Button from "./common/Button"; 
+import Input from "./common/Input"; 
 import { toast } from "sonner";
 import "./LowStockSettings.css";
-
 export default function LowStockSettings() {
   const { user } = useAuth();
   const { inventory, settings, updateSettings, updateItemThresholds } =

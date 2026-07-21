@@ -73,6 +73,7 @@
   font-weight: 500;
   transition: all 0.2s ease;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .inv-search-btn:hover {
@@ -119,6 +120,7 @@
   border-radius: 8px;
   color: #000000;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .inv-edit-select:focus {
@@ -164,6 +166,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  cursor: pointer;
 }
 
 .inv-update-btn:hover {
@@ -414,134 +417,5 @@
   .inv-update-btn {
     width: 100%;
     justify-content: center;
-  }
-}
-
-/* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .inventory-updation {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .inv-section-title {
-    color: #ffffff;
-  }
-
-  .inv-search-section {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .inv-search-input {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .inv-search-input::placeholder {
-    color: #6b7280;
-  }
-
-  .inv-edit-section {
-    border-top-color: #2d2d2d;
-  }
-
-  .inv-edit-title {
-    color: #ffffff;
-  }
-
-  .inv-edit-label {
-    color: #9ca3af;
-  }
-
-  .inv-edit-select {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .inv-edit-input input {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .inv-edit-input input::placeholder {
-    color: #6b7280;
-  }
-
-  .inv-table-section {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .inv-table-search-input {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .inv-table-search-input::placeholder {
-    color: #6b7280;
-  }
-
-  .inv-table-wrapper {
-    border-color: #2d2d2d;
-  }
-
-  .inv-table-wrapper thead {
-    background: #0d0d0d;
-    border-bottom-color: #2d2d2d;
-  }
-
-  .inv-table-wrapper th {
-    color: #9ca3af;
-  }
-
-  .inv-table-wrapper td {
-    color: #ffffff;
-    border-bottom-color: #2d2d2d;
-  }
-
-  .inv-table-wrapper tbody tr:hover {
-    background: #0d0d0d;
-  }
-
-  .inv-product-name {
-    color: #ffffff;
-  }
-
-  .inv-ref-no {
-    color: #9ca3af;
-  }
-
-  .inv-audit-section {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .inv-audit-icon {
-    color: #ffffff;
-  }
-
-  .inv-audit-item {
-    background: #0d0d0d;
-  }
-
-  .inv-audit-details {
-    color: #ffffff;
-  }
-
-  .inv-audit-time {
-    color: #9ca3af;
-  }
-
-  .inv-audit-empty {
-    color: #6b7280;
-  }
-
-  .inv-action-edit:hover {
-    background: #2d2d2d;
   }
 }

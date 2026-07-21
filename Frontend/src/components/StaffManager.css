@@ -67,6 +67,7 @@
   border-radius: 8px;
   font-weight: 500;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .staff-export-btn:hover {
@@ -85,6 +86,7 @@
   font-weight: 500;
   border: none;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .staff-add-btn:hover {
@@ -216,6 +218,7 @@
   border-radius: 8px;
   font-weight: 500;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .staff-modal-footer button:first-child {
@@ -329,106 +332,4 @@
   }
 }
 
-/* Dark Mode Support - Optional */
-@media (prefers-color-scheme: dark) {
-  .staff-manager {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .staff-search input,
-  .staff-filter-select select,
-  .staff-export-btn {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .staff-search input::placeholder {
-    color: #6b7280;
-  }
-
-  .staff-table-wrapper {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .staff-table-wrapper thead {
-    background: #0d0d0d;
-    border-bottom-color: #2d2d2d;
-  }
-
-  .staff-table-wrapper th {
-    color: #9ca3af;
-  }
-
-  .staff-table-wrapper td {
-    color: #ffffff;
-    border-bottom-color: #2d2d2d;
-  }
-
-  .staff-table-wrapper tbody tr:hover {
-    background: #0d0d0d;
-  }
-
-  .staff-form input {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .staff-role-hint {
-    background: #0d0d0d;
-    border-color: #2d2d2d;
-  }
-
-  .staff-role-hint p {
-    color: #9ca3af;
-  }
-
-  .staff-modal-footer {
-    border-top-color: #2d2d2d;
-  }
-
-  .staff-modal-footer button:first-child {
-    background: #1a1a1a;
-    color: #ffffff;
-    border-color: #2d2d2d;
-  }
-
-  .staff-modal-footer button:first-child:hover {
-    background: #0d0d0d;
-  }
-
-  .staff-add-btn {
-    background: #ffffff;
-    color: #000000;
-  }
-
-  .staff-add-btn:hover {
-    background: #e5e7eb;
-  }
-
-  .staff-export-btn {
-    background: #1a1a1a;
-    color: #ffffff;
-    border-color: #2d2d2d;
-  }
-
-  .staff-export-btn:hover {
-    background: #ffffff;
-    color: #000000;
-  }
-
-  .staff-action-edit:hover {
-    background: #2d2d2d;
-  }
-
-  .staff-id {
-    color: #9ca3af;
-  }
-
-  .staff-name {
-    color: #ffffff;
-  }
-}
+/* ✅ REMOVED DARK MODE - Now always white background */

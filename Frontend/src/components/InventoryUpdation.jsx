@@ -1,13 +1,13 @@
 import { useState, useMemo } from "react";
 import { Search, Edit, Save, History } from "lucide-react";
-import { useData } from "../../context/DataContext";
-import { useAuth } from "../../context/AuthContext";
-import Button from "../../components/common/Button";
-import Input from "../../components/common/Input";
-import Badge from "../../components/common/Badge";
-import Table from "../../components/common/Table";
-import { CATEGORIES } from "../../utils/constants";
-import { formatDate } from "../../utils/helpers";
+import { useData } from "../context/DataContext";
+import { useAuth } from "../context/AuthContext";
+import Button from "./common/Button";
+import Input from "./common/Input";
+import Badge from "./common/Badge";
+import Table from "./common/Table";
+import { CATEGORIES } from "./utils/constants"; 
+import { formatDate } from "./utils/helpers"; 
 import { toast } from "sonner";
 import "./InventoryUpdation.css";
 

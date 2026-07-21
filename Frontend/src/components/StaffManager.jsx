@@ -1,17 +1,17 @@
 import { useState, useMemo } from "react";
 import { Edit, Trash2, Plus, UserCheck, UserX } from "lucide-react";
-import { useData } from "../../context/DataContext";
-import { useAuth } from "../../context/AuthContext";
-import SearchBar from "../../components/common/SearchBar";
-import Select from "../../components/common/Select";
-import Table from "../../components/common/Table";
-import Modal from "../../components/common/Modal";
-import Button from "../../components/common/Button";
-import Input from "../../components/common/Input";
-import Badge from "../../components/common/Badge";
-import ConfirmDialog from "../../components/common/ConfirmDialog";
-import { validateEmail } from "../../utils/validators";
-import { formatDate, exportToCSV } from "../../utils/helpers";
+import { useData } from "../context/DataContext";
+import { useAuth } from "../context/AuthContext";
+import SearchBar from "./common/SearchBar";
+import Select from "./common/Select";
+import Table from "./common/Table";
+import Modal from "./common/Modal";
+import Button from "./common/Button";
+import Input from "./common/Input";
+import Badge from "./common/Badge";
+import ConfirmDialog from "./common/ConfirmDialog";
+import { validateEmail } from "./utils/validators"; // ← Fixed
+import { formatDate, exportToCSV } from "./utils/helpers"; // ← Fixed
 import { toast } from "sonner";
 import "./StaffManager.css";
 

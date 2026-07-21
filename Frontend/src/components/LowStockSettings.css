@@ -158,6 +158,10 @@
   outline: none;
 }
 
+.low-stock-default-input input::placeholder {
+  color: #9ca3af;
+}
+
 .low-stock-default-btn {
   background: #000000;
   color: #ffffff;
@@ -166,6 +170,7 @@
   border: none;
   font-weight: 500;
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .low-stock-default-btn:hover {
@@ -204,6 +209,7 @@
   font-weight: 500;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .low-stock-save-btn:hover {
@@ -424,138 +430,10 @@
     width: 60px;
     padding: 0.25rem 0.375rem;
   }
-}
 
-/* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .low-stock-settings {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .low-stock-title {
-    color: #ffffff;
-  }
-
-  .low-stock-subtitle {
-    color: #9ca3af;
-  }
-
-  .low-stock-card {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .low-stock-card-number {
-    color: #ffffff;
-  }
-
-  .low-stock-card-label {
-    color: #9ca3af;
-  }
-
-  .low-stock-default {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .low-stock-default-title {
-    color: #ffffff;
-  }
-
-  .low-stock-default-subtitle {
-    color: #9ca3af;
-  }
-
-  .low-stock-default-input input {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .low-stock-default-input input::placeholder {
-    color: #6b7280;
-  }
-
-  .low-stock-table-section {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-  }
-
-  .low-stock-table-title {
-    color: #ffffff;
-  }
-
-  .low-stock-search-input {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .low-stock-search-input::placeholder {
-    color: #6b7280;
-  }
-
-  .low-stock-table-wrapper {
-    border-color: #2d2d2d;
-  }
-
-  .low-stock-table thead {
-    background: #0d0d0d;
-    border-bottom-color: #2d2d2d;
-  }
-
-  .low-stock-table th {
-    color: #9ca3af;
-  }
-
-  .low-stock-table tbody tr {
-    border-top-color: #2d2d2d;
-  }
-
-  .low-stock-table-row:hover {
-    background: #0d0d0d;
-  }
-
-  .low-stock-ref-no {
-    color: #9ca3af;
-  }
-
-  .low-stock-product-name {
-    color: #ffffff;
-  }
-
-  .low-stock-category {
-    color: #9ca3af;
-  }
-
-  .low-stock-threshold-input {
-    background: #1a1a1a;
-    border-color: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .low-stock-threshold-edited {
-    background: #0d0d0d;
-    border-color: #ffffff;
-  }
-
-  .low-stock-unsaved {
-    color: #ffffff;
-  }
-
-  .low-stock-card-icon.primary {
-    background: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .low-stock-default-icon {
-    background: #2d2d2d;
-    color: #ffffff;
-  }
-
-  .low-stock-header-icon {
-    background: #2d2d2d;
-    color: #ef4444;
+  .low-stock-default-btn,
+  .low-stock-save-btn {
+    width: 100%;
+    justify-content: center;
   }
 }

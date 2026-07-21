@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, ChevronsDown } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsDown,
+  ClipboardCheck, // Issued - represents checkouts/borrowed items
+  GitBranch, // Exchange - represents movement between departments
+  PackageSearch, // Inventory - represents stock tracking/search
+  TrendingUp, // Analytics - represents data trends/insights
+  FileSpreadsheet, // Reports - represents detailed reporting/spreadsheets
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import businessStat from "../assets/business-stat.svg";
 import "./Carousel.css";
 
 const slides = [
@@ -10,47 +18,47 @@ const slides = [
     title: "Issued",
     copy: "See what's checked out to students right now.",
     to: "/issued",
-    illustration: businessStat,
+    icon: ClipboardCheck, // Clean, recognizable for checkouts
   },
   {
     key: "exchange",
     title: "Exchange",
     copy: "Track items moving between departments and suppliers.",
     to: "/track-exchange",
-    illustration: businessStat,
+    icon: GitBranch, // Visual representation of movement/branching
   },
   {
     key: "inventory",
     title: "Inventory",
     copy: "The full stock count, updated as items move.",
     to: "/dashboard",
-    illustration: businessStat,
+    icon: PackageSearch, // Searching/tracking inventory
   },
   {
     key: "analytics",
     title: "Analytics",
     copy: "Track usage patterns and optimize inventory flow.",
     to: "/analytics",
-    illustration: businessStat,
+    icon: TrendingUp, // Growth/trends analysis
   },
   {
     key: "reports",
     title: "Reports",
     copy: "Generate detailed reports on asset movement.",
     to: "/reports",
-    illustration: businessStat,
+    icon: FileSpreadsheet, // Detailed reporting/spreadsheets
   },
 ];
 
 export default function Carousel() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [direction, setDirection] = useState("next"); // 'next' or 'prev'
+  const [direction, setDirection] = useState("next");
   const trackRef = useRef(null);
   const navigate = useNavigate();
   const totalSlides = slides.length;
 
-  // Get visible slides (3 at a time) with position info
+  // Get visible slides (3 at a time)
   const getVisibleSlides = () => {
     const visible = [];
     for (let i = -1; i <= 1; i++) {
@@ -72,10 +80,9 @@ export default function Carousel() {
     setIsTransitioning(true);
     setCurrentIndex(index);
 
-    // Reset transitioning after animation completes
     setTimeout(() => {
       setIsTransitioning(false);
-    }, 600); // Slightly longer for smoother feel
+    }, 600);
   };
 
   const handlePrev = () => {
@@ -126,6 +133,7 @@ export default function Carousel() {
           {visibleSlides.map((slide, idx) => {
             let state = "side";
             let animationClass = "";
+            const Icon = slide.icon;
 
             if (slide.position === 0) {
               state = "active";
@@ -152,9 +160,10 @@ export default function Carousel() {
                 }}
               >
                 <div className="carousel__illustration">
-                  <img
-                    src={slide.illustration}
-                    alt={`${slide.title} illustration`}
+                  <Icon
+                    size={state === "active" ? 48 : 36}
+                    className="carousel__icon"
+                    strokeWidth={1.5}
                   />
                 </div>
 
