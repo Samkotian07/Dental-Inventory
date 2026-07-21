@@ -9,6 +9,8 @@ import ComingSoon from "./pages/ComingSoon.jsx";
 import StaffManager from "./components/StaffManager.jsx";
 import InventoryUpdation from "./components/InventoryUpdation.jsx";
 import LowStockSettings from "./components/LowStockSettings.jsx"; // Note: you have this in components
+import Stock from "./pages/Stock.jsx";
+import FailedInventory from "./pages/FailedInventory.jsx";
 
 export default function App() {
   return (
@@ -21,14 +23,14 @@ export default function App() {
         <Route path="/track-exchange" element={<TrackExchange />} />
 
         {/* Inventory Management Routes */}
-        <Route path="/stock" element={<ComingSoon />} />
+        <Route path="/stock" element={<Stock />} />
         <Route path="/inventory-updation" element={<InventoryUpdation />} />
         <Route path="/low-stock-settings" element={<LowStockSettings />} />
 
         {/* Stock Management */}
         <Route path="/stock-insertion" element={<ComingSoon />} />
         <Route path="/stock-deletion" element={<ComingSoon />} />
-        <Route path="/failed-inventory" element={<ComingSoon />} />
+        <Route path="/failed-inventory" element={<FailedInventory />} />
 
         {/* Staff & Settings */}
         <Route path="/staff-manager" element={<StaffManager />} />

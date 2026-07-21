@@ -1,0 +1,32 @@
+.confirm-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.confirm-row__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #FDEDEA;
+  color: var(--danger);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.confirm-row__icon--neutral {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+.confirm-row p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.confirm-row p strong {
+  color: var(--ink);
+}

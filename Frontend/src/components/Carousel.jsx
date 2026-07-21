@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -54,7 +54,6 @@ export default function Carousel() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [direction, setDirection] = useState("next");
-  const trackRef = useRef(null);
   const navigate = useNavigate();
   const totalSlides = slides.length;
 
@@ -129,34 +128,22 @@ export default function Carousel() {
       </button>
 
       <div className="carousel__track-wrapper">
-        <div className="carousel__track" ref={trackRef}>
-          {visibleSlides.map((slide, idx) => {
+        <div className="carousel__track">
+          {visibleSlides.map((slide) => {
             let state = "side";
-            let animationClass = "";
             const Icon = slide.icon;
 
             if (slide.position === 0) {
               state = "active";
             }
 
-            // Add direction-based animation classes
-            if (isTransitioning) {
-              if (direction === "next") {
-                if (slide.position === 1) animationClass = "slide-in-right";
-                if (slide.position === -1) animationClass = "slide-out-left";
-              } else {
-                if (slide.position === -1) animationClass = "slide-in-left";
-                if (slide.position === 1) animationClass = "slide-out-right";
-              }
-            }
-
             return (
               <article
                 key={`${slide.key}-${slide.position}`}
-                className={`carousel__card carousel__card--${state} ${animationClass}`}
+                className={`carousel__card carousel__card--${state}`}
                 onClick={() => handleCardClick(slide, slide.originalIndex)}
                 style={{
-                  transitionDelay: `${Math.abs(slide.position) * 0.05}s`,
+                  transitionDelay: `${Math.abs(slide.position) * 0.04}s`,
                 }}
               >
                 <div className="carousel__illustration">

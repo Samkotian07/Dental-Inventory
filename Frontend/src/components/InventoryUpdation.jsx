@@ -1,29 +1,36 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Search, Edit, Save, History } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
-import Button from "./common/Button";
-import Input from "./common/Input";
+import DashboardHeader from "./dashboard/DashboardHeader.jsx";
+import Pagination from "./Pagination.jsx";
 import Badge from "./common/Badge";
-import Table from "./common/Table";
-import { CATEGORIES } from "./utils/constants"; 
-import { formatDate } from "./utils/helpers"; 
+import { useMenuClick } from "./Layout.jsx";
+import { CATEGORIES } from "./utils/constants";
+import { formatDate } from "./utils/helpers";
 import { toast } from "sonner";
 import "./InventoryUpdation.css";
 
+const PAGE_SIZE = 8;
+
 export default function InventoryUpdation() {
+  const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { inventory, updateInventory, auditLog } = useData();
   const [searchRef, setSearchRef] = useState("");
   const [editItem, setEditItem] = useState(null);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   const handleSearch = () => {
+    const searchValue = searchRef.trim();
     const item = inventory.find(
-      (i) => i.refNo.toLowerCase() === searchRef.toLowerCase(),
+      (i) => i.refNo.toLowerCase() === searchValue.toLowerCase(),
     );
+
     if (item) {
       setEditItem({ ...item });
+      setPage(1);
     } else {
       toast.error("No item found with that Ref No");
       setEditItem(null);
@@ -38,207 +45,265 @@ export default function InventoryUpdation() {
   };
 
   const filtered = useMemo(() => {
-    return inventory.filter(
-      (i) =>
-        !search ||
-        i.refNo.toLowerCase().includes(search.toLowerCase()) ||
-        i.productName.toLowerCase().includes(search.toLowerCase()),
-    );
+    const query = search.trim().toLowerCase();
+
+    return inventory.filter((item) => {
+      const matchesQuery =
+        !query ||
+        item.refNo.toLowerCase().includes(query) ||
+        item.productName.toLowerCase().includes(query) ||
+        item.category.toLowerCase().includes(query);
+
+      return matchesQuery;
+    });
   }, [inventory, search]);
 
-  const columns = [
-    {
-      key: "refNo",
-      label: "Ref No",
-      render: (i) => <span className="inv-ref-no">{i.refNo}</span>,
-    },
-    {
-      key: "productName",
-      label: "Product",
-      render: (i) => <span className="inv-product-name">{i.productName}</span>,
-    },
-    {
-      key: "category",
-      label: "Category",
-      render: (i) => <Badge variant="primary">{i.category}</Badge>,
-    },
-    {
-      key: "quantity",
-      label: "Qty",
-      render: (i) => (
-        <span
-          className={`inv-quantity ${i.quantity <= 10 ? "inv-quantity-low" : ""}`}
-        >
-          {i.quantity}
-        </span>
-      ),
-    },
-  ];
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedInventory = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   const recentUpdates = auditLog
-    .filter((a) => a.action === "UPDATE" || a.action === "CREATE")
+    .filter((entry) => entry.action === "UPDATE" || entry.action === "CREATE")
     .slice(0, 5);
 
   return (
-    <div className="inventory-updation">
-      {/* Search Section */}
-      <div className="inv-search-section">
-        <h3 className="inv-section-title">Search Item to Update</h3>
-        <div className="inv-search-controls">
-          <div className="inv-search-input-wrapper">
-            <Search size={18} className="inv-search-icon" />
+    <>
+      <DashboardHeader title="Inventory Update" onMenuClick={onMenuClick} />
+
+      <main className="inventory-updation">
+        <section className="inventory-updation__toolbar">
+          <div className="inventory-updation__search">
+            <Search size={16} strokeWidth={2.2} />
             <input
               type="text"
               value={searchRef}
-              onChange={(e) => setSearchRef(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              placeholder="Enter Ref No (e.g. INV-001)"
-              className="inv-search-input"
+              onChange={(event) => setSearchRef(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && handleSearch()}
+              placeholder="Find an item by Ref No"
             />
           </div>
-          <Button onClick={handleSearch} className="inv-search-btn">
-            Search
-          </Button>
-        </div>
+
+          <button className="inventory-updation__btn inventory-updation__btn--primary" onClick={handleSearch}>
+            Search Item
+          </button>
+        </section>
 
         {editItem && (
-          <div className="inv-edit-section">
-            <h4 className="inv-edit-title">Edit Item: {editItem.refNo}</h4>
-            <div className="inv-edit-grid">
-              <div className="inv-edit-field">
-                <label className="inv-edit-label">Category</label>
+          <section className="inventory-updation__card inventory-updation__card--edit">
+            <div className="inventory-updation__card-header">
+              <div>
+                <h3 className="inventory-updation__section-title">Update Item</h3>
+                <p className="inventory-updation__section-subtitle">
+                  Editing {editItem.refNo}
+                </p>
+              </div>
+              <span className="inventory-updation__pill">Active</span>
+            </div>
+
+            <div className="inventory-updation__edit-grid">
+              <label className="inventory-updation__field">
+                <span>Category</span>
                 <select
-                  className="inv-edit-select"
                   value={editItem.category}
-                  onChange={(e) =>
-                    setEditItem({ ...editItem, category: e.target.value })
+                  onChange={(event) =>
+                    setEditItem({ ...editItem, category: event.target.value })
                   }
                 >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
                     </option>
                   ))}
                 </select>
-              </div>
-              <Input
-                label="Company Name"
-                value={editItem.companyName}
-                onChange={(e) =>
-                  setEditItem({ ...editItem, companyName: e.target.value })
-                }
-                className="inv-edit-input"
-              />
-              <Input
-                label="Product Name"
-                value={editItem.productName}
-                onChange={(e) =>
-                  setEditItem({ ...editItem, productName: e.target.value })
-                }
-                className="inv-edit-input"
-              />
-              <Input
-                label="Size"
-                value={editItem.size}
-                onChange={(e) =>
-                  setEditItem({ ...editItem, size: e.target.value })
-                }
-                className="inv-edit-input"
-              />
-              <Input
-                label="Lot No"
-                value={editItem.lotNo}
-                onChange={(e) =>
-                  setEditItem({ ...editItem, lotNo: e.target.value })
-                }
-                className="inv-edit-input"
-              />
-              <Input
-                label="Quantity"
-                type="number"
-                value={editItem.quantity}
-                onChange={(e) =>
-                  setEditItem({ ...editItem, quantity: Number(e.target.value) })
-                }
-                className="inv-edit-input"
-              />
-              <Input
-                label="Expiry Date"
-                type="date"
-                value={editItem.expiryDate}
-                onChange={(e) =>
-                  setEditItem({ ...editItem, expiryDate: e.target.value })
-                }
-                className="inv-edit-input"
-              />
-            </div>
-            <div className="inv-edit-actions">
-              <Button onClick={handleSave} className="inv-update-btn">
-                <Save size={16} /> Update Item
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+              </label>
 
-      {/* All Items Table */}
-      <div className="inv-table-section">
-        <div className="inv-table-header">
-          <h3 className="inv-section-title">All Items</h3>
-          <div className="inv-table-search-wrapper">
-            <Search size={16} className="inv-table-search-icon" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
-              className="inv-table-search-input"
-            />
-          </div>
-        </div>
-        <div className="inv-table-wrapper">
-          <Table
-            columns={columns}
-            data={filtered}
-            actions={(item) => (
-              <button
-                onClick={() => setEditItem({ ...item })}
-                className="inv-action-btn inv-action-edit"
-                title="Edit"
-              >
-                <Edit size={16} />
+              <label className="inventory-updation__field">
+                <span>Company Name</span>
+                <input
+                  value={editItem.companyName || ""}
+                  onChange={(event) =>
+                    setEditItem({ ...editItem, companyName: event.target.value })
+                  }
+                />
+              </label>
+
+              <label className="inventory-updation__field">
+                <span>Product Name</span>
+                <input
+                  value={editItem.productName || ""}
+                  onChange={(event) =>
+                    setEditItem({ ...editItem, productName: event.target.value })
+                  }
+                />
+              </label>
+
+              <label className="inventory-updation__field">
+                <span>Size</span>
+                <input
+                  value={editItem.size || ""}
+                  onChange={(event) =>
+                    setEditItem({ ...editItem, size: event.target.value })
+                  }
+                />
+              </label>
+
+              <label className="inventory-updation__field">
+                <span>Lot No</span>
+                <input
+                  value={editItem.lotNo || ""}
+                  onChange={(event) =>
+                    setEditItem({ ...editItem, lotNo: event.target.value })
+                  }
+                />
+              </label>
+
+              <label className="inventory-updation__field">
+                <span>Quantity</span>
+                <input
+                  type="number"
+                  value={editItem.quantity || 0}
+                  onChange={(event) =>
+                    setEditItem({ ...editItem, quantity: Number(event.target.value) })
+                  }
+                />
+              </label>
+
+              <label className="inventory-updation__field">
+                <span>Expiry Date</span>
+                <input
+                  type="date"
+                  value={editItem.expiryDate || ""}
+                  onChange={(event) =>
+                    setEditItem({ ...editItem, expiryDate: event.target.value })
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="inventory-updation__actions">
+              <button className="inventory-updation__btn inventory-updation__btn--primary" onClick={handleSave}>
+                <Save size={15} strokeWidth={2.2} />
+                Update Item
               </button>
-            )}
-          />
-        </div>
-      </div>
+            </div>
+          </section>
+        )}
 
-      {/* Audit Trail */}
-      <div className="inv-audit-section">
-        <div className="inv-audit-header">
-          <History size={18} className="inv-audit-icon" />
-          <h3 className="inv-section-title">Recent Updates</h3>
-        </div>
-        <div className="inv-audit-list">
-          {recentUpdates.length === 0 ? (
-            <p className="inv-audit-empty">No recent updates</p>
-          ) : (
-            recentUpdates.map((entry) => (
-              <div key={entry.id} className="inv-audit-item">
-                <Badge
-                  variant={entry.action === "CREATE" ? "success" : "primary"}
-                >
-                  {entry.action}
-                </Badge>
-                <p className="inv-audit-details">{entry.details}</p>
-                <p className="inv-audit-time">
-                  {formatDate(entry.timestamp, "MMM dd, HH:mm")}
-                </p>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
+        <section className="inventory-updation__card inventory-updation__card--table">
+          <div className="inventory-updation__table-toolbar">
+            <div>
+              <h3 className="inventory-updation__section-title">Inventory Items</h3>
+              <p className="inventory-updation__section-subtitle">
+                Browse the stock list and open any record for quick updates.
+              </p>
+            </div>
+
+            <div className="inventory-updation__table-search">
+              <Search size={15} strokeWidth={2.2} />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search inventory"
+              />
+            </div>
+          </div>
+
+          <div className="inventory-updation__table-scroll">
+            <table className="inventory-updation__table">
+              <thead>
+                <tr>
+                  <th>Ref No</th>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Quantity</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedInventory.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="inventory-updation__empty">
+                      No inventory items match your search.
+                    </td>
+                  </tr>
+                ) : (
+                  pagedInventory.map((item) => (
+                    <tr key={item.id}>
+                      <td className="inventory-updation__mono">{item.refNo}</td>
+                      <td className="inventory-updation__product">{item.productName}</td>
+                      <td>
+                        <Badge variant="primary">{item.category}</Badge>
+                      </td>
+                      <td>
+                        <span className={`inventory-updation__quantity ${item.quantity <= 10 ? "is-low" : ""}`}>
+                          {item.quantity}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="inventory-updation__icon-btn"
+                          onClick={() => setEditItem({ ...item })}
+                          title="Edit item"
+                        >
+                          <Edit size={15} strokeWidth={2} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        </section>
+
+        <section className="inventory-updation__card inventory-updation__card--audit">
+          <div className="inventory-updation__card-header">
+            <div>
+              <h3 className="inventory-updation__section-title">Recent Updates</h3>
+              <p className="inventory-updation__section-subtitle">
+                Latest inventory actions from the team.
+              </p>
+            </div>
+            <div className="inventory-updation__pill inventory-updation__pill--muted">
+              <History size={14} strokeWidth={2.2} />
+              <span>{recentUpdates.length}</span>
+            </div>
+          </div>
+
+          <div className="inventory-updation__audit-list">
+            {recentUpdates.length === 0 ? (
+              <p className="inventory-updation__empty inventory-updation__empty--soft">
+                No recent updates yet.
+              </p>
+            ) : (
+              recentUpdates.map((entry) => (
+                <div key={entry.id} className="inventory-updation__audit-item">
+                  <Badge variant={entry.action === "CREATE" ? "success" : "primary"}>
+                    {entry.action}
+                  </Badge>
+                  <p>{entry.details}</p>
+                  <span>{formatDate(entry.timestamp, "MMM dd, HH:mm")}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      </main>
+    </>
   );
 }
