@@ -1,0 +1,414 @@
+/* Stock Deletion - White & Black Theme */
+.sd-container {
+  padding: 1.5rem;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+/* Common */
+.sd-section-title {
+  font-weight: 600;
+  color: #000000;
+  margin: 0;
+}
+
+/* Search Section */
+.sd-search-section {
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.sd-search-section .sd-section-title {
+  margin-bottom: 1rem;
+}
+
+.sd-search-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sd-search-input-wrapper {
+  position: relative;
+  flex: 1;
+}
+
+.sd-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+
+.sd-search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #000000;
+  transition: all 0.2s ease;
+}
+
+.sd-search-input:focus {
+  border-color: #000000;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.sd-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.sd-search-btn {
+  background: #000000;
+  color: #ffffff;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sd-search-btn:hover {
+  background: #1a1a1a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Found Item */
+.sd-found-item {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 1rem;
+  margin-top: 1rem;
+}
+
+.sd-found-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.sd-found-item-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sd-found-item-icon-svg {
+  color: #ffffff;
+}
+
+.sd-found-item-name {
+  font-weight: 600;
+  color: #000000;
+  margin: 0;
+}
+
+.sd-found-item-details {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Delete Confirmation */
+.sd-delete-confirm {
+  padding: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sd-delete-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #dc2626;
+}
+
+.sd-delete-warning-icon {
+  flex-shrink: 0;
+}
+
+.sd-delete-warning-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.sd-delete-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.375rem;
+}
+
+.sd-delete-select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #000000;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.sd-delete-select:focus {
+  border-color: #000000;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.sd-delete-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+}
+
+.sd-delete-checkbox input {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  accent-color: #000000;
+  cursor: pointer;
+}
+
+.sd-delete-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.sd-delete-btn {
+  background: #ef4444;
+  color: #ffffff;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.sd-delete-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.sd-cancel-btn {
+  background: #ffffff;
+  color: #000000;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.sd-cancel-btn:hover {
+  background: #f8f9fa;
+}
+
+/* Table Section */
+.sd-table-section {
+  padding: 1.25rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.sd-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.sd-table-search-wrapper {
+  position: relative;
+  width: 200px;
+}
+
+.sd-table-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+
+.sd-table-search-input {
+  width: 100%;
+  padding: 0.375rem 0.75rem 0.375rem 2.25rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #000000;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.sd-table-search-input:focus {
+  border-color: #000000;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.sd-table-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.sd-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+/* Table Styles */
+.sd-table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sd-table-wrapper thead {
+  background: #f8f9fa;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.sd-table-wrapper th {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+
+.sd-table-wrapper td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+  color: #000000;
+}
+
+.sd-table-wrapper tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.sd-ref-no {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.sd-product-name {
+  font-weight: 500;
+  color: #000000;
+}
+
+.sd-quantity {
+  font-weight: 500;
+}
+
+.sd-quantity-low {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* Action Buttons */
+.sd-action-btn {
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+}
+
+.sd-action-btn:hover {
+  transform: scale(1.05);
+}
+
+.sd-action-delete:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sd-container {
+    padding: 1rem;
+  }
+
+  .sd-search-section {
+    padding: 1rem;
+  }
+
+  .sd-search-controls {
+    flex-direction: column;
+  }
+
+  .sd-search-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sd-delete-actions {
+    flex-direction: column;
+  }
+
+  .sd-delete-btn,
+  .sd-cancel-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sd-table-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .sd-table-search-wrapper {
+    width: 100%;
+  }
+
+  .sd-found-item-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .sd-delete-confirm {
+    padding: 0.75rem;
+  }
+}

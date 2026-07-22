@@ -13,6 +13,7 @@ import {
   UserCog,
   LogOut,
   HomeIcon,
+  AlertCircle,
 } from "lucide-react";
 import "./Sidebar.css";
 
@@ -27,11 +28,7 @@ const navItems = [
   { label: "Inventory Updation", to: "/inventory-updation", icon: PencilLine },
   { label: "Stock Insertion", to: "/stock-insertion", icon: PackagePlus },
   { label: "Stock Deletion", to: "/stock-deletion", icon: PackageMinus },
-  {
-    label: "Low Stock Settings",
-    to: "/low-stock-settings",
-    icon: AlertTriangle,
-  },
+  { label: "Low Stock Settings", to: "/low-stock-settings", icon: AlertCircle },
   { label: "Staff Manager", to: "/staff-manager", icon: UserCog },
   { label: "Settings", to: "/settings", icon: Settings },
 ];
