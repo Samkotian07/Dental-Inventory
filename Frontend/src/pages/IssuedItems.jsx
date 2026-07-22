@@ -12,7 +12,11 @@ import Pagination from "../components/Pagination.jsx";
 import IssueDetailsModal from "../components/issued/IssueDetailsModal.jsx";
 import ReturnItemModal from "../components/issued/ReturnItemModal.jsx";
 import IssueItemModal from "../components/issued/IssueItemModal.jsx";
-import { issuedItems as seedData, students, inventoryOptions } from "../data/issuedData.js";
+import {
+  issuedItems as seedData,
+  students,
+  inventoryOptions,
+} from "../data/issuedData.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import "./IssuedItems.css";
@@ -35,7 +39,11 @@ const CSV_COLUMNS = [
 function formatDate(isoOrDate) {
   const d = new Date(isoOrDate);
   if (Number.isNaN(d.getTime())) return isoOrDate;
-  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
 }
 
 export default function IssuedItems() {
@@ -69,7 +77,8 @@ export default function IssuedItems() {
       list = [...list].sort((a, b) => {
         const va = a[sort.key] ?? "";
         const vb = b[sort.key] ?? "";
-        if (typeof va === "number" && typeof vb === "number") return (va - vb) * sort.dir;
+        if (typeof va === "number" && typeof vb === "number")
+          return (va - vb) * sort.dir;
         return String(va).localeCompare(String(vb)) * sort.dir;
       });
     }
@@ -79,25 +88,36 @@ export default function IssuedItems() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   const toggleSort = (key) => {
-    setSort((prev) => (prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 }));
+    setSort((prev) =>
+      prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 },
+    );
   };
 
   const handleExport = () => {
-    exportToCsv(`issued-items-${new Date().toISOString().slice(0, 10)}`, CSV_COLUMNS, filtered);
+    exportToCsv(
+      `issued-items-${new Date().toISOString().slice(0, 10)}`,
+      CSV_COLUMNS,
+      filtered,
+    );
   };
 
+  // ✅ FIXED: Removed setReturnItem(null) from here
   const handleConfirmReturn = (issueId, returnDateISO) => {
     setRows((prev) =>
       prev.map((r) =>
         r.issueId === issueId
           ? { ...r, status: "Returned", returnDate: formatDate(returnDateISO) }
-          : r
-      )
+          : r,
+      ),
     );
-    setReturnItem(null);
+    // ✅ The modal will close when user clicks "Done" in the QR view
+    // DO NOT close modal here - let the modal handle it
   };
 
   const handleIssueNew = ({ studentId, itemId, qty }) => {
@@ -171,7 +191,10 @@ export default function IssuedItems() {
               <Download size={15} strokeWidth={2.2} />
               Export
             </button>
-            <button className="issued__btn issued__btn--primary" onClick={() => setIssueModalOpen(true)}>
+            <button
+              className="issued__btn issued__btn--primary"
+              onClick={() => setIssueModalOpen(true)}
+            >
               <Plus size={15} strokeWidth={2.4} />
               Issue Item
             </button>
@@ -185,7 +208,10 @@ export default function IssuedItems() {
                 <tr>
                   {columns.map((c) => (
                     <th key={c.key}>
-                      <button className="issued__sort" onClick={() => toggleSort(c.key)}>
+                      <button
+                        className="issued__sort"
+                        onClick={() => toggleSort(c.key)}
+                      >
                         {c.label}
                         <ArrowUpDown size={11} strokeWidth={2.5} />
                       </button>
@@ -214,7 +240,9 @@ export default function IssuedItems() {
                     <td>{row.qty}</td>
                     <td>{row.date}</td>
                     <td>
-                      <span className={`status-pill status-pill--${row.status.toLowerCase()}`}>
+                      <span
+                        className={`status-pill status-pill--${row.status.toLowerCase()}`}
+                      >
                         {row.status}
                       </span>
                     </td>
@@ -257,7 +285,10 @@ export default function IssuedItems() {
       </main>
 
       {detailItem && (
-        <IssueDetailsModal item={detailItem} onClose={() => setDetailItem(null)} />
+        <IssueDetailsModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+        />
       )}
 
       {returnItem && (
@@ -269,7 +300,10 @@ export default function IssuedItems() {
       )}
 
       {issueModalOpen && (
-        <IssueItemModal onClose={() => setIssueModalOpen(false)} onConfirm={handleIssueNew} />
+        <IssueItemModal
+          onClose={() => setIssueModalOpen(false)}
+          onConfirm={handleIssueNew}
+        />
       )}
     </>
   );
