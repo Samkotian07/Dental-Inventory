@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import { Sliders, Search, AlertTriangle, TrendingDown } from "lucide-react";
+import DashboardHeader from "./dashboard/DashboardHeader.jsx";
+import { useMenuClick } from "./Layout.jsx";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
 import Button from "./common/Button"; 
@@ -7,6 +9,7 @@ import Input from "./common/Input";
 import { toast } from "sonner";
 import "./LowStockSettings.css";
 export default function LowStockSettings() {
+  const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { inventory, settings, updateSettings, updateItemThresholds } =
     useData();
@@ -68,158 +71,149 @@ export default function LowStockSettings() {
   ).length;
 
   return (
-    <div className="low-stock-settings">
-      {/* Header */}
-      <div className="low-stock-header">
-        <div className="low-stock-header-icon">
-          <AlertTriangle size={22} />
-        </div>
-        <div>
-          <h2 className="low-stock-title">Low Stock Management</h2>
-          <p className="low-stock-subtitle">
-            Configure per-product low stock thresholds to receive alerts when
-            inventory runs low.
-          </p>
-        </div>
-      </div>
+    <>
+      <DashboardHeader title="Low Stock Management" onMenuClick={onMenuClick} />
+      
+      <main className="low-stock-settings">
+        {/* Summary cards */}
+        <section className="lss-summary">
+          <div className="lss-stat-card">
+            <div className="lss-stat-icon warning">
+              <TrendingDown size={18} />
+            </div>
+            <div>
+              <p className="lss-stat-number">{lowStockCount}</p>
+              <p className="lss-stat-label">
+                Products at or below threshold
+              </p>
+            </div>
+          </div>
+          <div className="lss-stat-card">
+            <div className="lss-stat-icon primary">
+              <Sliders size={18} />
+            </div>
+            <div>
+              <p className="lss-stat-number">{inventory.length}</p>
+              <p className="lss-stat-label">Total tracked products</p>
+            </div>
+          </div>
+        </section>
 
-      {/* Summary cards */}
-      <div className="low-stock-summary">
-        <div className="low-stock-card">
-          <div className="low-stock-card-icon warning">
-            <TrendingDown size={18} />
+        {/* Default threshold section */}
+        <section className="card lss-default-section">
+          <div className="lss-default-header">
+            <div className="lss-default-icon">
+              <Sliders size={18} />
+            </div>
+            <div>
+              <h3 className="lss-default-title">Default Threshold</h3>
+              <p className="lss-default-subtitle">
+                Applied to newly inserted items that don't have a specific threshold set.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="low-stock-card-number">{lowStockCount}</p>
-            <p className="low-stock-card-label">
-              Products at or below threshold
-            </p>
-          </div>
-        </div>
-        <div className="low-stock-card">
-          <div className="low-stock-card-icon primary">
-            <Sliders size={18} />
-          </div>
-          <div>
-            <p className="low-stock-card-number">{inventory.length}</p>
-            <p className="low-stock-card-label">Total tracked products</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Default threshold */}
-      <div className="low-stock-default">
-        <div className="low-stock-default-icon">
-          <Sliders size={18} />
-        </div>
-        <div className="low-stock-default-content">
-          <h3 className="low-stock-default-title">Default Threshold</h3>
-          <p className="low-stock-default-subtitle">
-            Applied to newly inserted items that don't have a specific threshold
-            set.
-          </p>
-          <div className="low-stock-default-controls">
+          <div className="lss-default-controls">
             <Input
               label="Default Low Quantity Threshold"
               type="number"
               value={lowQty}
               onChange={(e) => setLowQty(e.target.value)}
-              className="low-stock-default-input"
+              className="lss-default-input"
             />
-            <Button onClick={handleLowQty} className="low-stock-default-btn">
+            <Button onClick={handleLowQty} className="lss-default-btn">
               Save Default
             </Button>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* Per-product threshold table */}
-      <div className="low-stock-table-section">
-        <div className="low-stock-table-header">
-          <h3 className="low-stock-table-title">Per-Product Thresholds</h3>
-          <Button onClick={handleSaveThresholds} className="low-stock-save-btn">
-            Save All Changes
-          </Button>
-        </div>
+        {/* Per-product threshold table */}
+        <section className="card lss-table-section">
+          <div className="lss-table-header">
+            <h3 className="lss-table-title">Per-Product Thresholds</h3>
+            <Button onClick={handleSaveThresholds} className="lss-save-btn">
+              Save All Changes
+            </Button>
+          </div>
 
-        <div className="low-stock-search-wrapper">
-          <Search size={16} className="low-stock-search-icon" />
-          <input
-            type="text"
-            value={thresholdSearch}
-            onChange={(e) => setThresholdSearch(e.target.value)}
-            placeholder="Search by product, ref no, or category..."
-            className="low-stock-search-input"
-          />
-        </div>
+          <div className="lss-search-wrapper">
+            <Search size={16} className="lss-search-icon" />
+            <input
+              type="text"
+              value={thresholdSearch}
+              onChange={(e) => setThresholdSearch(e.target.value)}
+              placeholder="Search by product, ref no, or category..."
+              className="lss-search-input"
+            />
+          </div>
 
-        <div className="low-stock-table-wrapper">
-          <table className="low-stock-table">
-            <thead>
-              <tr>
-                <th>Ref No</th>
-                <th>Product</th>
-                <th className="low-stock-th-category">Category</th>
-                <th className="low-stock-th-center">Current Qty</th>
-                <th className="low-stock-th-center">Low Stock Threshold</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredInventory.length === 0 ? (
+          <div className="lss-table-scroll">
+            <table className="lss-table">
+              <thead>
                 <tr>
-                  <td colSpan={5} className="low-stock-empty">
-                    No products found
-                  </td>
+                  <th>Ref No</th>
+                  <th>Product</th>
+                  <th className="lss-th-category">Category</th>
+                  <th className="lss-th-center">Current Qty</th>
+                  <th className="lss-th-center">Low Stock Threshold</th>
                 </tr>
-              ) : (
-                filteredInventory.map((item) => {
-                  const currentThreshold =
-                    item.lowStockThreshold ?? settings.lowQuantityThreshold;
-                  const isLow = item.quantity <= currentThreshold;
-                  const isEdited =
-                    thresholdEdits[item.id] !== undefined &&
-                    thresholdEdits[item.id] !== "";
-                  return (
-                    <tr key={item.id} className="low-stock-table-row">
-                      <td className="low-stock-ref-no">{item.refNo}</td>
-                      <td className="low-stock-product-name">
-                        {item.productName}
-                      </td>
-                      <td className="low-stock-category hidden sm:table-cell">
-                        {item.category}
-                      </td>
-                      <td className="low-stock-quantity-cell">
-                        <span
-                          className={`low-stock-quantity-badge ${isLow ? "low-stock-badge-warning" : "low-stock-badge-success"}`}
-                        >
-                          {item.quantity}
-                        </span>
-                      </td>
-                      <td className="low-stock-threshold-cell">
-                        <input
-                          type="number"
-                          value={getThresholdValue(item)}
-                          onChange={(e) =>
-                            setThresholdEdits({
-                              ...thresholdEdits,
-                              [item.id]: e.target.value,
-                            })
-                          }
-                          className={`low-stock-threshold-input ${isEdited ? "low-stock-threshold-edited" : ""}`}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filteredInventory.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="lss-empty">
+                      No products found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredInventory.map((item) => {
+                    const currentThreshold =
+                      item.lowStockThreshold ?? settings.lowQuantityThreshold;
+                    const isLow = item.quantity <= currentThreshold;
+                    const isEdited =
+                      thresholdEdits[item.id] !== undefined &&
+                      thresholdEdits[item.id] !== "";
+                    return (
+                      <tr key={item.id} className="lss-table-row">
+                        <td className="lss-ref-no">{item.refNo}</td>
+                        <td className="lss-product-name">
+                          {item.productName}
+                        </td>
+                        <td className="lss-category">
+                          {item.category}
+                        </td>
+                        <td className="lss-qty-cell">
+                          <span
+                            className={`lss-qty-badge ${isLow ? "lss-qty-low" : "lss-qty-ok"}`}
+                          >
+                            {item.quantity}
+                          </span>
+                        </td>
+                        <td className="lss-threshold-cell">
+                          <input
+                            type="number"
+                            value={getThresholdValue(item)}
+                            onChange={(e) =>
+                              setThresholdEdits({
+                                ...thresholdEdits,
+                                [item.id]: e.target.value,
+                              })
+                            }
+                            className={`lss-threshold-input ${isEdited ? "lss-threshold-edited" : ""}`}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        {unsavedCount > 0 && (
-          <p className="low-stock-unsaved">{unsavedCount} unsaved change(s)</p>
-        )}
-      </div>
-    </div>
+          {unsavedCount > 0 && (
+            <p className="lss-unsaved">{unsavedCount} unsaved change(s)</p>
+          )}
+        </section>
+      </main>
+    </>
   );
 }

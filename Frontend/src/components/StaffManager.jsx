@@ -5,17 +5,19 @@ import { useAuth } from "../context/AuthContext";
 import SearchBar from "./common/SearchBar";
 import Select from "./common/Select";
 import Table from "./common/Table";
-import Modal from "./common/Modal";
+import Modal from "./issued/Modal.jsx";
 import Button from "./common/Button";
-import Input from "./common/Input";
 import Badge from "./common/Badge";
 import ConfirmDialog from "./common/ConfirmDialog";
+import DashboardHeader from "./dashboard/DashboardHeader.jsx";
+import { useMenuClick } from "./Layout.jsx";
 import { validateEmail } from "./utils/validators"; // ← Fixed
 import { formatDate, exportToCSV } from "./utils/helpers"; // ← Fixed
 import { toast } from "sonner";
 import "./StaffManager.css";
 
 export default function StaffManager() {
+  const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { staff, addStaff, updateStaff, deleteStaff, toggleStaffStatus } =
     useData();
@@ -132,7 +134,9 @@ export default function StaffManager() {
   };
 
   return (
-    <div className="staff-manager">
+    <>
+      <DashboardHeader title="Staff Management" onMenuClick={onMenuClick} />
+      <main className="staff-manager">
       {/* Controls */}
       <div className="staff-controls">
         <SearchBar
@@ -203,92 +207,49 @@ export default function StaffManager() {
       </div>
 
       {/* Add Modal */}
-      <Modal
-        isOpen={addOpen}
-        onClose={() => setAddOpen(false)}
-        title="Add Staff Member"
-        size="md"
-        footer={
-          <div className="staff-modal-footer">
-            <Button variant="secondary" onClick={() => setAddOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAdd}>Add Staff</Button>
+      {addOpen && (
+        <Modal title="Add Staff Member" onClose={() => setAddOpen(false)} width={480}>
+          <div className="modal__field">
+            <label htmlFor="staff-name">Full Name</label>
+            <input id="staff-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Doe" />
           </div>
-        }
-      >
-        <div className="staff-form">
-          <Input
-            label="Full Name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="John Doe"
-          />
-          <Input
-            label="Email Address"
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            placeholder="staff@yendental.com"
-          />
-          <Input
-            label="Password"
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder="Min 6 characters"
-          />
-          <Input
-            label="Confirm Password"
-            type="password"
-            value={form.confirmPassword}
-            onChange={(e) =>
-              setForm({ ...form, confirmPassword: e.target.value })
-            }
-          />
-          <div className="staff-role-hint">
-            <p>
-              Role: <Badge variant="primary">Staff</Badge> (fixed)
-            </p>
+          <div className="modal__field">
+            <label htmlFor="staff-email">Email Address</label>
+            <input id="staff-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="staff@yendental.com" />
           </div>
-        </div>
-      </Modal>
+          <div className="modal__field">
+            <label htmlFor="staff-password">Password</label>
+            <input id="staff-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Min 6 characters" />
+          </div>
+          <div className="modal__field">
+            <label htmlFor="staff-confirm-password">Confirm Password</label>
+            <input id="staff-confirm-password" type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} />
+          </div>
+          <div className="staff-role-hint"><p>Role: <Badge variant="primary">Staff</Badge> (fixed)</p></div>
+          <div className="modal__actions">
+            <button className="modal__btn" onClick={() => setAddOpen(false)}>Cancel</button>
+            <button className="modal__btn modal__btn--primary" onClick={handleAdd}>Add Staff</button>
+          </div>
+        </Modal>
+      )}
 
       {/* Edit Modal */}
-      <Modal
-        isOpen={!!editTarget}
-        onClose={() => setEditTarget(null)}
-        title="Edit Staff Member"
-        size="md"
-        footer={
-          <div className="staff-modal-footer">
-            <Button variant="secondary" onClick={() => setEditTarget(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEditSave}>Save Changes</Button>
+      {editTarget && (
+        <Modal title="Edit Staff Member" onClose={() => setEditTarget(null)} width={480}>
+          <div className="modal__field">
+            <label htmlFor="edit-staff-name">Full Name</label>
+            <input id="edit-staff-name" value={editTarget.name} onChange={(e) => setEditTarget({ ...editTarget, name: e.target.value })} />
           </div>
-        }
-      >
-        {editTarget && (
-          <div className="staff-form">
-            <Input
-              label="Full Name"
-              value={editTarget.name}
-              onChange={(e) =>
-                setEditTarget({ ...editTarget, name: e.target.value })
-              }
-            />
-            <Input
-              label="Email Address"
-              type="email"
-              value={editTarget.email}
-              onChange={(e) =>
-                setEditTarget({ ...editTarget, email: e.target.value })
-              }
-            />
+          <div className="modal__field">
+            <label htmlFor="edit-staff-email">Email Address</label>
+            <input id="edit-staff-email" type="email" value={editTarget.email} onChange={(e) => setEditTarget({ ...editTarget, email: e.target.value })} />
           </div>
-        )}
-      </Modal>
+          <div className="modal__actions">
+            <button className="modal__btn" onClick={() => setEditTarget(null)}>Cancel</button>
+            <button className="modal__btn modal__btn--primary" onClick={handleEditSave}>Save Changes</button>
+          </div>
+        </Modal>
+      )}
 
       <ConfirmDialog
         isOpen={!!deleteTarget}
@@ -298,6 +259,7 @@ export default function StaffManager() {
         message={`Are you sure you want to delete ${deleteTarget?.name} (${deleteTarget?.email})? This action cannot be undone.`}
         confirmLabel="Delete"
       />
-    </div>
+      </main>
+    </>
   );
 }

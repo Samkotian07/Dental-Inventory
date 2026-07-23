@@ -8,10 +8,13 @@ import Button from "./common/Button";
 import Input from "./common/Input";
 import ToggleSwitch from "./common/ToggleSwitch";
 import ConfirmDialog from "./common/ConfirmDialog";
+import DashboardHeader from "./dashboard/DashboardHeader.jsx";
+import { useMenuClick } from "./Layout.jsx";
 import { toast } from "sonner";
 import "./Settings.css";
 
 export default function Settings() {
+  const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { settings, updateSettings } = useData();
   // Remove darkMode - no ThemeContext
@@ -109,7 +112,9 @@ export default function Settings() {
   ];
 
   return (
-    <div className="settings-container">
+    <>
+      <DashboardHeader title="Settings" onMenuClick={onMenuClick} />
+      <main className="settings-container">
       {/* Settings sections */}
       {sections.map((section, idx) => {
         const Icon = section.icon;
@@ -224,6 +229,7 @@ export default function Settings() {
         message="Are you sure you want to sign out from every active session? You will need to log in again on all devices."
         confirmLabel="Sign Out All"
       />
-    </div>
+      </main>
+    </>
   );
 }
