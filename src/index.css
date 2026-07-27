@@ -1,0 +1,125 @@
+:root {
+  --bg: #F5F5F5;
+  --surface: #FFFFFF;
+  --panel: #EDEDED;
+  --panel-dark: #DFDFDF;
+  --accent: #3A3A3D;
+  --accent-deep: #000000;
+  --accent-soft: #F0F0F0;
+  --ink: #141416;
+  --ink-soft: #6B6E76;
+  --line: #E4E4E4;
+  --danger: #E4573D;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 9px;
+  --font-display: "Outfit", "Inter", sans-serif;
+  --font-body: "Inter", sans-serif;
+}
+
+:root.dark {
+  --bg: #0F0F11;
+  --surface: #18181B;
+  --panel: #27272A;
+  --panel-dark: #3F3F46;
+  --accent: #A1A1AA;
+  --accent-deep: #FFFFFF;
+  --accent-soft: #202024;
+  --ink: #F4F4F5;
+  --ink-soft: #A1A1AA;
+  --line: #27272A;
+  --danger: #EF4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-deep);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Smooth transitions for theme-sensitive elements */
+body,
+.app,
+.app__main,
+.app__content,
+.sidebar,
+.sidebar__link,
+.settings-card,
+.settings-card-icon,
+.dashboard-header,
+.topbar,
+input,
+select,
+button {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* High-contrast text overrides for active dark mode elements (white background in dark mode) */
+:root.dark [class*="__btn--primary"],
+:root.dark [class*="-search-btn"],
+:root.dark [class*="-add-btn"],
+:root.dark [class*="-save-btn"],
+:root.dark [class*="-update-btn"],
+:root.dark [class*="-details-btn"],
+:root.dark .sidebar__link.is-active,
+:root.dark .sidebar__avatar,
+:root.dark .tooth-mark,
+:root.dark .settings-card:hover .settings-card-icon,
+:root.dark .btn-primary,
+:root.dark [class*="btn-primary"],
+:root.dark .cal__cell.is-selected,
+:root.dark .pagination__page.is-active,
+:root.dark .status-pill--active,
+:root.dark .failed-status-pill--failed,
+:root.dark .exch-status-pill--pending {
+  color: #0F0F11 !important;
+}
+
+/* Restore white text color when hovered (since hover background is dark) */
+:root.dark [class*="__btn--primary"]:hover,
+:root.dark [class*="-search-btn"]:hover,
+:root.dark [class*="-add-btn"]:hover,
+:root.dark [class*="-save-btn"]:hover,
+:root.dark [class*="-update-btn"]:hover,
+:root.dark [class*="-details-btn"]:hover,
+:root.dark .btn-primary:hover,
+:root.dark [class*="btn-primary"]:hover {
+  color: #FFFFFF !important;
+}

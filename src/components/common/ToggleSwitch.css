@@ -1,0 +1,62 @@
+.toggle-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+.toggle-switch-track {
+  position: relative;
+  display: inline-flex;
+  height: 24px;
+  width: 44px;
+  align-items: center;
+  border-radius: 9999px;
+  background-color: #d4d4d8;
+  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.toggle-switch-track.is-on {
+  background-color: var(--accent-deep);
+}
+
+.toggle-switch-thumb {
+  display: inline-block;
+  height: 18px;
+  width: 18px;
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(3px);
+}
+
+.toggle-switch-track.is-on .toggle-switch-thumb {
+  transform: translateX(23px);
+}
+
+/* Dark mode overrides */
+:root.dark .toggle-switch-track {
+  background-color: #3f3f46;
+}
+
+:root.dark .toggle-switch-track.is-on {
+  background-color: var(--accent-deep); /* white in dark mode */
+}
+
+:root.dark .toggle-switch-track.is-on .toggle-switch-thumb {
+  background-color: #0f0f11;
+}
+
+.toggle-switch-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: color 0.25s ease;
+  user-select: none;
+}
