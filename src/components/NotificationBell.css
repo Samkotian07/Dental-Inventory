@@ -140,6 +140,15 @@
   background: #2B2B2E;
 }
 
+:root.dark .notif-pop__all {
+  color: #0F0F11;
+}
+
+:root.dark .notif-pop__all:hover {
+  background: #E4E4E7;
+  color: #0F0F11;
+}
+
 @media (max-width: 900px) {
   .notif-pop {
     width: min(320px, 84vw);
