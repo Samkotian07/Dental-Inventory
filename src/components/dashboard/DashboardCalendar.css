@@ -95,6 +95,10 @@
   font-weight: 700;
 }
 
+.cal__cell.is-selected:hover {
+  background: var(--accent-deep);
+}
+
 .cal__dot {
   position: absolute;
   bottom: 4px;

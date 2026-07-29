@@ -57,7 +57,7 @@ export const lowStockAlerts = [
 ];
 
 export const categoryDistribution = [
-  { name: "NP Implants", value: 2, color: "#141416" },
+  { name: "NP Implants", value: 2, color: "var(--ink)" },
   { name: "RP Implants", value: 7, color: "#2C3E50" },
   { name: "Universal Bases", value: 4, color: "#3498DB" },
   { name: "Healing Abutments", value: 6, color: "#2ECC71" },
