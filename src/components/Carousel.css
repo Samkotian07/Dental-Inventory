@@ -4,10 +4,11 @@
   align-items: center;
   justify-content: center;
   gap: 22px;
-  padding: clamp(42px, 6vw, 64px) 20px 48px;
+  /* Reserve a dedicated footer for the pagination dots. */
+  padding: clamp(42px, 6vw, 64px) 20px 72px;
   background: linear-gradient(180deg, var(--bg, #f8f9fa) 0%, #f3f4f6 100%);
   overflow: hidden;
-  min-height: 420px;
+  min-height: 450px;
 }
 
 .carousel__arrow {
@@ -195,7 +196,7 @@
 
 .carousel__dots {
   position: absolute;
-  bottom: -6px;
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
