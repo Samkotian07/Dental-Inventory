@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Admin User",
+      "email": "admin@yendental.com",
+      "password": "admin123",
+      "role": "admin",
+      "status": "active",
+      "createdAt": "2024-01-01"
+    },
+    {
+      "id": 2,
+      "name": "John Staff",
+      "email": "staff@yendental.com",
+      "password": "staff123",
+      "role": "staff",
+      "status": "active",
+      "createdAt": "2024-06-15"
+    }
+  ]
+}
