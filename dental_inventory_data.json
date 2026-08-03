@@ -1,0 +1,112 @@
+{
+  "users": [
+    {
+      "id": "number",
+      "name": "string",
+      "email": "string",
+      "password": "string",
+      "role": "admin|staff",
+      "status": "active|inactive",
+      "createdAt": "date"
+    }
+  ],
+  "inventoryItems": [
+    {
+      "refNo": "string",
+      "invoiceNo": "string",
+      "lotNo": "string",
+      "category": "string",
+      "company": "string",
+      "product": "string",
+      "size": "string",
+      "qty": "number",
+      "expiry": "date",
+      "created": "date"
+    }
+  ],
+  "students": [
+    {
+      "id": "string",
+      "name": "string",
+      "course": "string",
+      "semester": "string",
+      "added": "date"
+    }
+  ],
+  "issuedItems": [
+    {
+      "issueId": "string",
+      "studentId": "string",
+      "student": "string",
+      "product": "string",
+      "lotNo": "string",
+      "refNo": "string",
+      "qty": "number",
+      "date": "date",
+      "returnDate": "date|null",
+      "status": "Active|Returned"
+    }
+  ],
+  "exchangeItems": [
+    {
+      "exchangeId": "string",
+      "studentId": "string",
+      "student": "string",
+      "refNo": "string",
+      "creditNo": "string",
+      "reason": "string",
+      "date": "date",
+      "status": "Pending|Completed|Rejected"
+    }
+  ],
+  "failedInventoryItems": [
+    {
+      "refNo": "string",
+      "category": "string",
+      "company": "string",
+      "product": "string",
+      "size": "string",
+      "lotNo": "string",
+      "invoiceNo": "string",
+      "qty": "number",
+      "failedDate": "date",
+      "reason": "string",
+      "status": "failed|disposed"
+    }
+  ],
+  "analytics": {
+    "stats": [
+      {
+        "key": "total|low|expiring|issued",
+        "label": "string",
+        "value": "number",
+        "tone": "blue|amber|red|green"
+      }
+    ],
+    "lowStockAlerts": [
+      {
+        "id": "string",
+        "product": "string",
+        "left": "number"
+      }
+    ],
+    "categoryDistribution": [
+      {
+        "name": "string",
+        "value": "number",
+        "color": "string"
+      }
+    ],
+    "monthlyTrends": [
+      {
+        "month": "string",
+        "added": "number",
+        "issued": "number"
+      }
+    ]
+  },
+  "categories": ["string"],
+  "courses": ["string"],
+  "semesters": ["string"],
+  "failReasons": ["string"]
+} 

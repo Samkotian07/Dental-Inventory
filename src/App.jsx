@@ -9,7 +9,6 @@ import TrackExchange from "./pages/TrackExchange.jsx";
 import StudentDetails from "./pages/StudentDetails.jsx";
 import Stock from "./pages/Stock.jsx";
 import FailedInventory from "./pages/FailedInventory.jsx";
-import ComingSoon from "./pages/ComingSoon.jsx";
 
 // Components
 import StaffManager from "./components/StaffManager.jsx";
@@ -32,7 +31,7 @@ function ProtectedRoute({ children, requireAdmin = false }) {
   }
 
   if (requireAdmin && user?.role !== "admin") {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return children;
@@ -64,32 +63,12 @@ export default function App() {
         <Route path="/track-exchange" element={<TrackExchange />} />
         <Route path="/stock" element={<Stock />} />
         <Route path="/failed-inventory" element={<FailedInventory />} />
+        <Route path="/stock-insertion" element={<StockInsertion />} />
+        <Route path="/stock-deletion" element={<StockDeletion />} />
+        <Route path="/inventory-updation" element={<InventoryUpdation />} />
+        <Route path="/settings" element={<Settings />} />
 
         {/* Admin Only Routes */}
-        <Route
-          path="/stock-insertion"
-          element={
-            <AdminRoute>
-              <StockInsertion />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/stock-deletion"
-          element={
-            <AdminRoute>
-              <StockDeletion />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/inventory-updation"
-          element={
-            <AdminRoute>
-              <InventoryUpdation />
-            </AdminRoute>
-          }
-        />
         <Route
           path="/low-stock-settings"
           element={
@@ -106,17 +85,8 @@ export default function App() {
             </AdminRoute>
           }
         />
-        <Route
-          path="/settings"
-          element={
-            <AdminRoute>
-              <Settings />
-            </AdminRoute>
-          }
-        />
 
-        <Route path="/coming-soon" element={<ComingSoon />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );
