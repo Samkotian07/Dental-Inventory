@@ -17,18 +17,18 @@ export default function Settings() {
   const { user } = useAuth();
   const { settings, updateSettings } = useData();
   const { darkMode, toggleDarkMode } = useTheme();
-  const [emailUpdates, setEmailUpdates] = useState(
-    settings.emailUpdates || false,
-  );
+  // const [emailUpdates, setEmailUpdates] = useState(
+  //   settings.emailUpdates || false,
+  // );
   const [twoFactor, setTwoFactor] = useState(settings.twoFactor || false);
   const [pwd, setPwd] = useState({ current: "", new: "", confirm: "" });
   const [logoutAllOpen, setLogoutAllOpen] = useState(false);
 
-  const handleEmailToggle = () => {
-    setEmailUpdates(!emailUpdates);
-    updateSettings({ emailUpdates: !emailUpdates });
-    toast.success(`Email updates ${!emailUpdates ? "enabled" : "disabled"}`);
-  };
+  // const handleEmailToggle = () => {
+  //   setEmailUpdates(!emailUpdates);
+  //   updateSettings({ emailUpdates: !emailUpdates });
+  //   toast.success(`Email updates ${!emailUpdates ? "enabled" : "disabled"}`);
+  // };
 
   const handle2FAToggle = () => {
     setTwoFactor(!twoFactor);
@@ -61,16 +61,17 @@ export default function Settings() {
   };
 
   const sections = [
-    {
-      icon: Mail,
-      title: "Email Updates",
-      desc: "Keep it ON to receive notifications through email",
-      content: (
-        <div className="settings-toggle-wrapper">
-          <ToggleSwitch isOn={emailUpdates} onToggle={handleEmailToggle} />
-        </div>
-      ),
-    },
+    // Email Updates - Commented out for future use
+    // {
+    //   icon: Mail,
+    //   title: "Email Updates",
+    //   desc: "Keep it ON to receive notifications through email",
+    //   content: (
+    //     <div className="settings-toggle-wrapper">
+    //       <ToggleSwitch isOn={emailUpdates} onToggle={handleEmailToggle} />
+    //     </div>
+    //   ),
+    // },
     {
       icon: Moon,
       title: "Dark Mode",
