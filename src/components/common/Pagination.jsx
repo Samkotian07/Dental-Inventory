@@ -3,12 +3,9 @@ import { cn } from '../utils/helpers';
 
 export default function Pagination({ currentPage, totalPages, onPageChange }) {
   const pages = [];
-  const maxVisible = 5;
-  let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-  let end = Math.min(totalPages, start + maxVisible - 1);
-  if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
-
-  for (let i = start; i <= end; i++) pages.push(i);
+  if (currentPage - 1 >= 1) pages.push(currentPage - 1);
+  pages.push(currentPage);
+  if (currentPage + 1 <= totalPages) pages.push(currentPage + 1);
 
   return (
     <div className="flex items-center justify-between mt-4 px-1">
@@ -23,14 +20,6 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
         >
           <ChevronLeft size={18} />
         </button>
-        {start > 1 && (
-          <>
-            <button onClick={() => onPageChange(1)} className="px-3 py-1.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-              1
-            </button>
-            {start > 2 && <span className="px-1 text-gray-400">...</span>}
-          </>
-        )}
         {pages.map((p) => (
           <button
             key={p}
@@ -45,14 +34,6 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
             {p}
           </button>
         ))}
-        {end < totalPages && (
-          <>
-            {end < totalPages - 1 && <span className="px-1 text-gray-400">...</span>}
-            <button onClick={() => onPageChange(totalPages)} className="px-3 py-1.5 rounded-lg text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-              {totalPages}
-            </button>
-          </>
-        )}
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}

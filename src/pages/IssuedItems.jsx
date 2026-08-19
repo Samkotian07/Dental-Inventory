@@ -120,16 +120,24 @@ export default function IssuedItems() {
     // DO NOT close modal here - let the modal handle it
   };
 
-  const handleIssueNew = ({ studentId, itemId, qty }) => {
+  const handleIssueNew = ({ studentId, itemId, lotId, qty }) => {
     const student = students.find((s) => s.id === studentId);
     const item = inventoryOptions.find((i) => i.id === itemId);
+    const selectedLot = item?.lots?.find((l) => l.id === lotId || l.number === lotId);
+    const lotNo =
+      selectedLot?.number ||
+      (typeof lotId === "string" && lotId.startsWith("LOT-")
+        ? lotId.replace("LOT-", "")
+        : lotId) ||
+      "4510315832";
+
     const nextNum = rows.length + 1;
     const newRow = {
       issueId: `ISS-${String(nextNum).padStart(3, "0")}`,
       studentId,
       student: student?.name ?? studentId,
       product: item?.product ?? itemId,
-      lotNo: `LOT-2024-${String(nextNum).padStart(3, "0")}`,
+      lotNo,
       refNo: itemId,
       qty,
       date: formatDate(new Date()),
