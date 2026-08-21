@@ -20,32 +20,32 @@ This frontend is built with React, Vite, and React Router. It provides the UI fo
 Frontend/
 +-- public/                  # Static assets
 +-- src/
-¦   +-- App.jsx              # Main route definitions
-¦   +-- main.jsx             # App entry point
-¦   +-- index.css            # Global styles
-¦   +-- App.css              # App-level styles
-¦   +-- components/          # Reusable UI components
-¦   ¦   +-- Layout.jsx       # Shared layout wrapper
-¦   ¦   +-- Sidebar.jsx      # Sidebar navigation
-¦   ¦   +-- Topbar.jsx       # Top navigation bar
-¦   ¦   +-- dashboard/       # Dashboard widgets/cards/charts
-¦   ¦   +-- issued/          # Issued item modals and related UI
-¦   ¦   +-- student-details/ # Student form/modals/import UI
-¦   ¦   +-- track-exchange/  # Exchange tracking modals
-¦   +-- data/                # Static/mock data files
-¦   ¦   +-- dashboardData.js
-¦   ¦   +-- exchangeData.js
-¦   ¦   +-- issuedData.js
-¦   ¦   +-- studentData.js
-¦   +-- pages/               # Route-level pages
-¦   ¦   +-- Landing.jsx
-¦   ¦   +-- Dashboard.jsx
-¦   ¦   +-- IssuedItems.jsx
-¦   ¦   +-- StudentDetails.jsx
-¦   ¦   +-- TrackExchange.jsx
-¦   ¦   +-- ComingSoon.jsx   # Placeholder page for unfinished features
-¦   +-- utils/               # Helper utilities
-¦       +-- csv.js
+ï¿½   +-- App.jsx              # Main route definitions
+ï¿½   +-- main.jsx             # App entry point
+ï¿½   +-- index.css            # Global styles
+ï¿½   +-- App.css              # App-level styles
+ï¿½   +-- components/          # Reusable UI components
+ï¿½   ï¿½   +-- Layout.jsx       # Shared layout wrapper
+ï¿½   ï¿½   +-- Sidebar.jsx      # Sidebar navigation
+ï¿½   ï¿½   +-- Topbar.jsx       # Top navigation bar
+ï¿½   ï¿½   +-- dashboard/       # Dashboard widgets/cards/charts
+ï¿½   ï¿½   +-- issued/          # Issued item modals and related UI
+ï¿½   ï¿½   +-- student-details/ # Student form/modals/import UI
+ï¿½   ï¿½   +-- track-exchange/  # Exchange tracking modals
+ï¿½   +-- data/                # Static/mock data files
+ï¿½   ï¿½   +-- dashboardData.js
+ï¿½   ï¿½   +-- exchangeData.js
+ï¿½   ï¿½   +-- issuedData.js
+ï¿½   ï¿½   +-- studentData.js
+ï¿½   +-- pages/               # Route-level pages
+ï¿½   ï¿½   +-- Landing.jsx
+ï¿½   ï¿½   +-- Dashboard.jsx
+ï¿½   ï¿½   +-- IssuedItems.jsx
+ï¿½   ï¿½   +-- StudentDetails.jsx
+ï¿½   ï¿½   +-- TrackExchange.jsx
+ï¿½   ï¿½   +-- ComingSoon.jsx   # Placeholder page for unfinished features
+ï¿½   +-- utils/               # Helper utilities
+ï¿½       +-- csv.js
 +-- package.json
 `
 
@@ -71,7 +71,6 @@ The following routes are intentionally mapped to the Coming Soon page because th
 - /stock
 - /failed-inventory
 - /stock-insertion
-- /inventory-updation
 - /stock-deletion
 - /settings
 - /staff-manager

@@ -12,7 +12,6 @@ import FailedInventory from "./pages/FailedInventory.jsx";
 
 // Components
 import StaffManager from "./components/StaffManager.jsx";
-import InventoryUpdation from "./components/InventoryUpdation.jsx";
 import LowStockSettings from "./components/LowStockSettings.jsx";
 import Settings from "./components/Settings.jsx";
 import StockInsertion from "./components/StockInsertion.jsx";
@@ -65,7 +64,6 @@ export default function App() {
         <Route path="/failed-inventory" element={<FailedInventory />} />
         <Route path="/stock-insertion" element={<StockInsertion />} />
         <Route path="/stock-deletion" element={<StockDeletion />} />
-        <Route path="/inventory-updation" element={<InventoryUpdation />} />
         <Route path="/settings" element={<Settings />} />
 
         {/* Admin Only Routes */}
