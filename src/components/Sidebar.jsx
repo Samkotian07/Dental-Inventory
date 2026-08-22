@@ -53,7 +53,7 @@ export default function Sidebar({ open, onClose }) {
       <aside className={`sidebar ${open ? "sidebar--open" : ""}`}>
         <NavLink to="/" className="sidebar__brand" onClick={onClose}>
           <div className="sidebar__brand-text">
-            <span className="sidebar__brand-name">YEN DENTAL</span>
+            <span className="sidebar__brand-name">YEN LEDGER</span>
             <span className="sidebar__brand-sub">Inventory System</span>
           </div>
         </NavLink>
