@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Search, PlusCircle, Upload, Check, Package } from "lucide-react";
+import { Search, PlusCircle, Upload, Check, Package, Download } from "lucide-react";
 import Papa from "papaparse";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
@@ -14,14 +14,22 @@ import { toast } from "sonner";
 import { useMenuClick } from "./Layout.jsx";
 import "./StockInsertion.css";
 
+// CSV Template headers
+const CSV_TEMPLATE = [
+  "invoiceNumber",
+  "category",
+  "companyName",
+  "productName",
+  "size",
+  "lotNo",
+  "quantity",
+  "expiryDate"
+];
+
 export default function StockInsertion() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { inventory, addInventory } = useData();
-  const [mode, setMode] = useState("new");
-  const [searchRef, setSearchRef] = useState("");
-  const [foundItem, setFoundItem] = useState(null);
-  const [addQty, setAddQty] = useState(0);
   const [csvPreview, setCsvPreview] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
@@ -36,40 +44,6 @@ export default function StockInsertion() {
     quantity: "",
     expiryDate: "",
   });
-
-  const handleSearch = () => {
-    const item = inventory.find(
-      (i) => i.refNo.toLowerCase() === searchRef.toLowerCase(),
-    );
-    if (item) {
-      setFoundItem(item);
-      setAddQty(0);
-    } else {
-      setFoundItem(null);
-      toast.error("No item found with that Ref No");
-    }
-  };
-
-  const handleUpdateQty = () => {
-    if (addQty <= 0) {
-      toast.error("Please enter a valid quantity");
-      return;
-    }
-    const newQty = foundItem.quantity + Number(addQty);
-    addInventory(
-      {
-        ...foundItem,
-        refNo: foundItem.refNo,
-        invoiceNumber: foundItem.invoiceNumber,
-        quantity: newQty,
-      },
-      user?.name,
-    );
-    toast.success(`Added ${addQty} units. New total: ${newQty}`);
-    setFoundItem(null);
-    setSearchRef("");
-    setAddQty(0);
-  };
 
   const handleNewSubmit = () => {
     if (
@@ -88,6 +62,7 @@ export default function StockInsertion() {
         ...form,
         refNo: generateId("INV"),
         quantity: Number(form.quantity),
+        status: "active",
       },
       user?.name,
     );
@@ -135,6 +110,7 @@ export default function StockInsertion() {
           category: row.category || "XYXX",
           quantity: Number(row.quantity) || 0,
           size: row.size || "",
+          status: "active",
         },
         user?.name,
       );
@@ -143,199 +119,178 @@ export default function StockInsertion() {
     setCsvPreview(null);
   };
 
+  // Download CSV Template
+  const downloadTemplate = () => {
+    // Create header row
+    const headerRow = CSV_TEMPLATE.join(",");
+    
+    // Create sample data row
+    const sampleRow = [
+      "INV-2024-001",
+      "CONSUMABLES",
+      "Dental Supplies Co.",
+      "Dental Floss",
+      "50m",
+      "LOT-2024-001",
+      "100",
+      "2026-12-31"
+    ].join(",");
+    
+    const csvContent = `${headerRow}\n${sampleRow}`;
+    
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "inventory_template.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success("Template downloaded successfully");
+  };
+
   return (
     <>
       <DashboardHeader title="Stock Insertion" onMenuClick={onMenuClick} />
 
       <main className="stock-insertion">
-        <section className="stock-insertion__toolbar">
-          <div className="si-mode-toggle">
-            <button
-              onClick={() => setMode("new")}
-              className={`si-mode-btn ${mode === "new" ? "si-mode-active" : "si-mode-inactive"}`}
-            >
-              New Item
-            </button>
-            <button
-              onClick={() => setMode("update")}
-              className={`si-mode-btn ${mode === "update" ? "si-mode-active" : "si-mode-inactive"}`}
-            >
-              Update Existing
-            </button>
-          </div>
-        </section>
-
         <div className="si-container">
-          {mode === "update" && (
-            <div className="si-search-section">
-              <h3 className="si-section-title">Search Existing Item</h3>
-              <div className="si-search-controls">
-                <div className="si-search-input-wrapper">
-                  <Search size={18} className="si-search-icon" />
-                  <input
-                    type="text"
-                    value={searchRef}
-                    onChange={(e) => setSearchRef(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    placeholder="Enter Ref No (e.g. INV-001)"
-                    className="si-search-input"
-                  />
-                </div>
-                <Button onClick={handleSearch} className="si-search-btn">
-                  Search
-                </Button>
+          {/* New Item Section */}
+          <div className="si-new-section">
+            <h3 className="si-section-title">Add New Inventory Item</h3>
+            <div className="si-new-grid">
+              <Input
+                label="Invoice Number *"
+                value={form.invoiceNumber}
+                onChange={(e) =>
+                  setForm({ ...form, invoiceNumber: e.target.value })
+                }
+                placeholder="INV-2024-XXX"
+                className="si-new-input"
+              />
+              <div className="si-new-field">
+                <label className="si-new-label">Category *</label>
+                <select
+                  className="si-new-select"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
-
-              {foundItem && (
-                <div className="si-found-item">
-                  <div className="si-found-item-header">
-                    <div className="si-found-item-icon">
-                      <Package size={18} />
-                    </div>
-                    <div>
-                      <p className="si-found-item-name">{foundItem.productName}</p>
-                      <p className="si-found-item-details">
-                        {foundItem.refNo} - Current Qty: {foundItem.quantity}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="si-found-item-actions">
-                    <Input
-                      label="Add Quantity"
-                      type="number"
-                      value={addQty}
-                      onChange={(e) => setAddQty(e.target.value)}
-                      className="si-add-qty-input"
-                    />
-                    <Button
-                      onClick={handleUpdateQty}
-                      className="si-update-stock-btn"
-                    >
-                      Update Stock
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {mode === "new" && (
-            <div className="si-new-section">
-              <h3 className="si-section-title">Add New Inventory Item</h3>
-              <div className="si-new-grid">
-                <Input
-                  label="Invoice Number *"
-                  value={form.invoiceNumber}
-                  onChange={(e) =>
-                    setForm({ ...form, invoiceNumber: e.target.value })
-                  }
-                  placeholder="INV-2024-XXX"
-                  className="si-new-input"
-                />
-                <div className="si-new-field">
-                  <label className="si-new-label">Category *</label>
-                  <select
-                    className="si-new-select"
-                    value={form.category}
-                    onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Input
-                  label="Company Name *"
-                  value={form.companyName}
-                  onChange={(e) =>
-                    setForm({ ...form, companyName: e.target.value })
-                  }
-                  className="si-new-input"
-                />
-                <Input
-                  label="Product Name *"
-                  value={form.productName}
-                  onChange={(e) =>
-                    setForm({ ...form, productName: e.target.value })
-                  }
-                  className="si-new-input"
-                />
-                <Input
-                  label="Size"
-                  value={form.size}
-                  onChange={(e) => setForm({ ...form, size: e.target.value })}
-                  className="si-new-input"
-                />
-                <Input
-                  label="Lot No *"
-                  value={form.lotNo}
-                  onChange={(e) => setForm({ ...form, lotNo: e.target.value })}
-                  className="si-new-input"
-                />
-                <Input
-                  label="Quantity *"
-                  type="number"
-                  value={form.quantity}
-                  onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                  className="si-new-input"
-                />
-                <Input
-                  label="Expiry Date *"
-                  type="date"
-                  value={form.expiryDate}
-                  onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
-                  className="si-new-input"
-                />
-              </div>
-              <div className="si-new-actions">
-                <Button onClick={handleNewSubmit} className="si-add-btn">
-                  <PlusCircle size={16} /> Add Item
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <div
-            className={`si-bulk-section ${isDragging ? "si-bulk-dragging" : ""}`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-          >
-            <div className="si-bulk-content">
-              <div className="si-bulk-left">
-                <div className="si-bulk-icon">
-                  <Upload size={22} />
-                </div>
-                <div>
-                  <p className="si-bulk-title">Bulk Import Inventory</p>
-                  <p className="si-bulk-desc">
-                    Drag & drop a CSV file. Columns: invoiceNumber, category,
-                    companyName, productName, size, lotNo, quantity, expiryDate
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="secondary"
-                onClick={() => fileInputRef.current?.click()}
-                className="si-browse-btn"
-              >
-                Browse Files
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                className="si-hidden-input"
-                onChange={(e) => handleFile(e.target.files[0])}
+              <Input
+                label="Company Name *"
+                value={form.companyName}
+                onChange={(e) =>
+                  setForm({ ...form, companyName: e.target.value })
+                }
+                className="si-new-input"
+              />
+              <Input
+                label="Product Name *"
+                value={form.productName}
+                onChange={(e) =>
+                  setForm({ ...form, productName: e.target.value })
+                }
+                className="si-new-input"
+              />
+              <Input
+                label="Size"
+                value={form.size}
+                onChange={(e) => setForm({ ...form, size: e.target.value })}
+                className="si-new-input"
+              />
+              <Input
+                label="Lot No *"
+                value={form.lotNo}
+                onChange={(e) => setForm({ ...form, lotNo: e.target.value })}
+                className="si-new-input"
+              />
+              <Input
+                label="Quantity *"
+                type="number"
+                value={form.quantity}
+                onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+                className="si-new-input"
+              />
+              <Input
+                label="Expiry Date *"
+                type="date"
+                value={form.expiryDate}
+                onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
+                className="si-new-input"
               />
             </div>
+            <div className="si-new-actions">
+              <Button onClick={handleNewSubmit} className="si-add-btn">
+                <PlusCircle size={16} /> Add Item
+              </Button>
+            </div>
           </div>
 
+          {/* Bulk Import Section with Download CSV */}
+          <div className="si-bulk-section-wrapper">
+            <div className="si-bulk-header">
+              <h3 className="si-section-title">Bulk Import Inventory</h3>
+              <Button
+                variant="secondary"
+                onClick={downloadTemplate}
+                className="si-download-btn"
+              >
+                <Download size={16} /> Download CSV Template
+              </Button>
+            </div>
+
+            <div
+              className={`si-bulk-section ${isDragging ? "si-bulk-dragging" : ""}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+            >
+              <div className="si-bulk-content">
+                <div className="si-bulk-left">
+                  <div className="si-bulk-icon">
+                    <Upload size={22} />
+                  </div>
+                  <div>
+                    <p className="si-bulk-title">Upload CSV File</p>
+                    <p className="si-bulk-desc">
+                      Drag & drop a CSV file or click Browse. Required columns:{" "}
+                      <span className="si-bulk-columns">
+                        invoiceNumber, category, companyName, productName, size, lotNo, quantity, expiryDate
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="si-browse-btn"
+                >
+                  Browse Files
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  className="si-hidden-input"
+                  onChange={(e) => handleFile(e.target.files[0])}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Preview Modal */}
           <Modal
             isOpen={!!csvPreview}
             onClose={() => setCsvPreview(null)}

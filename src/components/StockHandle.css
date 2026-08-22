@@ -1,11 +1,11 @@
-.stock-deletion {
+.stock-handle {
   padding: 22px 28px 60px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.stock-deletion__card {
+.stock-handle__card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -396,7 +396,7 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-  .stock-deletion {
+  .stock-handle {
     padding: 1rem;
   }
 
@@ -439,6 +439,6 @@
   }
 }
 
-.stock-deletion > .pagination {
+.stock-handle > .pagination {
   padding: 12px 2px 0;
 }

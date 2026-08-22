@@ -15,7 +15,7 @@ import StaffManager from "./components/StaffManager.jsx";
 import LowStockSettings from "./components/LowStockSettings.jsx";
 import Settings from "./components/Settings.jsx";
 import StockInsertion from "./components/StockInsertion.jsx";
-import StockDeletion from "./components/StockDeletion.jsx";
+import StockHandle from "./components/StockHandle.jsx";
 
 // Protected Route Component
 function ProtectedRoute({ children, requireAdmin = false }) {
@@ -63,7 +63,7 @@ export default function App() {
         <Route path="/stock" element={<Stock />} />
         <Route path="/failed-inventory" element={<FailedInventory />} />
         <Route path="/stock-insertion" element={<StockInsertion />} />
-        <Route path="/stock-deletion" element={<StockDeletion />} />
+        <Route path="/stock-handle" element={<StockHandle />} />
         <Route path="/settings" element={<Settings />} />
 
         {/* Admin Only Routes */}

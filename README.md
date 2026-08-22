@@ -71,7 +71,7 @@ The following routes are intentionally mapped to the Coming Soon page because th
 - /stock
 - /failed-inventory
 - /stock-insertion
-- /stock-deletion
+- /stock-handle
 - /settings
 - /staff-manager
 - /coming-soon

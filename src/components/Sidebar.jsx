@@ -26,7 +26,7 @@ const navItems = [
   { label: "Failed Inventory", to: "/failed-inventory", icon: AlertTriangle },
   { label: "Track Exchange", to: "/track-exchange", icon: Repeat },
   { label: "Stock Insertion", to: "/stock-insertion", icon: PackagePlus },
-  { label: "Stock Deletion", to: "/stock-deletion", icon: PackageMinus },
+  { label: "Stock Handle", to: "/stock-handle", icon: PackageMinus },
   { label: "Settings", to: "/settings", icon: Settings },
 ];
 
