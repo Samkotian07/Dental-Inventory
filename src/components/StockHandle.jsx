@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Search, Package } from "lucide-react";
 import { useData } from "../context/DataContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useInventory } from "../context/InventoryContext.jsx";
 import DashboardHeader from "./dashboard/DashboardHeader.jsx";
 import Pagination from "./Pagination.jsx";
 import Badge from "./common/Badge.jsx";
@@ -16,15 +17,16 @@ const PAGE_SIZE = 8;
 export default function StockHandle() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { inventory, updateInventory } = useData();
+  const { updateInventory } = useData();
+  const { stock, updateStockItem } = useInventory();
   const [searchRef, setSearchRef] = useState("");
   const [foundItem, setFoundItem] = useState(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
   const handleSearch = () => {
-    const item = inventory.find(
-      (i) => i.refNo.toLowerCase() === searchRef.toLowerCase(),
+    const item = stock.find(
+      (i) => i.refNo.toLowerCase() === searchRef.trim().toLowerCase(),
     );
     if (item) {
       setFoundItem(item);
@@ -38,17 +40,18 @@ export default function StockHandle() {
   const handleToggleStatus = (itemId, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     updateInventory(itemId, { status: newStatus }, user?.name);
+    updateStockItem(itemId, { status: newStatus });
     toast.success(`Item status updated to ${newStatus}`);
   };
 
   const filtered = useMemo(() => {
-    return inventory.filter(
+    return stock.filter(
       (i) =>
         !search ||
         i.refNo.toLowerCase().includes(search.toLowerCase()) ||
-        i.productName.toLowerCase().includes(search.toLowerCase()),
+        (i.productName || i.product || "").toLowerCase().includes(search.toLowerCase()),
     );
-  }, [inventory, search]);
+  }, [stock, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);

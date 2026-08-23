@@ -5,20 +5,22 @@ import { categories } from "../../data/stockData.js";
 const editableCategories = categories.filter((c) => c !== "All Categories");
 
 export default function EditItemModal({ item, onClose, onSave }) {
+  if (!item) return null;
+
   const [form, setForm] = useState({
-    category: item.category,
-    company: item.company,
-    product: item.product,
-    size: item.size,
-    lotNo: item.lotNo,
-    qty: item.qty,
-    expiry: item.expiry || "",
+    category: item.category || editableCategories[0],
+    company: item.company || item.companyName || "",
+    product: item.product || item.productName || "",
+    size: item.size || "",
+    lotNo: item.lotNo || "",
+    qty: item.qty ?? item.quantity ?? 1,
+    expiry: item.expiry || item.expiryDate || "",
   });
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const handleSave = () => {
-    onSave(item.refNo, { ...form, qty: Number(form.qty) });
+    onSave(item.refNo || item.id, { ...form, qty: Number(form.qty) });
   };
 
   return (

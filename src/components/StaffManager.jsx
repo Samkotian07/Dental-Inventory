@@ -130,7 +130,7 @@ export default function StaffManager() {
       { key: "role", label: "Role" },
       { key: "status", label: "Status" },
     ]);
-    toast.success("CSV exported successfully");
+    toast.success("Excel exported successfully");
   };
 
   return (

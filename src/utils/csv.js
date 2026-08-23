@@ -1,28 +1,25 @@
-// Converts an array of row objects to a CSV file and triggers a browser download.
-// columns: [{ key: "issueId", label: "Issue ID" }, ...]
-export function exportToCsv(filename, columns, rows) {
-  const escapeCell = (value) => {
-    const str = String(value ?? "");
-    if (/[",\n]/.test(str)) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
+import * as XLSX from "xlsx";
 
-  const header = columns.map((c) => escapeCell(c.label)).join(",");
-  const body = rows
-    .map((row) => columns.map((c) => escapeCell(row[c.key])).join(","))
-    .join("\n");
+/**
+ * Converts an array of row objects to an Excel (.xlsx) file and triggers a browser download.
+ * columns: [{ key: "issueId", label: "Issue ID" }, ...]
+ */
+export function exportToExcel(filename, columns, rows) {
+  const data = rows.map((row) => {
+    const obj = {};
+    columns.forEach((c) => {
+      obj[c.label] = row[c.key] ?? "";
+    });
+    return obj;
+  });
 
-  const csvContent = `${header}\n${body}`;
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
 
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  const cleanName = filename.replace(/\.(csv|xlsx)$/i, "");
+  XLSX.writeFile(workbook, `${cleanName}.xlsx`);
 }
+
+// Backwards compatibility alias: all export calls export native Excel (.xlsx) files
+export const exportToCsv = exportToExcel;

@@ -19,6 +19,7 @@ import {
 } from "../data/issuedData.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
+import { useInventory } from "../context/InventoryContext.jsx";
 import "./IssuedItems.css";
 
 const PAGE_SIZE = 6;
@@ -48,8 +49,8 @@ function formatDate(isoOrDate) {
 
 export default function IssuedItems() {
   const onMenuClick = useMenuClick();
+  const { issuedItems, issueItem, returnIssuedItem, stock } = useInventory();
 
-  const [rows, setRows] = useState(seedData);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All Status");
   const [sort, setSort] = useState({ key: null, dir: 1 });
@@ -61,15 +62,15 @@ export default function IssuedItems() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    let list = (issuedItems || []).filter((r) => {
       const matchesStatus = status === "All Status" || r.status === status;
       const matchesQuery =
         !q ||
-        r.student.toLowerCase().includes(q) ||
-        r.studentId.toLowerCase().includes(q) ||
-        r.product.toLowerCase().includes(q) ||
-        r.issueId.toLowerCase().includes(q) ||
-        r.refNo.toLowerCase().includes(q);
+        (r.student || "").toLowerCase().includes(q) ||
+        (r.studentId || "").toLowerCase().includes(q) ||
+        (r.product || r.productName || "").toLowerCase().includes(q) ||
+        (r.issueId || "").toLowerCase().includes(q) ||
+        (r.refNo || "").toLowerCase().includes(q);
       return matchesStatus && matchesQuery;
     });
 
@@ -84,7 +85,7 @@ export default function IssuedItems() {
     }
 
     return list;
-  }, [rows, query, status, sort]);
+  }, [issuedItems, query, status, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -107,44 +108,35 @@ export default function IssuedItems() {
     );
   };
 
-  // ✅ FIXED: Removed setReturnItem(null) from here
   const handleConfirmReturn = (issueId, returnDateISO) => {
-    setRows((prev) =>
-      prev.map((r) =>
-        r.issueId === issueId
-          ? { ...r, status: "Returned", returnDate: formatDate(returnDateISO) }
-          : r,
-      ),
-    );
-    // ✅ The modal will close when user clicks "Done" in the QR view
-    // DO NOT close modal here - let the modal handle it
+    returnIssuedItem(issueId);
   };
 
   const handleIssueNew = ({ studentId, itemId, lotId, qty }) => {
     const student = students.find((s) => s.id === studentId);
-    const item = inventoryOptions.find((i) => i.id === itemId);
-    const selectedLot = item?.lots?.find((l) => l.id === lotId || l.number === lotId);
+    // Find item from stock or inventoryOptions
+    const stockMatch = stock.find((s) => s.refNo === itemId || s.id === itemId);
+    const item = stockMatch
+      ? { id: stockMatch.refNo, product: stockMatch.product || stockMatch.productName, lotNo: stockMatch.lotNo }
+      : inventoryOptions.find((i) => i.id === itemId);
+
     const lotNo =
-      selectedLot?.number ||
+      stockMatch?.lotNo ||
       (typeof lotId === "string" && lotId.startsWith("LOT-")
         ? lotId.replace("LOT-", "")
         : lotId) ||
       "4510315832";
 
-    const nextNum = rows.length + 1;
-    const newRow = {
-      issueId: `ISS-${String(nextNum).padStart(3, "0")}`,
+    issueItem({
       studentId,
       student: student?.name ?? studentId,
       product: item?.product ?? itemId,
       lotNo,
       refNo: itemId,
-      qty,
-      date: formatDate(new Date()),
-      returnDate: null,
-      status: "Active",
-    };
-    setRows((prev) => [newRow, ...prev]);
+      qty: Number(qty),
+      date: formatDate(new Date().toISOString().slice(0, 10)),
+    });
+
     setIssueModalOpen(false);
     setPage(1);
   };
@@ -238,15 +230,15 @@ export default function IssuedItems() {
                 )}
 
                 {pageRows.map((row) => (
-                  <tr key={row.issueId}>
-                    <td className="issued__mono">{row.issueId}</td>
-                    <td className="issued__strong">{row.student}</td>
+                  <tr key={row.issueId || row.id}>
+                    <td className="issued__mono">{row.issueId || row.id}</td>
+                    <td className="issued__strong">{row.student || row.studentName}</td>
                     <td className="issued__mono">{row.studentId}</td>
-                    <td>{row.product}</td>
+                    <td>{row.product || row.productName}</td>
                     <td className="issued__mono">{row.lotNo}</td>
                     <td className="issued__mono">{row.refNo}</td>
-                    <td>{row.qty}</td>
-                    <td>{row.date}</td>
+                    <td>{row.qty ?? row.quantity}</td>
+                    <td>{row.date || row.issuedDate || row.issueDate}</td>
                     <td>
                       <span
                         className={`status-pill status-pill--${row.status.toLowerCase()}`}

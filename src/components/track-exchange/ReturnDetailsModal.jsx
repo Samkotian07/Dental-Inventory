@@ -5,8 +5,11 @@ import "./ReturnDetailsModal.css";
 export default function ReturnDetailsModal({ item, onClose }) {
   if (!item) return null;
 
-  const isExchange = item.type === "exchange";
-  const returnedBatch = item.batchNo || item.oldBatchNo || "—";
+  const rawType = String(item.type || "").toLowerCase();
+  const isExchange = rawType === "exchange";
+  const returnedBatch = item.batchNo || item.oldBatchNo || item.lotNo || "—";
+  const statusStr = String(item.status || "Pending");
+  const returnId = item.returnId || item.id || "—";
 
   return (
     <Modal title="Return Details" onClose={onClose} width={480}>
@@ -16,9 +19,9 @@ export default function ReturnDetailsModal({ item, onClose }) {
             {isExchange ? <Repeat size={18} strokeWidth={2.2} /> : <FileText size={18} strokeWidth={2.2} />}
           </span>
           <div>
-            <strong>{item.returnId}</strong>
-            <span className={`ret-status-pill ret-status-pill--${item.status.toLowerCase().replace(/\s+/g, "-")}`}>
-              {item.status.toLowerCase()}
+            <strong>{returnId}</strong>
+            <span className={`ret-status-pill ret-status-pill--${statusStr.toLowerCase().replace(/\s+/g, "-")}`}>
+              {statusStr.toLowerCase()}
             </span>
           </div>
         </div>
@@ -32,15 +35,15 @@ export default function ReturnDetailsModal({ item, onClose }) {
           </div>
           <div>
             <span>Ref No</span>
-            <p>{item.refNo}</p>
+            <p>{item.refNo || "—"}</p>
           </div>
           <div>
             <span>Product</span>
-            <p>{item.productName}</p>
+            <p>{item.productName || item.product || "—"}</p>
           </div>
           <div>
             <span>Quantity</span>
-            <p>{item.quantity}</p>
+            <p>{item.quantity ?? item.qty ?? "—"}</p>
           </div>
 
           <div>
@@ -59,18 +62,18 @@ export default function ReturnDetailsModal({ item, onClose }) {
             <div>
               <span>Credit Note</span>
               <p className="ret-details__credit-note">
-                {item.creditNote || <em style={{ color: "#9ca3af" }}>Pending completion</em>}
+                {item.creditNote || item.creditNo || <em style={{ color: "#9ca3af" }}>Pending completion</em>}
               </p>
             </div>
           )}
 
           <div>
             <span>Return Date</span>
-            <p>{item.returnDate}</p>
+            <p>{item.returnDate || item.date || "—"}</p>
           </div>
           <div className="ret-details__grid-full">
             <span>Reason</span>
-            <p>{item.reason}</p>
+            <p>{item.reason || "—"}</p>
           </div>
         </div>
       </div>

@@ -59,28 +59,27 @@ export function totalPages(total, perPage = 8) {
   return Math.max(1, Math.ceil(total / perPage));
 }
 
-export function exportToCSV(data, filename, columns) {
-  const header = columns.map((c) => c.label).join(',');
-  const rows = data.map((item) =>
-    columns
-      .map((c) => {
-        const val = typeof c.value === 'function' ? c.value(item) : item[c.key];
-        const str = String(val ?? '');
-        return str.includes(',') ? `"${str}"` : str;
-      })
-      .join(',')
-  );
-  const csv = [header, ...rows].join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+import * as XLSX from 'xlsx';
+
+export function exportToExcel(data, filename, columns) {
+  const formattedData = data.map((item) => {
+    const obj = {};
+    columns.forEach((c) => {
+      const val = typeof c.value === 'function' ? c.value(item) : item[c.key];
+      obj[c.label] = val ?? '';
+    });
+    return obj;
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(formattedData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Data');
+
+  const cleanName = filename.replace(/\.(csv|xlsx)$/i, '');
+  XLSX.writeFile(workbook, `${cleanName}.xlsx`);
 }
+
+export const exportToCSV = exportToExcel;
 
 export function cn(...classes) {
   return classes.filter(Boolean).join(' ');

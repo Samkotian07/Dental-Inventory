@@ -10,6 +10,8 @@ function formatDisplayDate(iso) {
 }
 
 export default function ItemDetailsModal({ item, onClose }) {
+  if (!item) return null;
+
   return (
     <Modal title="Item Details" onClose={onClose} width={480}>
       <div className="item-details">
@@ -18,43 +20,43 @@ export default function ItemDetailsModal({ item, onClose }) {
             <Package size={18} strokeWidth={2.2} />
           </span>
           <div>
-            <strong>{item.product}</strong>
-            <span>{item.refNo}</span>
+            <strong>{item.product || item.productName || "—"}</strong>
+            <span>{item.refNo || item.id || "—"}</span>
           </div>
         </div>
 
         <div className="item-details__grid">
           <div>
             <span>Category</span>
-            <p>{item.category}</p>
+            <p>{item.category || "—"}</p>
           </div>
           <div>
             <span>Company</span>
-            <p>{item.company}</p>
+            <p>{item.company || item.companyName || "—"}</p>
           </div>
           <div>
             <span>Size</span>
-            <p>{item.size}</p>
+            <p>{item.size || "—"}</p>
           </div>
           <div>
             <span>Lot No</span>
-            <p>{item.lotNo}</p>
+            <p>{item.lotNo || "—"}</p>
           </div>
           <div>
             <span>Invoice No</span>
-            <p>{item.invoiceNo}</p>
+            <p>{item.invoiceNo || item.invoiceNumber || item.documentNumber || "—"}</p>
           </div>
           <div>
             <span>Quantity</span>
-            <p>{item.qty}</p>
+            <p>{item.qty ?? item.quantity ?? "—"}</p>
           </div>
           <div>
             <span>Expiry Date</span>
-            <p>{formatDisplayDate(item.expiry)}</p>
+            <p>{formatDisplayDate(item.expiry || item.expiryDate)}</p>
           </div>
           <div>
             <span>Created</span>
-            <p>{formatDisplayDate(item.created)}</p>
+            <p>{formatDisplayDate(item.created || item.createdAt)}</p>
           </div>
         </div>
       </div>

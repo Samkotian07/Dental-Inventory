@@ -9,6 +9,7 @@ import DiscardConfirmModal from "../components/track-exchange/DiscardConfirmModa
 import { returnItems as seedData, inventoryOptions } from "../data/returnData.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
+import { useInventory } from "../context/InventoryContext.jsx";
 import "./TrackExchange.css";
 
 const PAGE_SIZE = 6;
@@ -44,17 +45,19 @@ export default function TrackReturns() {
   const [discardItem, setDiscardItem] = useState(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
 
+  const { returns } = useInventory();
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    let list = (returns || rows || []).filter((r) => {
       const matchesStatus = status === "All Status" || r.status === status;
       const matchesQuery =
         !q ||
-        r.returnId.toLowerCase().includes(q) ||
-        r.refNo.toLowerCase().includes(q) ||
-        r.creditNo.toLowerCase().includes(q) ||
-        r.reason.toLowerCase().includes(q) ||
-        r.productName.toLowerCase().includes(q);
+        (r.returnId || "").toLowerCase().includes(q) ||
+        (r.refNo || "").toLowerCase().includes(q) ||
+        (r.creditNo || r.creditNote || "").toLowerCase().includes(q) ||
+        (r.reason || "").toLowerCase().includes(q) ||
+        (r.productName || r.product || "").toLowerCase().includes(q);
       return matchesStatus && matchesQuery;
     });
 
@@ -68,7 +71,7 @@ export default function TrackReturns() {
     }
 
     return list;
-  }, [rows, query, status, sort]);
+  }, [returns, query, status, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);

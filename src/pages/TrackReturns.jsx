@@ -10,6 +10,7 @@ import DiscardConfirmModal from "../components/track-exchange/DiscardConfirmModa
 import { returnItems as seedData, inventoryOptions } from "../data/returnData.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
+import { useInventory } from "../context/InventoryContext.jsx";
 import "./TrackReturns.css";
 
 const PAGE_SIZE = 6;
@@ -34,8 +35,8 @@ function formatDate(isoOrDate) {
 
 export default function TrackReturns() {
   const onMenuClick = useMenuClick();
+  const { returns, addReturn, updateReturnStatus, discardReturn } = useInventory();
 
-  const [rows, setRows] = useState(seedData);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All Status");
   const [type, setType] = useState("All Types");
@@ -62,16 +63,16 @@ export default function TrackReturns() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    let list = (returns || []).filter((r) => {
       const matchesStatus = status === "All Status" || r.status === status;
       const matchesType = type === "All Types" || r.type === type;
       const matchesQuery =
         !q ||
-        r.returnId.toLowerCase().includes(q) ||
-        r.refNo.toLowerCase().includes(q) ||
-        r.creditNote.toLowerCase().includes(q) ||
-        r.reason.toLowerCase().includes(q) ||
-        r.productName.toLowerCase().includes(q);
+        (r.returnId || "").toLowerCase().includes(q) ||
+        (r.refNo || "").toLowerCase().includes(q) ||
+        (r.creditNote || "").toLowerCase().includes(q) ||
+        (r.reason || "").toLowerCase().includes(q) ||
+        (r.productName || r.product || "").toLowerCase().includes(q);
       return matchesStatus && matchesType && matchesQuery;
     });
 
@@ -85,7 +86,7 @@ export default function TrackReturns() {
     }
 
     return list;
-  }, [rows, query, status, type, sort]);
+  }, [returns, query, status, type, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -100,64 +101,41 @@ export default function TrackReturns() {
   };
 
   const handleUpdateStatus = (returnId, newStatus, extraData = {}) => {
-    const { creditNote, newBatchNo } = typeof extraData === "string" ? { creditNote: extraData } : (extraData || {});
-    setRows((prev) =>
-      prev.map((r) =>
-        r.returnId === returnId
-          ? { 
-              ...r, 
-              status: newStatus,
-              ...(creditNote !== undefined && creditNote !== "" && { creditNote }),
-              ...(newBatchNo !== undefined && newBatchNo !== "" && { newBatchNo })
-            }
-          : r
-      )
-    );
+    updateReturnStatus(returnId, newStatus, extraData);
     setStatusItem(null);
   };
 
   const handleDiscard = (returnId) => {
-    setRows((prev) => prev.filter((r) => r.returnId !== returnId));
+    discardReturn(returnId);
     setDiscardItem(null);
   };
 
   const handleAddExchange = (data) => {
     const item = inventoryOptions.find((i) => i.id === data.itemId);
-    const nextNum = rows.length + 1;
-    const newRow = {
-      returnId: `RET-${String(nextNum).padStart(3, "0")}`,
+    addReturn({
       type: "exchange",
-      refNo: data.itemId,
-      productName: item ? item.product : data.itemId,
-      oldBatchNo: data.oldBatchNo,
-      newBatchNo: data.newBatchNo,
-      quantity: data.quantity,
-      reason: data.reason,
-      returnDate: formatDate(data.returnDate),
-      creditNote: "",
-      status: "Pending",
-    };
-    setRows((prev) => [newRow, ...prev]);
-    setExchangeModalOpen(false);
-    setPage(1);
-  };
-
-  const handleAddCreditNote = (data) => {
-    const item = inventoryOptions.find((i) => i.id === data.itemId);
-    const nextNum = rows.length + 1;
-    const newRow = {
-      returnId: `RET-${String(nextNum).padStart(3, "0")}`,
-      type: "creditNote",
       refNo: data.itemId,
       productName: item ? item.product : data.itemId,
       batchNo: data.batchNo,
       quantity: data.quantity,
       reason: data.reason,
       returnDate: formatDate(data.returnDate),
-      creditNote: "",
-      status: "Pending",
-    };
-    setRows((prev) => [newRow, ...prev]);
+    });
+    setExchangeModalOpen(false);
+    setPage(1);
+  };
+
+  const handleAddCreditNote = (data) => {
+    const item = inventoryOptions.find((i) => i.id === data.itemId);
+    addReturn({
+      type: "return",
+      refNo: data.itemId,
+      productName: item ? item.product : data.itemId,
+      batchNo: data.batchNo,
+      quantity: data.quantity,
+      reason: data.reason,
+      returnDate: formatDate(data.returnDate),
+    });
     setCreditModalOpen(false);
     setPage(1);
   };

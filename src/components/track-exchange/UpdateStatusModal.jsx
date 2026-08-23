@@ -4,13 +4,16 @@ import Modal from "./Modal.jsx";
 const STATUS_OPTIONS = ["Pending", "In Progress", "Completed", "Rejected"];
 
 export default function UpdateStatusModal({ item, onClose, onConfirm }) {
-  const [status, setStatus] = useState(item.status);
-  const [creditNote, setCreditNote] = useState(item.creditNote || "");
+  if (!item) return null;
+
+  const [status, setStatus] = useState(item.status || "Pending");
+  const [creditNote, setCreditNote] = useState(item.creditNote || item.creditNo || "");
   const [newBatchNo, setNewBatchNo] = useState(item.newBatchNo || "");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const isReturn = item.type === "return" || item.type === "creditNote";
-  const isExchange = item.type === "exchange";
+  const rawType = String(item.type || "").toLowerCase();
+  const isReturn = rawType === "return" || rawType === "creditnote";
+  const isExchange = rawType === "exchange";
 
   const handleStatusChange = (e) => {
     const newStatus = e.target.value;
@@ -30,7 +33,7 @@ export default function UpdateStatusModal({ item, onClose, onConfirm }) {
       }
     }
 
-    onConfirm(item.returnId, status, {
+    onConfirm(item.returnId || item.id, status, {
       creditNote: creditNote.trim(),
       newBatchNo: newBatchNo.trim(),
     });

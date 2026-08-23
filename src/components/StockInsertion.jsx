@@ -4,6 +4,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
+import { useInventory } from "../context/InventoryContext.jsx";
 import Button from "./common/Button";
 import Input from "./common/Input";
 import Badge from "./common/Badge";
@@ -31,10 +32,15 @@ export default function StockInsertion() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { inventory, addInventory } = useData();
+  const { addStockItem, returns } = useInventory();
   const [csvPreview, setCsvPreview] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [documentType, setDocumentType] = useState("invoice"); // 'invoice' or 'creditNote'
   const fileInputRef = useRef(null);
+
+  const completedCreditNotes = (returns || [])
+    .filter((r) => r.creditNote)
+    .map((r) => r.creditNote);
 
   const [form, setForm] = useState({
     documentNumber: "",
@@ -59,16 +65,21 @@ export default function StockInsertion() {
       toast.error("Please fill all required fields");
       return;
     }
-    addInventory(
-      {
-        ...form,
-        refNo: generateId("INV"),
-        documentType: documentType,
-        quantity: Number(form.quantity),
-        status: "active",
-      },
-      user?.name,
-    );
+    const itemData = {
+      ...form,
+      refNo: generateId("INV"),
+      documentType: documentType,
+      invoiceNo: documentType === "invoice" ? form.documentNumber : "",
+      creditNoteNo: documentType === "creditNote" ? form.documentNumber : "",
+      qty: Number(form.quantity),
+      quantity: Number(form.quantity),
+      product: form.productName,
+      company: form.companyName,
+      expiry: form.expiryDate,
+      status: "active",
+    };
+    addInventory(itemData, user?.name);
+    addStockItem(itemData);
     toast.success(`New inventory item added successfully with ${documentType === 'invoice' ? 'Invoice' : 'Credit Note'} number`);
     setForm({
       documentNumber: "",
@@ -115,18 +126,21 @@ export default function StockInsertion() {
 
   const handleBulkImport = () => {
     csvPreview.forEach((row) => {
-      addInventory(
-        {
-          ...row,
-          refNo: row.refNo || generateId("INV"),
-          documentType: documentType,
-          category: row.category || "XYXX",
-          quantity: Number(row.quantity) || 0,
-          size: row.size || "",
-          status: "active",
-        },
-        user?.name,
-      );
+      const itemData = {
+        ...row,
+        refNo: row.refNo || generateId("INV"),
+        documentType: documentType,
+        category: row.category || "General",
+        qty: Number(row.quantity) || 1,
+        quantity: Number(row.quantity) || 1,
+        product: row.productName || row.product || "Dental Item",
+        company: row.companyName || row.company || "Vendor",
+        expiry: row.expiryDate || row.expiry || "",
+        size: row.size || "",
+        status: "active",
+      };
+      addInventory(itemData, user?.name);
+      addStockItem(itemData);
     });
     toast.success(`Imported ${csvPreview.length} items successfully`);
     setCsvPreview(null);
@@ -208,15 +222,32 @@ export default function StockInsertion() {
             </div>
 
             <div className="si-new-grid">
-              <Input
-                label={documentType === "invoice" ? "Invoice Number *" : "Credit Note Number *"}
-                value={form.documentNumber}
-                onChange={(e) =>
-                  setForm({ ...form, documentNumber: e.target.value })
-                }
-                placeholder={documentType === "invoice" ? "INV-2024-XXX" : "CN-2024-XXX"}
-                className="si-new-input"
-              />
+              <div className="si-new-field">
+                <label className="si-new-label">
+                  {documentType === "invoice" ? "Invoice Number *" : "Credit Note Number *"}
+                </label>
+                {documentType === "creditNote" && completedCreditNotes.length > 0 ? (
+                  <select
+                    className="si-new-select"
+                    value={form.documentNumber}
+                    onChange={(e) => setForm({ ...form, documentNumber: e.target.value })}
+                  >
+                    <option value="">Select available Credit Note...</option>
+                    {completedCreditNotes.map((cn) => (
+                      <option key={cn} value={cn}>
+                        {cn}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    value={form.documentNumber}
+                    onChange={(e) => setForm({ ...form, documentNumber: e.target.value })}
+                    placeholder={documentType === "invoice" ? "INV-2024-XXX" : "CN-2024-XXX"}
+                    className="si-new-input"
+                  />
+                )}
+              </div>
               <div className="si-new-field">
                 <label className="si-new-label">Category *</label>
                 <select

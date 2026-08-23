@@ -148,7 +148,7 @@ export default function Stock() {
 
           <button className="stock__btn" onClick={handleExport}>
             <Download size={15} strokeWidth={2.2} />
-            Export CSV
+            Export
           </button>
         </div>
 
