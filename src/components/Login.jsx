@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
+import inventoryIcon from "./icons/inventory.svg";
 import "./Login.css";
 
 export default function Login() {
@@ -61,9 +62,12 @@ export default function Login() {
 
   return (
     <div className="login-container">
-      <div className="login-card">
-        <div className="login-header">
-          <h1>🦷 YEN DENTAL</h1>
+        <div className="login-card">
+          <div className="login-header">
+          <div className="login-brand">
+            <img src={inventoryIcon} alt="" className="login-brand-icon" />
+            <h1>YEN LEDGER</h1>
+          </div>
           <p>Inventory Management System</p>
         </div>
 
