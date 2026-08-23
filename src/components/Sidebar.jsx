@@ -24,7 +24,7 @@ const navItems = [
   { label: "Student Details", to: "/students", icon: Users },
   { label: "Issued", to: "/issued", icon: ClipboardList },
   { label: "Failed Inventory", to: "/failed-inventory", icon: AlertTriangle },
-  { label: "Track Exchange", to: "/track-exchange", icon: Repeat },
+  { label: "Track Returns", to: "/track-exchange", icon: Repeat },
   { label: "Stock Insertion", to: "/stock-insertion", icon: PackagePlus },
   { label: "Stock Handle", to: "/stock-handle", icon: PackageMinus },
   { label: "Settings", to: "/settings", icon: Settings },

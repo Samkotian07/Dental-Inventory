@@ -1,0 +1,144 @@
+import { useState } from "react";
+import Modal from "./Modal.jsx";
+import { inventoryOptions } from "../../data/returnData.js";
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export default function ExchangeModal({ onClose, onConfirm }) {
+  const [itemId, setItemId] = useState("");
+  const [batchNo, setBatchNo] = useState("");
+  const [customBatch, setCustomBatch] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [reason, setReason] = useState("");
+  const [returnDate, setReturnDate] = useState(todayISO());
+
+  const selectedItem = inventoryOptions.find((i) => i.id === itemId);
+  const availableBatches = selectedItem?.batches || [];
+
+  const handleItemChange = (e) => {
+    const id = e.target.value;
+    setItemId(id);
+    const item = inventoryOptions.find((i) => i.id === id);
+    if (item?.batches && item.batches.length > 0) {
+      setBatchNo(item.batches[0]);
+    } else {
+      setBatchNo("");
+    }
+  };
+
+  const finalBatchNo = batchNo === "custom" ? customBatch : batchNo;
+  const canSubmit = itemId && quantity > 0 && finalBatchNo.trim() && reason.trim();
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    onConfirm({
+      itemId,
+      quantity: Number(quantity),
+      batchNo: finalBatchNo.trim(),
+      reason: reason.trim(),
+      returnDate,
+      type: "exchange",
+    });
+  };
+
+  return (
+    <Modal title="Exchange - Damaged Item" onClose={onClose} width={460}>
+      <div className="modal__field">
+        <label htmlFor="exch-item">Inventory Item (Ref No) *</label>
+        <select id="exch-item" value={itemId} onChange={handleItemChange}>
+          <option value="">Select item...</option>
+          {inventoryOptions.map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.product} ({i.id})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="modal__field">
+        <label htmlFor="exch-batch">Returned Item Batch / Lot No *</label>
+        {itemId && availableBatches.length > 0 ? (
+          <>
+            <select
+              id="exch-batch"
+              value={batchNo}
+              onChange={(e) => setBatchNo(e.target.value)}
+            >
+              {availableBatches.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+              <option value="custom">Other / Custom Lot...</option>
+            </select>
+
+            {batchNo === "custom" && (
+              <input
+                type="text"
+                placeholder="Enter custom batch no..."
+                style={{ marginTop: "6px" }}
+                value={customBatch}
+                onChange={(e) => setCustomBatch(e.target.value)}
+              />
+            )}
+          </>
+        ) : (
+          <input
+            id="exch-batch"
+            type="text"
+            placeholder="LOT-2024-001"
+            value={batchNo}
+            onChange={(e) => setBatchNo(e.target.value)}
+          />
+        )}
+      </div>
+
+      <div className="modal__field">
+        <label htmlFor="exch-qty">Quantity *</label>
+        <input
+          id="exch-qty"
+          type="number"
+          min="1"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+        />
+      </div>
+
+      <div className="modal__field">
+        <label htmlFor="exch-reason">Reason for Exchange *</label>
+        <textarea
+          id="exch-reason"
+          rows={3}
+          placeholder="Defective, Damaged, Expired, etc..."
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </div>
+
+      <div className="modal__field">
+        <label htmlFor="exch-date">Return Date</label>
+        <input
+          id="exch-date"
+          type="date"
+          value={returnDate}
+          onChange={(e) => setReturnDate(e.target.value)}
+        />
+      </div>
+
+      <div className="modal__actions">
+        <button className="modal__btn" onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          className="modal__btn modal__btn--primary"
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+        >
+          Create Exchange
+        </button>
+      </div>
+    </Modal>
+  );
+}

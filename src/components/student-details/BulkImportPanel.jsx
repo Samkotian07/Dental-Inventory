@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { Upload, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 import "./BulkImportPanel.css";
 
 // Minimal CSV parser for simple, unquoted-comma files with a header row.
@@ -35,14 +36,38 @@ export default function BulkImportPanel({ onImport }) {
 
   const handleFile = async (file) => {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      setFeedback({ type: "error", text: "Please upload a .csv file." });
+    
+    // Check if it's CSV or Excel
+    const isCsv = file.name.toLowerCase().endsWith(".csv");
+    const isExcel = file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xls");
+    
+    if (!isCsv && !isExcel) {
+      setFeedback({ type: "error", text: "Please upload a .csv or .xlsx file." });
       return;
     }
 
     try {
-      const text = await file.text();
-      const rows = parseCsv(text).filter((r) => r.name && r.campusId);
+      let rows = [];
+      
+      if (isCsv) {
+        const text = await file.text();
+        rows = parseCsv(text).filter((r) => r.name && r.campusId);
+      } else {
+        // Handle Excel file
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+        
+        rows = jsonData
+          .filter((r) => r.name && r.campusId)
+          .map((r) => ({
+            name: r.name,
+            campusId: r.campusId || r.campusid,
+            course: r.course || "",
+            semester: r.semester || "",
+          }));
+      }
 
       if (rows.length === 0) {
         setFeedback({
@@ -58,6 +83,48 @@ export default function BulkImportPanel({ onImport }) {
     } catch {
       setFeedback({ type: "error", text: "Couldn't read that file. Please try again." });
     }
+  };
+
+  // Download Excel Template (headers only)
+  const downloadTemplate = () => {
+    // Create headers only (no sample data)
+    const headers = ["name", "campusId", "course", "semester"];
+    
+    // Create workbook with headers only
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        name: "",
+        campusId: "",
+        course: "",
+        semester: ""
+      }
+    ]);
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 25 }, // name
+      { wch: 15 }, // campusId
+      { wch: 20 }, // course
+      { wch: 15 }, // semester
+    ];
+    
+    XLSX.utils.book_append_sheet(wb, ws, "Students");
+
+    // Generate Excel file
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "student_bulk_import_template.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    setFeedback({ type: "success", text: "Template downloaded successfully!" });
+    setTimeout(() => setFeedback(null), 3000);
   };
 
   return (
@@ -80,18 +147,24 @@ export default function BulkImportPanel({ onImport }) {
         </span>
 
         <div className="bulk-import__text">
-          <strong>Bulk Import Students</strong>
-          <span>Drag &amp; drop a CSV file or browse. Columns: name, campusId, course, semester</span>
+          <strong>Upload Excel or CSV</strong>
+          <span>Drag &amp; drop a file or browse. Supports .xlsx</span>
         </div>
 
-        <button className="bulk-import__browse" onClick={() => inputRef.current?.click()}>
-          Browse Files
-        </button>
+        <div className="bulk-import__actions">
+          <button className="bulk-import__download-btn" onClick={downloadTemplate}>
+            <FileSpreadsheet size={16} />
+            Download Template
+          </button>
+          <button className="bulk-import__browse" onClick={() => inputRef.current?.click()}>
+            Browse Files
+          </button>
+        </div>
 
         <input
           ref={inputRef}
           type="file"
-          accept=".csv"
+          accept=".csv,.xlsx,.xls"
           hidden
           onChange={(e) => handleFile(e.target.files?.[0])}
         />

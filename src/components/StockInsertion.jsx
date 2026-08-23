@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
-import { Search, PlusCircle, Upload, Check, Package, Download } from "lucide-react";
+import { Search, PlusCircle, Upload, Check, Package, Download, FileText, FileCheck, FileSpreadsheet } from "lucide-react";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
 import Button from "./common/Button";
@@ -14,9 +15,9 @@ import { toast } from "sonner";
 import { useMenuClick } from "./Layout.jsx";
 import "./StockInsertion.css";
 
-// CSV Template headers
-const CSV_TEMPLATE = [
-  "invoiceNumber",
+// Excel Template headers
+const EXCEL_HEADERS = [
+  "documentNumber",
   "category",
   "companyName",
   "productName",
@@ -32,10 +33,11 @@ export default function StockInsertion() {
   const { inventory, addInventory } = useData();
   const [csvPreview, setCsvPreview] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [documentType, setDocumentType] = useState("invoice"); // 'invoice' or 'creditNote'
   const fileInputRef = useRef(null);
 
   const [form, setForm] = useState({
-    invoiceNumber: "",
+    documentNumber: "",
     category: CATEGORIES[0],
     companyName: "",
     productName: "",
@@ -47,7 +49,7 @@ export default function StockInsertion() {
 
   const handleNewSubmit = () => {
     if (
-      !form.invoiceNumber ||
+      !form.documentNumber ||
       !form.companyName ||
       !form.productName ||
       !form.lotNo ||
@@ -61,14 +63,15 @@ export default function StockInsertion() {
       {
         ...form,
         refNo: generateId("INV"),
+        documentType: documentType,
         quantity: Number(form.quantity),
         status: "active",
       },
       user?.name,
     );
-    toast.success("New inventory item added successfully");
+    toast.success(`New inventory item added successfully with ${documentType === 'invoice' ? 'Invoice' : 'Credit Note'} number`);
     setForm({
-      invoiceNumber: "",
+      documentNumber: "",
       category: CATEGORIES[0],
       companyName: "",
       productName: "",
@@ -81,18 +84,27 @@ export default function StockInsertion() {
 
   const handleFile = (file) => {
     if (!file) return;
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const valid = results.data.filter((r) => r.productName && r.lotNo);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+        
+        const valid = jsonData.filter((r) => r.productName && r.lotNo);
         if (valid.length === 0) {
           toast.error("No valid rows found");
           return;
         }
         setCsvPreview(valid);
-      },
-    });
+      } catch (error) {
+        toast.error("Error reading file. Please check the format.");
+        console.error(error);
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const handleDrop = (e) => {
@@ -107,6 +119,7 @@ export default function StockInsertion() {
         {
           ...row,
           refNo: row.refNo || generateId("INV"),
+          documentType: documentType,
           category: row.category || "XYXX",
           quantity: Number(row.quantity) || 0,
           size: row.size || "",
@@ -119,31 +132,45 @@ export default function StockInsertion() {
     setCsvPreview(null);
   };
 
-  // Download CSV Template
+  // Download Excel Template (headers only - no sample data)
   const downloadTemplate = () => {
-    // Create header row
-    const headerRow = CSV_TEMPLATE.join(",");
-    
-    // Create sample data row
-    const sampleRow = [
-      "INV-2024-001",
-      "CONSUMABLES",
-      "Dental Supplies Co.",
-      "Dental Floss",
-      "50m",
-      "LOT-2024-001",
-      "100",
-      "2026-12-31"
-    ].join(",");
-    
-    const csvContent = `${headerRow}\n${sampleRow}`;
-    
-    // Create and download the file
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    // Create workbook with headers only (empty row)
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        documentNumber: "",
+        category: "",
+        companyName: "",
+        productName: "",
+        size: "",
+        lotNo: "",
+        quantity: "",
+        expiryDate: ""
+      }
+    ]);
+
+    // Auto-size columns
+    const colWidths = [
+      { wch: 18 }, // documentNumber
+      { wch: 15 }, // category
+      { wch: 25 }, // companyName
+      { wch: 25 }, // productName
+      { wch: 12 }, // size
+      { wch: 15 }, // lotNo
+      { wch: 10 }, // quantity
+      { wch: 15 }, // expiryDate
+    ];
+    ws['!cols'] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, "Inventory");
+
+    // Generate Excel file
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "inventory_template.csv";
+    link.download = "inventory_template.xlsx";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -160,15 +187,34 @@ export default function StockInsertion() {
         <div className="si-container">
           {/* New Item Section */}
           <div className="si-new-section">
-            <h3 className="si-section-title">Add New Inventory Item</h3>
+            <div className="si-header-row">
+              <h3 className="si-section-title">Add New Inventory Item</h3>
+              <div className="si-doc-type-toggle">
+                <button
+                  onClick={() => setDocumentType("invoice")}
+                  className={`si-doc-btn ${documentType === "invoice" ? "si-doc-active" : "si-doc-inactive"}`}
+                >
+                  <FileText size={16} />
+                  Invoice
+                </button>
+                <button
+                  onClick={() => setDocumentType("creditNote")}
+                  className={`si-doc-btn ${documentType === "creditNote" ? "si-doc-active" : "si-doc-inactive"}`}
+                >
+                  <FileCheck size={16} />
+                  Credit Note
+                </button>
+              </div>
+            </div>
+
             <div className="si-new-grid">
               <Input
-                label="Invoice Number *"
-                value={form.invoiceNumber}
+                label={documentType === "invoice" ? "Invoice Number *" : "Credit Note Number *"}
+                value={form.documentNumber}
                 onChange={(e) =>
-                  setForm({ ...form, invoiceNumber: e.target.value })
+                  setForm({ ...form, documentNumber: e.target.value })
                 }
-                placeholder="INV-2024-XXX"
+                placeholder={documentType === "invoice" ? "INV-2024-XXX" : "CN-2024-XXX"}
                 className="si-new-input"
               />
               <div className="si-new-field">
@@ -235,7 +281,7 @@ export default function StockInsertion() {
             </div>
           </div>
 
-          {/* Bulk Import Section with Download CSV */}
+          {/* Bulk Import Section with Download Excel */}
           <div className="si-bulk-section-wrapper">
             <div className="si-bulk-header">
               <h3 className="si-section-title">Bulk Import Inventory</h3>
@@ -244,7 +290,7 @@ export default function StockInsertion() {
                 onClick={downloadTemplate}
                 className="si-download-btn"
               >
-                <Download size={16} /> Download CSV Template
+                <Download size={16} /> Download Template
               </Button>
             </div>
 
@@ -263,12 +309,9 @@ export default function StockInsertion() {
                     <Upload size={22} />
                   </div>
                   <div>
-                    <p className="si-bulk-title">Upload CSV File</p>
+                    <p className="si-bulk-title">Upload Excel File</p>
                     <p className="si-bulk-desc">
-                      Drag & drop a CSV file or click Browse. Required columns:{" "}
-                      <span className="si-bulk-columns">
-                        invoiceNumber, category, companyName, productName, size, lotNo, quantity, expiryDate
-                      </span>
+                      Drag & drop an Excel file (.xlsx) or click Browse.
                     </p>
                   </div>
                 </div>
@@ -282,7 +325,7 @@ export default function StockInsertion() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv"
+                  accept=".xlsx,.xls"
                   className="si-hidden-input"
                   onChange={(e) => handleFile(e.target.files[0])}
                 />
@@ -317,6 +360,7 @@ export default function StockInsertion() {
                   <thead>
                     <tr className="si-preview-header">
                       {[
+                        "Document Number",
                         "Product",
                         "Category",
                         "Company",
@@ -333,6 +377,7 @@ export default function StockInsertion() {
                   <tbody>
                     {csvPreview.map((row, i) => (
                       <tr key={i} className="si-preview-row">
+                        <td className="si-preview-td si-preview-lot">{row.documentNumber}</td>
                         <td className="si-preview-td">{row.productName}</td>
                         <td className="si-preview-td">
                           <Badge variant="primary">{row.category || "XYXX"}</Badge>

@@ -2,9 +2,9 @@ import Modal from "./Modal.jsx";
 
 export default function DiscardConfirmModal({ item, onClose, onConfirm }) {
   return (
-    <Modal title="Discard Exchange Record" onClose={onClose} width={420}>
+    <Modal title="Discard Record" onClose={onClose} width={420}>
       <p className="modal__lead">
-        This will permanently remove <strong>{item.exchangeId}</strong> ({item.reason}) from the
+        This will permanently remove <strong>{item.returnId}</strong> ({item.reason}) from the
         list. This can't be undone.
       </p>
 
@@ -14,7 +14,7 @@ export default function DiscardConfirmModal({ item, onClose, onConfirm }) {
         </button>
         <button
           className="modal__btn modal__btn--danger"
-          onClick={() => onConfirm(item.exchangeId)}
+          onClick={() => onConfirm(item.returnId)}
         >
           Discard
         </button>

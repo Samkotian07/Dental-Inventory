@@ -1,0 +1,347 @@
+.returns {
+  padding: 20px 28px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.returns__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.returns__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.returns__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.returns__search input {
+  border: none;
+  background: transparent;
+  padding: 9px 0;
+  font-size: 13px;
+  color: var(--ink);
+  min-width: 200px;
+}
+
+.returns__search input:focus {
+  outline: none;
+}
+
+.returns__search input::placeholder {
+  color: var(--ink-soft);
+}
+
+.returns__filters select {
+  padding: 9px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.returns__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.returns__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.returns__btn:hover {
+  background: var(--accent-soft);
+}
+
+.returns__btn--primary {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+  color: #ffffff;
+}
+
+.returns__btn--primary:hover {
+  background: #1f1f22;
+}
+
+/* Dropdown Menu */
+.returns__dropdown {
+  position: relative;
+}
+
+.returns__dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.returns__dropdown-menu button {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.returns__dropdown-menu button:hover {
+  background: var(--accent-soft);
+}
+
+.returns__dropdown-menu button:not(:last-child) {
+  border-bottom: 1px solid var(--line);
+}
+
+.returns__card {
+  padding: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 2px rgba(20, 20, 22, 0.02);
+}
+
+.returns__scroll {
+  overflow-x: auto;
+  padding: 0 4px;
+}
+
+.returns__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 700px;
+}
+
+.returns__table th {
+  padding: 14px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.returns__table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.returns__table tbody tr:hover {
+  background: var(--bg);
+}
+
+.returns__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0;
+}
+
+.returns__sort:hover {
+  color: var(--ink);
+}
+
+.returns__mono {
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
+}
+
+.returns__strong {
+  font-weight: 600;
+}
+
+.returns__empty {
+  text-align: center;
+  color: var(--ink-soft);
+  padding: 40px 0;
+}
+
+.returns__actions-head {
+  text-align: right;
+}
+
+.returns__row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.returns__icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.returns__icon-btn:hover {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.returns__icon-btn--danger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Status Badge */
+.ret-status-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.ret-status-pill--pending {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.ret-status-pill--in-progress {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.ret-status-pill--completed {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.ret-status-pill--rejected {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Type Badge */
+.ret-type-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ret-type-badge--exchange {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.ret-type-badge--creditNote,
+.ret-type-badge--return {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+@media (max-width: 640px) {
+  .returns {
+    padding: 16px;
+  }
+
+  .returns__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .returns__filters {
+    flex-direction: column;
+  }
+
+  .returns__search input {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .returns__filters select {
+    width: 100%;
+  }
+
+  .returns__actions {
+    flex-direction: column;
+  }
+
+  .returns__btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .returns__dropdown-menu {
+    right: unset;
+    left: 0;
+  }
+}
+.ret-type-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ret-type-badge--exchange {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.ret-type-badge--creditNote {
+  background: #fef3c7;
+  color: #d97706;
+}

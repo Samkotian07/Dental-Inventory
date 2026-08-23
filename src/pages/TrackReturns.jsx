@@ -1,25 +1,27 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Search, Download, Plus, Eye, RefreshCw, Trash2, ArrowUpDown } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import ReturnDetailsModal from "../components/track-exchange/ReturnDetailsModal.jsx";
 import UpdateStatusModal from "../components/track-exchange/UpdateStatusModal.jsx";
-import AddReturnModal from "../components/track-exchange/AddReturnModal.jsx";
+import ExchangeModal from "../components/track-exchange/ExchangeModal.jsx";
+import CreditNoteModal from "../components/track-exchange/CreditNoteModal.jsx";
 import DiscardConfirmModal from "../components/track-exchange/DiscardConfirmModal.jsx";
 import { returnItems as seedData, inventoryOptions } from "../data/returnData.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
-import "./TrackExchange.css";
+import "./TrackReturns.css";
 
 const PAGE_SIZE = 6;
 
 const CSV_COLUMNS = [
   { key: "returnId", label: "Return ID" },
-  { key: "refNo", label: "Item (Ref No)" },
+  { key: "type", label: "Type" },
+  { key: "refNo", label: "Ref No" },
   { key: "productName", label: "Product" },
   { key: "quantity", label: "Quantity" },
   { key: "reason", label: "Reason" },
-  { key: "creditNo", label: "Credit Note" },
+  { key: "creditNote", label: "Credit Note" },
   { key: "returnDate", label: "Return Date" },
   { key: "status", label: "Status" },
 ];
@@ -36,26 +38,41 @@ export default function TrackReturns() {
   const [rows, setRows] = useState(seedData);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All Status");
+  const [type, setType] = useState("All Types");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
 
   const [detailItem, setDetailItem] = useState(null);
   const [statusItem, setStatusItem] = useState(null);
   const [discardItem, setDiscardItem] = useState(null);
-  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [exchangeModalOpen, setExchangeModalOpen] = useState(false);
+  const [creditModalOpen, setCreditModalOpen] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowCreateMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = rows.filter((r) => {
       const matchesStatus = status === "All Status" || r.status === status;
+      const matchesType = type === "All Types" || r.type === type;
       const matchesQuery =
         !q ||
         r.returnId.toLowerCase().includes(q) ||
         r.refNo.toLowerCase().includes(q) ||
-        r.creditNo.toLowerCase().includes(q) ||
+        r.creditNote.toLowerCase().includes(q) ||
         r.reason.toLowerCase().includes(q) ||
         r.productName.toLowerCase().includes(q);
-      return matchesStatus && matchesQuery;
+      return matchesStatus && matchesType && matchesQuery;
     });
 
     if (sort.key) {
@@ -68,7 +85,7 @@ export default function TrackReturns() {
     }
 
     return list;
-  }, [rows, query, status, sort]);
+  }, [rows, query, status, type, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -82,9 +99,19 @@ export default function TrackReturns() {
     exportToCsv(`track-returns-${new Date().toISOString().slice(0, 10)}`, CSV_COLUMNS, filtered);
   };
 
-  const handleUpdateStatus = (returnId, newStatus) => {
+  const handleUpdateStatus = (returnId, newStatus, extraData = {}) => {
+    const { creditNote, newBatchNo } = typeof extraData === "string" ? { creditNote: extraData } : (extraData || {});
     setRows((prev) =>
-      prev.map((r) => (r.returnId === returnId ? { ...r, status: newStatus } : r))
+      prev.map((r) =>
+        r.returnId === returnId
+          ? { 
+              ...r, 
+              status: newStatus,
+              ...(creditNote !== undefined && creditNote !== "" && { creditNote }),
+              ...(newBatchNo !== undefined && newBatchNo !== "" && { newBatchNo })
+            }
+          : r
+      )
     );
     setStatusItem(null);
   };
@@ -94,31 +121,55 @@ export default function TrackReturns() {
     setDiscardItem(null);
   };
 
-  const handleAddReturn = ({ itemId, quantity, reason, creditNo, returnDate }) => {
-    // Find the item details from inventory
-    const item = inventoryOptions.find((i) => i.id === itemId);
+  const handleAddExchange = (data) => {
+    const item = inventoryOptions.find((i) => i.id === data.itemId);
     const nextNum = rows.length + 1;
     const newRow = {
       returnId: `RET-${String(nextNum).padStart(3, "0")}`,
-      refNo: itemId,
-      productName: item?.product || itemId,
-      quantity: quantity,
-      reason: reason,
-      creditNo: creditNo,
-      returnDate: formatDate(returnDate),
+      type: "exchange",
+      refNo: data.itemId,
+      productName: item ? item.product : data.itemId,
+      oldBatchNo: data.oldBatchNo,
+      newBatchNo: data.newBatchNo,
+      quantity: data.quantity,
+      reason: data.reason,
+      returnDate: formatDate(data.returnDate),
+      creditNote: "",
       status: "Pending",
     };
     setRows((prev) => [newRow, ...prev]);
-    setAddModalOpen(false);
+    setExchangeModalOpen(false);
+    setPage(1);
+  };
+
+  const handleAddCreditNote = (data) => {
+    const item = inventoryOptions.find((i) => i.id === data.itemId);
+    const nextNum = rows.length + 1;
+    const newRow = {
+      returnId: `RET-${String(nextNum).padStart(3, "0")}`,
+      type: "creditNote",
+      refNo: data.itemId,
+      productName: item ? item.product : data.itemId,
+      batchNo: data.batchNo,
+      quantity: data.quantity,
+      reason: data.reason,
+      returnDate: formatDate(data.returnDate),
+      creditNote: "",
+      status: "Pending",
+    };
+    setRows((prev) => [newRow, ...prev]);
+    setCreditModalOpen(false);
     setPage(1);
   };
 
   const columns = [
     { key: "returnId", label: "Return ID" },
+    { key: "type", label: "Type" },
     { key: "refNo", label: "Ref No" },
     { key: "productName", label: "Product" },
     { key: "quantity", label: "Qty" },
-    { key: "creditNo", label: "Credit Note" },
+    { key: "batchNo", label: "Batch No" },
+    { key: "creditNote", label: "Credit Note / Repl" },
     { key: "returnDate", label: "Return Date" },
     { key: "status", label: "Status" },
   ];
@@ -152,8 +203,21 @@ export default function TrackReturns() {
             >
               <option>All Status</option>
               <option>Pending</option>
+              <option>In Progress</option>
               <option>Completed</option>
               <option>Rejected</option>
+            </select>
+
+            <select
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option>All Types</option>
+              <option value="exchange">Exchange</option>
+              <option value="return">Return</option>
             </select>
           </div>
 
@@ -162,13 +226,25 @@ export default function TrackReturns() {
               <Download size={15} strokeWidth={2.2} />
               Export
             </button>
-            <button
-              className="returns__btn returns__btn--primary"
-              onClick={() => setAddModalOpen(true)}
-            >
-              <Plus size={15} strokeWidth={2.4} />
-              Return to Manufacturer
-            </button>
+            <div className="returns__dropdown" ref={dropdownRef}>
+              <button
+                className="returns__btn returns__btn--primary"
+                onClick={() => setShowCreateMenu(!showCreateMenu)}
+              >
+                <Plus size={15} strokeWidth={2.4} />
+                Create Return
+              </button>
+              {showCreateMenu && (
+                <div className="returns__dropdown-menu">
+                  <button onClick={() => { setExchangeModalOpen(true); setShowCreateMenu(false); }}>
+                    🔄 Exchange (Damaged)
+                  </button>
+                  <button onClick={() => { setCreditModalOpen(true); setShowCreateMenu(false); }}>
+                    📄 Return (Overstock / Defective)
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -200,13 +276,25 @@ export default function TrackReturns() {
                 {pageRows.map((row) => (
                   <tr key={row.returnId}>
                     <td className="returns__mono">{row.returnId}</td>
+                    <td>
+                      <span className={`ret-type-badge ret-type-badge--${row.type}`}>
+                        {row.type === "exchange" ? "🔄 Exchange" : "📄 Return"}
+                      </span>
+                    </td>
                     <td className="returns__mono">{row.refNo}</td>
                     <td>{row.productName}</td>
                     <td>{row.quantity}</td>
-                    <td className="returns__mono">{row.creditNo}</td>
+                    <td className="returns__mono">{row.batchNo || row.oldBatchNo || "—"}</td>
+                    <td className="returns__mono">
+                      {row.type === "exchange"
+                        ? row.newBatchNo
+                          ? `LOT: ${row.newBatchNo}`
+                          : "—"
+                        : row.creditNote || "—"}
+                    </td>
                     <td>{row.returnDate}</td>
                     <td>
-                      <span className={`ret-status-pill ret-status-pill--${row.status.toLowerCase()}`}>
+                      <span className={`ret-status-pill ret-status-pill--${row.status.toLowerCase().replace(/\s+/g, "-")}`}>
                         {row.status.toLowerCase()}
                       </span>
                     </td>
@@ -221,7 +309,7 @@ export default function TrackReturns() {
                           <Eye size={16} strokeWidth={2} />
                         </button>
 
-                        {row.status !== "Completed" && (
+                        {row.status !== "Completed" && row.status !== "Rejected" && (
                           <button
                             className="returns__icon-btn"
                             onClick={() => setStatusItem(row)}
@@ -232,16 +320,14 @@ export default function TrackReturns() {
                           </button>
                         )}
 
-                        {row.status === "Completed" && (
-                          <button
-                            className="returns__icon-btn returns__icon-btn--danger"
-                            onClick={() => setDiscardItem(row)}
-                            aria-label={`Discard ${row.returnId}`}
-                            title="Discard record"
-                          >
-                            <Trash2 size={15} strokeWidth={2} />
-                          </button>
-                        )}
+                        <button
+                          className="returns__icon-btn returns__icon-btn--danger"
+                          onClick={() => setDiscardItem(row)}
+                          aria-label={`Discard ${row.returnId}`}
+                          title="Discard record"
+                        >
+                          <Trash2 size={15} strokeWidth={2} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -278,8 +364,12 @@ export default function TrackReturns() {
         />
       )}
 
-      {addModalOpen && (
-        <AddReturnModal onClose={() => setAddModalOpen(false)} onConfirm={handleAddReturn} />
+      {exchangeModalOpen && (
+        <ExchangeModal onClose={() => setExchangeModalOpen(false)} onConfirm={handleAddExchange} />
+      )}
+
+      {creditModalOpen && (
+        <CreditNoteModal onClose={() => setCreditModalOpen(false)} onConfirm={handleAddCreditNote} />
       )}
     </>
   );

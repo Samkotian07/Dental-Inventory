@@ -5,7 +5,7 @@ import Login from "./components/Login.jsx";
 import Landing from "./pages/Landing.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import IssuedItems from "./pages/IssuedItems.jsx";
-import TrackExchange from "./pages/TrackExchange.jsx";
+import TrackReturns from "./pages/TrackReturns.jsx";
 import StudentDetails from "./pages/StudentDetails.jsx";
 import Stock from "./pages/Stock.jsx";
 import FailedInventory from "./pages/FailedInventory.jsx";
@@ -59,7 +59,8 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/students" element={<StudentDetails />} />
         <Route path="/issued" element={<IssuedItems />} />
-        <Route path="/track-exchange" element={<TrackExchange />} />
+        <Route path="/track-exchange" element={<TrackReturns />} />
+        <Route path="/track-returns" element={<TrackReturns />} />
         <Route path="/stock" element={<Stock />} />
         <Route path="/failed-inventory" element={<FailedInventory />} />
         <Route path="/stock-insertion" element={<StockInsertion />} />

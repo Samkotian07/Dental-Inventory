@@ -58,5 +58,6 @@
   font-weight: 500;
   color: var(--ink);
   transition: color 0.25s ease;
+  -webkit-user-select: none;
   user-select: none;
 }

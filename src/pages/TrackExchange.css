@@ -1,3 +1,4 @@
+.returns,
 .exchange {
   padding: 22px 28px 60px;
   display: flex;
@@ -5,6 +6,7 @@
   gap: 16px;
 }
 
+.returns__toolbar,
 .exchange__toolbar {
   display: flex;
   align-items: center;
@@ -13,6 +15,7 @@
   flex-wrap: wrap;
 }
 
+.returns__filters,
 .exchange__filters {
   display: flex;
   gap: 10px;
@@ -20,6 +23,7 @@
   min-width: 260px;
 }
 
+.returns__search,
 .exchange__search {
   display: flex;
   align-items: center;
@@ -33,6 +37,7 @@
   color: var(--ink-soft);
 }
 
+.returns__search input,
 .exchange__search input {
   border: none;
   background: transparent;
@@ -43,6 +48,7 @@
   font-family: var(--font-body);
 }
 
+.returns__filters select,
 .exchange__filters select {
   border: 1px solid var(--line);
   background: var(--surface);
@@ -53,11 +59,13 @@
   font-family: var(--font-body);
 }
 
+.returns__actions,
 .exchange__actions {
   display: flex;
   gap: 10px;
 }
 
+.returns__btn,
 .exchange__btn {
   display: flex;
   align-items: center;
@@ -72,34 +80,41 @@
   white-space: nowrap;
 }
 
+.returns__btn:hover,
 .exchange__btn:hover {
   border-color: var(--accent-deep);
 }
 
+.returns__btn--primary,
 .exchange__btn--primary {
   background: var(--accent-deep);
   border-color: var(--accent-deep);
   color: #fff;
 }
 
+.returns__btn--primary:hover,
 .exchange__btn--primary:hover {
   background: #2B2B2E;
 }
 
+.returns__card,
 .exchange__card {
   padding: 0;
   overflow: hidden;
 }
 
+.returns__scroll,
 .exchange__scroll {
   overflow-x: auto;
 }
 
+.returns__table,
 .exchange__table {
   width: 100%;
   border-collapse: collapse;
 }
 
+.returns__table th,
 .exchange__table th {
   text-align: left;
   padding: 14px 16px;
@@ -107,6 +122,7 @@
   white-space: nowrap;
 }
 
+.returns__sort,
 .exchange__sort {
   display: inline-flex;
   align-items: center;
@@ -121,10 +137,12 @@
   padding: 0;
 }
 
+.returns__sort:hover,
 .exchange__sort:hover {
   color: var(--ink);
 }
 
+.returns__actions-head,
 .exchange__actions-head {
   text-align: right;
   padding: 14px 16px;
@@ -136,6 +154,7 @@
   color: var(--ink-soft);
 }
 
+.returns__table td,
 .exchange__table td {
   padding: 14px 16px;
   border-bottom: 1px solid var(--line);
@@ -144,26 +163,31 @@
   white-space: nowrap;
 }
 
+.returns__table tr:last-child td,
 .exchange__table tr:last-child td {
   border-bottom: none;
 }
 
+.returns__strong,
 .exchange__strong {
   font-weight: 600;
 }
 
+.returns__mono,
 .exchange__mono {
   color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
   font-size: 12.5px;
 }
 
+.returns__empty,
 .exchange__empty {
   text-align: center;
   color: var(--ink-soft);
   padding: 40px 0;
 }
 
+.returns__row-actions,
 .exchange__row-actions {
   display: flex;
   align-items: center;
@@ -171,6 +195,7 @@
   gap: 6px;
 }
 
+.returns__icon-btn,
 .exchange__icon-btn {
   width: 30px;
   height: 30px;
@@ -182,54 +207,91 @@
   place-items: center;
 }
 
+.returns__icon-btn:hover,
 .exchange__icon-btn:hover {
   border-color: var(--line);
   background: var(--accent-soft);
   color: var(--ink);
 }
 
+.returns__icon-btn--danger:hover,
 .exchange__icon-btn--danger:hover {
   border-color: #F5C7BC;
   background: #FDEDEA;
   color: var(--danger);
 }
 
+.returns__card > .pagination,
 .exchange__card > .pagination {
   padding: 14px 16px 16px;
 }
 
+/* Status pills */
+.ret-status-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-transform: lowercase;
+}
+
+.ret-status-pill--pending {
+  background: var(--accent-deep);
+  color: #fff;
+}
+
+.ret-status-pill--completed {
+  background: var(--panel);
+  color: var(--ink-soft);
+}
+
+.ret-status-pill--rejected {
+  background: #FDEDEA;
+  color: var(--danger);
+}
+
 @media (max-width: 1024px) {
+  .returns,
   .exchange {
     padding: 18px 20px 50px;
   }
 
+  .returns__toolbar,
   .exchange__toolbar {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .returns__filters,
   .exchange__filters {
     min-width: 0;
   }
 
+  .returns__search,
   .exchange__search {
     max-width: none;
   }
 
+  .returns__actions,
   .exchange__actions {
     justify-content: flex-end;
   }
 
+  .returns__btn,
   .exchange__btn {
     padding: 12px 16px;
     font-size: 13.5px;
   }
 
+  .returns__icon-btn,
   .exchange__icon-btn {
     width: 36px;
     height: 36px;
   }
 
+  .returns__table th,
+  .returns__table td,
   .exchange__table th,
   .exchange__table td {
     padding: 16px 14px;
@@ -237,18 +299,22 @@
 }
 
 @media (max-width: 640px) {
+  .returns,
   .exchange {
     padding: 16px 12px 44px;
   }
 
+  .returns__filters,
   .exchange__filters {
     flex-direction: column;
   }
 
+  .returns__actions,
   .exchange__actions {
     justify-content: stretch;
   }
 
+  .returns__btn,
   .exchange__btn {
     flex: 1;
     justify-content: center;

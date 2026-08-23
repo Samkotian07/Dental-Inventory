@@ -369,3 +369,72 @@
     align-items: stretch;
   }
 }
+/* Document Type Toggle */
+.si-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.si-header-row .si-section-title {
+  margin: 0;
+}
+
+.si-doc-type-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  padding: 4px;
+  background: var(--surface);
+}
+
+.si-doc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.si-doc-btn:hover {
+  color: var(--ink);
+}
+
+.si-doc-active {
+  background: var(--accent-deep);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+
+.si-doc-active:hover {
+  background: #1f1f22;
+  color: #ffffff;
+}
+
+.si-doc-inactive {
+  color: var(--ink-soft);
+}
+
+/* Bulk Import Hint */
+.si-bulk-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.si-bulk-hint-label {
+  font-weight: 600;
+  color: var(--ink);
+}

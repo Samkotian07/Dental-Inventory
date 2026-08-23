@@ -1,0 +1,17 @@
+.ret-type-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ret-type-badge--exchange {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.ret-type-badge--creditNote {
+  background: #fef3c7;
+  color: #d97706;
+}
