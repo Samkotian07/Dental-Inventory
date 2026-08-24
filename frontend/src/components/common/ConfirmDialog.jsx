@@ -1,6 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import Modal from './Modal';
-import Button from './Button';
+import './ConfirmDialog.css';
 
 export default function ConfirmDialog({
   isOpen,
@@ -13,25 +12,33 @@ export default function ConfirmDialog({
   variant = 'danger',
   children,
 }) {
+  if (!isOpen) return null;
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
-      <div className="flex gap-4">
-        <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${variant === 'danger' ? 'bg-error-50 dark:bg-error-500/10' : 'bg-warning-50 dark:bg-warning-500/10'}`}>
-          <AlertTriangle size={20} className={variant === 'danger' ? 'text-error-500' : 'text-warning-500'} />
+    <div className="confirm-dialog-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
+      <div className="confirm-dialog-card" onClick={(e) => e.stopPropagation()}>
+        <div className="confirm-dialog-body">
+          <div className={`confirm-dialog-icon-wrapper ${variant}`}>
+            <AlertTriangle size={22} strokeWidth={2.2} />
+          </div>
+          <div className="confirm-dialog-content">
+            <h3 className="confirm-dialog-title">{title}</h3>
+            <p className="confirm-dialog-message">{message}</p>
+            {children}
+          </div>
         </div>
-        <div className="flex-1">
-          <p className="text-gray-600 dark:text-gray-300 text-sm">{message}</p>
-          {children}
+        <div className="confirm-dialog-actions">
+          <button className="confirm-dialog-btn confirm-dialog-btn-cancel" onClick={onClose}>
+            {cancelLabel}
+          </button>
+          <button
+            className={`confirm-dialog-btn confirm-dialog-btn-${variant}`}
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
         </div>
       </div>
-      <div className="flex justify-end gap-3 mt-6">
-        <Button variant="secondary" onClick={onClose}>
-          {cancelLabel}
-        </Button>
-        <Button variant={variant} onClick={onConfirm}>
-          {confirmLabel}
-        </Button>
-      </div>
-    </Modal>
+    </div>
   );
 }

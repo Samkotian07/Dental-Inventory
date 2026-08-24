@@ -17,25 +17,26 @@ def get_students():
 @students_bp.route('/search', methods=['GET'])
 @token_required
 def search_students():
-    """Search students by name"""
-    name = request.args.get('name', '')
-    if not name:
+    """Search students by name, campusId, course, or email"""
+    query_str = request.args.get('name', '') or request.args.get('q', '')
+    if not query_str:
+        students = Student.find_all()
         return jsonify({
             'success': True,
-            'data': []
+            'data': [s.to_dict() for s in students]
         }), 200
     
-    students = Student.find_by_name(name)
+    students = Student.search(query_str)
     return jsonify({
         'success': True,
         'data': [s.to_dict() for s in students]
     }), 200
 
-@students_bp.route('/<student_id>', methods=['GET'])
+@students_bp.route('/<campus_id>', methods=['GET'])
 @token_required
-def get_student(student_id):
-    """Get student by ID"""
-    student = Student.find_by_id(student_id)
+def get_student(campus_id):
+    """Get student by Campus ID"""
+    student = Student.find_by_campus_id(campus_id)
     if not student:
         return jsonify({
             'success': False,
@@ -72,11 +73,11 @@ def create_student():
         'message': 'Student created successfully'
     }), 201
 
-@students_bp.route('/<student_id>', methods=['PUT'])
+@students_bp.route('/<campus_id>', methods=['PUT'])
 @token_required
-def update_student(student_id):
+def update_student(campus_id):
     """Update a student"""
-    student = Student.find_by_id(student_id)
+    student = Student.find_by_campus_id(campus_id)
     if not student:
         return jsonify({
             'success': False,
@@ -103,11 +104,11 @@ def update_student(student_id):
         'message': 'Student updated successfully'
     }), 200
 
-@students_bp.route('/<student_id>', methods=['DELETE'])
+@students_bp.route('/<campus_id>', methods=['DELETE'])
 @token_required
-def delete_student(student_id):
+def delete_student(campus_id):
     """Delete a student"""
-    student = Student.find_by_id(student_id)
+    student = Student.find_by_campus_id(campus_id)
     if not student:
         return jsonify({
             'success': False,

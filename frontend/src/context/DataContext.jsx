@@ -1,297 +1,287 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import {
-  students,
-  issuedItems,
-  exchangeItems,
-  inventory,
-} from "../data/studentData";
 
 const DataContext = createContext();
+const API_URL = "http://localhost:5000/api";
+
+// Helper function to get auth headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("dental_token");
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`
+  };
+};
 
 export function DataProvider({ children }) {
-  // State
-  const [inventoryState, setInventoryState] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [staff, setStaff] = useState([]);
-  const [studentsState, setStudentsState] = useState([]);
-  const [issuedItemsState, setIssuedItemsState] = useState([]);
-  const [exchangesState, setExchangesState] = useState([]);
-  const [settings, setSettings] = useState({ lowQuantityThreshold: 10 });
-  const [auditLog, setAuditLog] = useState([]);
-
-  // Initialize with mock data
-  useEffect(() => {
-    // Format students - USE the imported 'students' directly
-    const formattedStudents = students.map((s, index) => ({
-      id: s.id || `STU-${String(index + 1).padStart(3, "0")}`,
-      name: s.name,
-      email:
-        s.email || `${s.name.toLowerCase().replace(/\s/g, ".")}@example.com`,
-      course: s.course || "Dental",
-      year: s.semester || "1st Year",
-      status: "active",
-      createdAt: s.added || new Date().toISOString().split("T")[0],
-    }));
-
-    // Format issued items - USE the imported 'issuedItems'
-    const formattedIssued = issuedItems.map((item, index) => ({
-      id: item.issueId || `ISS-${String(index + 1).padStart(3, "0")}`,
-      studentId:
-        item.studentId ||
-        `STU-${String(Math.floor(Math.random() * 10) + 1).padStart(3, "0")}`,
-      studentName: item.student || "Student Name",
-      itemName: item.product || "Dental Item",
-      quantity: item.qty || 1,
-      issuedDate: item.date || new Date().toISOString().split("T")[0],
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
-      status: item.status === "Active" ? "issued" : "returned",
-      refNo: item.refNo || `REF-${String(index + 1).padStart(3, "0")}`,
-    }));
-
-    // Format exchanges - USE the imported 'exchangeItems'
-    const formattedExchanges = exchangeItems.map((item, index) => ({
-      id: item.exchangeId || `EXC-${String(index + 1).padStart(3, "0")}`,
-      studentName: item.student || "Student Name",
-      itemName: item.reason || "Dental Item",
-      requestDate: item.date || new Date().toISOString().split("T")[0],
-      status: item.status?.toLowerCase() || "pending",
-      quantity: 1,
-      reason: item.reason || "Exchange request",
-    }));
-
-    // Use the imported inventory data
-    const mockInventory =
-      inventory.length > 0
-        ? inventory
-        : [
-            {
-              id: "INV-001",
-              refNo: "INV-001",
-              productName: "Dental Floss",
-              category: "Consumables",
-              companyName: "DentalCo",
-              size: "50m",
-              lotNo: "LOT-001",
-              quantity: 45,
-              expiryDate: "2026-12-31",
-              lowStockThreshold: 10,
-            },
-            {
-              id: "INV-002",
-              refNo: "INV-002",
-              productName: "Toothbrush",
-              category: "Equipment",
-              companyName: "OralCare",
-              size: "Medium",
-              lotNo: "LOT-002",
-              quantity: 8,
-              expiryDate: "2027-01-15",
-              lowStockThreshold: 15,
-            },
-            {
-              id: "INV-003",
-              refNo: "INV-003",
-              productName: "Dental Crown",
-              category: "Prosthetics",
-              companyName: "DentTech",
-              size: "Molar",
-              lotNo: "LOT-003",
-              quantity: 12,
-              expiryDate: "2026-10-30",
-              lowStockThreshold: 5,
-            },
-            {
-              id: "INV-004",
-              refNo: "INV-004",
-              productName: "Anesthetic",
-              category: "Medications",
-              companyName: "PharmaDent",
-              size: "2ml",
-              lotNo: "LOT-004",
-              quantity: 3,
-              expiryDate: "2026-09-15",
-              lowStockThreshold: 20,
-            },
-            {
-              id: "INV-005",
-              refNo: "INV-005",
-              productName: "Surgical Gloves",
-              category: "Consumables",
-              companyName: "SafeHands",
-              size: "Large",
-              lotNo: "LOT-005",
-              quantity: 25,
-              expiryDate: "2027-03-20",
-              lowStockThreshold: 10,
-            },
-          ];
-
-    // Mock staff
-    const mockStaff = [
-      {
-        id: 1,
-        name: "Admin User",
-        email: "admin@yendental.com",
-        role: "admin",
-        status: "active",
-        createdAt: "2024-01-01",
-      },
-      {
-        id: 2,
-        name: "John Staff",
-        email: "john@yendental.com",
-        role: "staff",
-        status: "active",
-        createdAt: "2024-06-15",
-      },
-    ];
-
-    setInventoryState(mockInventory);
-    setStaff(mockStaff);
-    setStudentsState(formattedStudents);
-    setIssuedItemsState(formattedIssued);
-    setExchangesState(formattedExchanges);
-    setAuditLog([
-      {
-        id: 1,
-        action: "CREATE",
-        details: "Added new staff member: John Staff",
-        timestamp: new Date().toISOString(),
-      },
-      {
-        id: 2,
-        action: "UPDATE",
-        details: "Updated inventory: Dental Floss",
-        timestamp: new Date(Date.now() - 3600000).toISOString(),
-      },
-    ]);
-  }, []);
-
-  // Data functions
-  const updateInventory = (id, updatedData, userName) => {
-    setInventoryState((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updatedData } : item)),
-    );
-    setAuditLog((prev) => [
-      {
-        id: prev.length + 1,
-        action: "UPDATE",
-        details: `Updated inventory item by ${userName || "Admin"}`,
-        timestamp: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-  };
+  const [settings, setSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem("dental_settings");
+      return saved
+        ? JSON.parse(saved)
+        : { lowQuantityThreshold: 10, twoFactor: false, emailUpdates: false };
+    } catch {
+      return { lowQuantityThreshold: 10, twoFactor: false, emailUpdates: false };
+    }
+  });
 
   const updateSettings = (newSettings) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+    setSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+      try {
+        localStorage.setItem("dental_settings", JSON.stringify(updated));
+      } catch (e) {
+        console.error("Failed to save settings:", e);
+      }
+      return updated;
+    });
   };
 
-  const updateItemThresholds = (updates, userName) => {
-    setInventoryState((prev) =>
-      prev.map((item) => {
-        if (updates[item.id] !== undefined) {
-          return { ...item, lowStockThreshold: updates[item.id] };
-        }
-        return item;
-      }),
-    );
-    setAuditLog((prev) => [
-      {
-        id: prev.length + 1,
-        action: "UPDATE",
-        details: `Updated thresholds for ${Object.keys(updates).length} items by ${userName || "Admin"}`,
-        timestamp: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+  // ========== STUDENT FUNCTIONS ==========
+
+  // Fetch all students
+  const fetchStudents = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/students/`, {
+        headers: getAuthHeaders()
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStudents(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching students:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addStaff = (staffData, userName) => {
-    const newStaff = {
-      id: staff.length + 1,
-      ...staffData,
-      role: "staff",
-      status: "active",
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-    setStaff((prev) => [...prev, newStaff]);
-    setAuditLog((prev) => [
-      {
-        id: prev.length + 1,
-        action: "CREATE",
-        details: `Added staff member: ${staffData.name} by ${userName || "Admin"}`,
-        timestamp: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+  // Add a new student
+  const addStudent = async (studentData) => {
+    try {
+      const response = await fetch(`${API_URL}/students/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(studentData)
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStudents(prev => [...prev, data.data]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error adding student:", error);
+      return { success: false, message: "Network error" };
+    }
   };
 
-  const updateStaff = (id, staffData, userName) => {
-    setStaff((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...staffData } : s)),
-    );
-    setAuditLog((prev) => [
-      {
-        id: prev.length + 1,
-        action: "UPDATE",
-        details: `Updated staff member: ${staffData.name} by ${userName || "Admin"}`,
-        timestamp: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+  // Update a student
+  const updateStudent = async (id, studentData) => {
+    try {
+      const response = await fetch(`${API_URL}/students/${id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(studentData)
+      });
+      const data = await response.json();
+      if (data.success) {
+        const updated = data.data;
+        setStudents(prev => prev.map(s => (s.id === id || s.campusId === id) ? updated : s));
+        return { success: true, data: updated };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error updating student:", error);
+      return { success: false, message: "Network error" };
+    }
   };
 
-  const deleteStaff = (id, userName) => {
-    const staffToDelete = staff.find((s) => s.id === id);
-    setStaff((prev) => prev.filter((s) => s.id !== id));
-    setAuditLog((prev) => [
-      {
-        id: prev.length + 1,
-        action: "DELETE",
-        details: `Deleted staff member: ${staffToDelete?.name} by ${userName || "Admin"}`,
-        timestamp: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+  // Delete a student
+  const deleteStudent = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/students/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders()
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStudents(prev => prev.filter(s => s.id !== id && s.campusId !== id));
+        return { success: true };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error deleting student:", error);
+      return { success: false, message: "Network error" };
+    }
   };
 
-  const toggleStaffStatus = (id, userName) => {
-    setStaff((prev) =>
-      prev.map((s) =>
-        s.id === id
-          ? { ...s, status: s.status === "active" ? "inactive" : "active" }
-          : s,
-      ),
-    );
-    const staffItem = staff.find((s) => s.id === id);
-    setAuditLog((prev) => [
-      {
-        id: prev.length + 1,
-        action: "UPDATE",
-        details: `Toggled staff status for ${staffItem?.name} by ${userName || "Admin"}`,
-        timestamp: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
+  // Bulk import students
+  const bulkImportStudents = async (studentsData) => {
+    try {
+      const response = await fetch(`${API_URL}/students/bulk`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(studentsData)
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStudents(prev => [...prev, ...data.data]);
+        return { success: true, count: data.data.length };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error bulk importing students:", error);
+      return { success: false, message: "Network error" };
+    }
   };
+
+  // ========== STAFF FUNCTIONS ==========
+
+  // Fetch all staff
+  const fetchStaff = async () => {
+    try {
+      const response = await fetch(`${API_URL}/users/`, {
+        headers: getAuthHeaders()
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStaff(data.data);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // Add a new staff member
+  const addStaff = async (staffData) => {
+    try {
+      const response = await fetch(`${API_URL}/users/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(staffData)
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStaff(prev => [...prev, data.data]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error adding staff:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // Update a staff member
+  const updateStaff = async (id, staffData) => {
+    try {
+      const response = await fetch(`${API_URL}/users/${id}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(staffData)
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStaff(prev => prev.map(s => s.id === id ? data.data : s));
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error updating staff:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // Toggle staff status
+  const toggleStaffStatus = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/users/${id}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders()
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStaff(prev => prev.map(s => s.id === id ? data.data : s));
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error toggling staff status:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // Delete a staff member
+  const deleteStaff = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/users/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders()
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStaff(prev => prev.filter(s => s.id !== id));
+        return { success: true };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error deleting staff:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // Update staff password
+  const updateStaffPassword = async (id, password) => {
+    try {
+      const response = await fetch(`${API_URL}/users/${id}/password`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ password })
+      });
+      const data = await response.json();
+      if (data.success) {
+        return { success: true };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error updating password:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // Initialize - fetch students on mount
+  useEffect(() => {
+    fetchStudents();
+    fetchStaff();
+  }, []);
 
   const value = {
-    inventory: inventoryState,
+    // Students
+    students,
+    loading,
+    fetchStudents,
+    addStudent,
+    updateStudent,
+    deleteStudent,
+    bulkImportStudents,
+    // Staff
     staff,
-    students: studentsState,
-    issuedItems: issuedItemsState,
-    exchanges: exchangesState,
-    settings,
-    auditLog,
-    updateInventory,
-    updateSettings,
-    updateItemThresholds,
+    fetchStaff,
     addStaff,
     updateStaff,
-    deleteStaff,
     toggleStaffStatus,
+    deleteStaff,
+    updateStaffPassword,
+    // Settings
+    settings,
+    updateSettings,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

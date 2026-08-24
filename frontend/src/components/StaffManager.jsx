@@ -81,7 +81,7 @@ export default function StaffManager() {
     },
   ];
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.name || !form.email || !form.password) {
       toast.error("All fields are required");
       return;
@@ -98,27 +98,39 @@ export default function StaffManager() {
       toast.error("Password must be at least 6 characters");
       return;
     }
-    addStaff(
+    const result = await addStaff(
       { name: form.name, email: form.email, password: form.password },
       user?.name,
     );
+    if (!result.success) {
+      toast.error(result.message || "Failed to add staff member");
+      return;
+    }
     setForm({ name: "", email: "", password: "", confirmPassword: "" });
     setAddOpen(false);
     toast.success("Staff member added successfully");
   };
 
-  const handleEditSave = () => {
-    updateStaff(
+  const handleEditSave = async () => {
+    const result = await updateStaff(
       editTarget.id,
       { name: editTarget.name, email: editTarget.email },
       user?.name,
     );
+    if (!result.success) {
+      toast.error(result.message || "Failed to update staff member");
+      return;
+    }
     setEditTarget(null);
     toast.success("Staff member updated");
   };
 
-  const handleDelete = () => {
-    deleteStaff(deleteTarget.id, user?.name);
+  const handleDelete = async () => {
+    const result = await deleteStaff(deleteTarget.id, user?.name);
+    if (!result.success) {
+      toast.error(result.message || "Failed to delete staff member");
+      return;
+    }
     setDeleteTarget(null);
     toast.success("Staff member deleted");
   };
@@ -182,7 +194,10 @@ export default function StaffManager() {
                 <Edit size={16} />
               </button>
               <button
-                onClick={() => toggleStaffStatus(item.id, user?.name)}
+                onClick={async () => {
+                  const result = await toggleStaffStatus(item.id, user?.name);
+                  if (!result.success) toast.error(result.message || "Failed to update staff status");
+                }}
                 className={`staff-action-btn ${item.status === "active" ? "staff-action-deactivate" : "staff-action-activate"}`}
                 title={item.status === "active" ? "Deactivate" : "Activate"}
               >

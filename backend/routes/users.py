@@ -1,9 +1,11 @@
 from flask import Blueprint, request, jsonify
 from middleware.auth import token_required, admin_required
 from models.user import User
-import bcrypt
+import re
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
+
+EMAIL_REGEX = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
 
 @users_bp.route('/', methods=['GET'])
 @token_required
@@ -12,13 +14,14 @@ def get_users():
     """Get all users (Admin only)"""
     db = User.get_db()
     results = db.execute_query("""
-        SELECT id, name, email, role, status, created_at 
+        SELECT * 
         FROM users 
         ORDER BY created_at DESC
     """)
+    users_data = [User(row).to_dict() for row in results]
     return jsonify({
         'success': True,
-        'data': results
+        'data': users_data
     }), 200
 
 @users_bp.route('/<int:user_id>', methods=['GET'])
@@ -68,7 +71,26 @@ def create_user():
             }
         }), 400
     
-    existing = User.find_by_email(data['email'])
+    email = data['email'].strip()
+    if not re.match(EMAIL_REGEX, email):
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'VALIDATION_ERROR',
+                'message': 'Invalid email address format'
+            }
+        }), 400
+    
+    if len(data['password']) < 6:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'VALIDATION_ERROR',
+                'message': 'Password must be at least 6 characters'
+            }
+        }), 400
+    
+    existing = User.find_by_email(email)
     if existing:
         return jsonify({
             'success': False,
@@ -83,8 +105,8 @@ def create_user():
         role = 'staff'
     
     user = User.create(
-        name=data['name'],
-        email=data['email'],
+        name=data['name'].strip(),
+        email=email,
         password=data['password'],
         role=role
     )
@@ -120,6 +142,42 @@ def update_user(user_id):
             }
         }), 400
     
+    # Email uniqueness check if email is being updated
+    if 'email' in data:
+        email = data['email'].strip()
+        if not re.match(EMAIL_REGEX, email):
+            return jsonify({
+                'success': False,
+                'error': {
+                    'code': 'VALIDATION_ERROR',
+                    'message': 'Invalid email address format'
+                }
+            }), 400
+        
+        existing = User.find_by_email_exclude_id(email, user_id)
+        if existing:
+            return jsonify({
+                'success': False,
+                'error': {
+                    'code': 'EMAIL_EXISTS',
+                    'message': 'Email already registered by another user'
+                }
+            }), 400
+        data['email'] = email
+
+    # Prevent logged-in admin from demoting themselves
+    if 'role' in data:
+        if data['role'] not in ['admin', 'staff']:
+            data['role'] = 'staff'
+        if request.current_user.id == user_id and data['role'] != 'admin':
+            return jsonify({
+                'success': False,
+                'error': {
+                    'code': 'CANNOT_DEMOTE_SELF',
+                    'message': 'You cannot remove your own admin role'
+                }
+            }), 400
+
     updated_user = user.update(data)
     
     return jsonify({
@@ -184,6 +242,26 @@ def toggle_user_status(user_id):
             }
         }), 404
     
+    # Prevent deactivating admin accounts
+    if user.role == 'admin':
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'CANNOT_DEACTIVATE_ADMIN',
+                'message': 'Admin accounts cannot be deactivated'
+            }
+        }), 400
+    
+    # Prevent self-deactivation
+    if request.current_user.id == user_id:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'CANNOT_DEACTIVATE_SELF',
+                'message': 'You cannot deactivate your own account'
+            }
+        }), 400
+    
     new_status = 'inactive' if user.status == 'active' else 'active'
     user.update({'status': new_status})
     
@@ -207,6 +285,26 @@ def delete_user(user_id):
                 'message': 'User not found'
             }
         }), 404
+    
+    # Safeguard 1: Admin accounts cannot be deleted
+    if user.role == 'admin':
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'CANNOT_DELETE_ADMIN',
+                'message': 'Admin accounts cannot be deleted'
+            }
+        }), 400
+    
+    # Safeguard 2: Logged-in user cannot delete themselves
+    if request.current_user.id == user_id:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'CANNOT_DELETE_SELF',
+                'message': 'You cannot delete your own account'
+            }
+        }), 400
     
     db = User.get_db()
     db.execute_query("DELETE FROM users WHERE id = %s", (user_id,))

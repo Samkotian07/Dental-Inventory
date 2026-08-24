@@ -15,8 +15,8 @@ import "./StudentDetails.css";
 const PAGE_SIZE = 6;
 
 const CSV_COLUMNS = [
+  { key: "campusId", label: "Campus ID" },
   { key: "name", label: "Name" },
-  { key: "id", label: "Student ID" },
   { key: "email", label: "Email" },
   { key: "course", label: "Course" },
   { key: "semester", label: "Semester" },
@@ -88,7 +88,7 @@ export default function StudentDetails() {
 
   const handleSaveStudent = async (existingId, formData) => {
     if (existingId) {
-      // Update existing student
+      // Update existing student - use the student's id (not campusId)
       const result = await updateStudent(existingId, formData);
       if (result.success) {
         toast.success("Student updated successfully!");
@@ -119,8 +119,9 @@ export default function StudentDetails() {
     }
   };
 
-  const handleConfirmDelete = async (id) => {
-    const result = await deleteStudent(id);
+  const handleConfirmDelete = async (studentId) => {
+    // Use the student's id (not campusId)
+    const result = await deleteStudent(studentId);
     if (result.success) {
       toast.success("Student deleted successfully!");
       setDeleteTarget(null);
@@ -130,8 +131,8 @@ export default function StudentDetails() {
   };
 
   const columns = [
+    { key: "campusId", label: "Campus ID" },
     { key: "name", label: "Name" },
-    { key: "id", label: "Student ID" },
     { key: "email", label: "Email" },
     { key: "course", label: "Course" },
     { key: "semester", label: "Semester" },
@@ -202,9 +203,9 @@ export default function StudentDetails() {
                   </tr>
                 ) : (
                   pageRows.map((row) => (
-                    <tr key={row.id}>
+                    <tr key={row.campusId || row.id}>
+                      <td className="students__mono">{row.campusId || row.id}</td>
                       <td className="students__strong">{row.name}</td>
-                      <td className="students__mono">{row.id}</td>
                       <td>{row.email || "—"}</td>
                       <td>
                         <span className="students-tag">{row.course || "—"}</span>

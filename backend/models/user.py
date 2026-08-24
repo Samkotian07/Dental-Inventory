@@ -66,6 +66,18 @@ class User:
         return None
     
     @classmethod
+    def find_by_email_exclude_id(cls, email, exclude_id):
+        """Find a user by email excluding a specific user ID"""
+        db = cls.get_db()
+        result = db.execute_query(
+            "SELECT * FROM users WHERE email = %s AND id != %s",
+            (email, exclude_id)
+        )
+        if result:
+            return cls(result[0])
+        return None
+    
+    @classmethod
     def find_by_id(cls, user_id):
         """Find a user by ID"""
         db = cls.get_db()

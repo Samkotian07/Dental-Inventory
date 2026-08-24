@@ -7,7 +7,7 @@ export default function StudentFormModal({ student, onClose, onSave }) {
 
   const [form, setForm] = useState({
     name: student?.name ?? "",
-    campusId: student?.campusId ?? "",
+    campusId: student?.campusId ?? student?.id ?? "",
     course: student?.course ?? courses[0],
     semester: student?.semester ?? semesters[0],
   });
@@ -18,9 +18,10 @@ export default function StudentFormModal({ student, onClose, onSave }) {
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    onSave(student?.campusId ?? null, {
+    onSave(student?.campusId ?? student?.id ?? null, {
       name: form.name.trim(),
       campusId: form.campusId.trim(),
+      id: form.campusId.trim(),
       course: form.course,
       semester: form.semester,
     });

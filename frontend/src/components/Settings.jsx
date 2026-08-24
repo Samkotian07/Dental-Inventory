@@ -15,12 +15,12 @@ import "./Settings.css";
 export default function Settings() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { settings, updateSettings } = useData();
+  const { settings = { lowQuantityThreshold: 10, twoFactor: false }, updateSettings } = useData();
   const { darkMode, toggleDarkMode } = useTheme();
   // const [emailUpdates, setEmailUpdates] = useState(
-  //   settings.emailUpdates || false,
+  //   settings?.emailUpdates || false,
   // );
-  const [twoFactor, setTwoFactor] = useState(settings.twoFactor || false);
+  const [twoFactor, setTwoFactor] = useState(settings?.twoFactor || false);
   const [pwd, setPwd] = useState({ current: "", new: "", confirm: "" });
   const [logoutAllOpen, setLogoutAllOpen] = useState(false);
 
