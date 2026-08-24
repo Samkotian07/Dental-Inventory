@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
-import inventoryIcon from "./icons/inventory.svg";
 import "./Login.css";
 
 export default function Login() {
@@ -15,7 +14,7 @@ export default function Login() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // Reset form when component mounts (e.g., after logout)
+  // Reset form when component mounts
   useEffect(() => {
     setEmail("");
     setPassword("");
@@ -25,7 +24,7 @@ export default function Login() {
   // Redirect if already logged in
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/");
+      navigate("/dashboard");
     }
   }, [isAuthenticated, navigate]);
 
@@ -40,14 +39,12 @@ export default function Login() {
 
     setLoading(true);
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const result = login(email.trim(), password);
+    // Call the backend login
+    const result = await login(email.trim(), password);
 
     if (result.success) {
       toast.success(`Welcome back, ${result.user.name}!`);
-      navigate("/");
+      navigate("/dashboard");
     } else {
       toast.error(result.message);
       setError(result.message);
@@ -62,11 +59,10 @@ export default function Login() {
 
   return (
     <div className="login-container">
-        <div className="login-card">
-          <div className="login-header">
+      <div className="login-card">
+        <div className="login-header">
           <div className="login-brand">
-            <img src={inventoryIcon} alt="" className="login-brand-icon" />
-            <h1>YEN LEDGER</h1>
+            <h1>🦷 YEN DENTAL</h1>
           </div>
           <p>Inventory Management System</p>
         </div>
