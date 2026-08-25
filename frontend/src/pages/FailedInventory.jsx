@@ -8,6 +8,7 @@ import { CATEGORIES as categories, FAILED_REASONS as failReasons } from "../comp
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
+import { toast } from "sonner";
 import "./FailedInventory.css";
 
 const PAGE_SIZE = 6;
@@ -80,13 +81,31 @@ export default function FailedInventory() {
     exportToCsv(`failed-inventory-${new Date().toISOString().slice(0, 10)}`, CSV_COLUMNS, filtered);
   };
 
-  const handleConfirmDispose = (refNo) => {
-    markFailedDisposed(refNo);
+  const handleConfirmDispose = async (refNo) => {
+    const item = rows.find(r => r.refNo === refNo || r.id === refNo);
+    const result = await markFailedDisposed(item?.id || refNo);
+    if (result.success) {
+      toast.success("Item marked as disposed");
+    } else {
+      toast.error(result.message || "Failed to dispose item");
+    }
     setDisposeItem(null);
   };
 
-  const handleConfirmRestore = (refNo) => {
-    restoreFailedToStock(refNo);
+  const handleConfirmRestore = async (refNo) => {
+    const item = rows.find(r => r.refNo === refNo || r.id === refNo);
+    const result = await restoreFailedToStock(item?.id || refNo, {
+      product_name: item?.product,
+      category: item?.category,
+      company_name: item?.company,
+      lot_no: item?.lotNo,
+      quantity: item?.qty,
+    });
+    if (result.success) {
+      toast.success("Item restored to inventory stock");
+    } else {
+      toast.error(result.message || "Failed to restore item");
+    }
     setRestoreItem(null);
   };
 
@@ -204,12 +223,12 @@ export default function FailedInventory() {
                     </td>
                     <td>{row.qty}</td>
                     <td>
-                      <span className={`failed-status-pill failed-status-pill--${row.status}`}>
+                      <span className={`failed-status-pill failed-status-pill--${(row.status || "failed").toLowerCase()}`}>
                         {row.status}
                       </span>
                     </td>
                     <td>
-                      {row.status === "failed" && (
+                      {row.status?.toLowerCase() !== "disposed" && row.status?.toLowerCase() !== "restored" && (
                         <div className="failed__row-actions">
                           <button
                             className="failed__icon-btn"

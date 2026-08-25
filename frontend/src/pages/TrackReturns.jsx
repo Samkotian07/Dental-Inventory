@@ -10,6 +10,7 @@ import DiscardConfirmModal from "../components/track-exchange/DiscardConfirmModa
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
+import { toast } from "sonner";
 import "./TrackReturns.css";
 
 const PAGE_SIZE = 6;
@@ -108,44 +109,64 @@ export default function TrackReturns() {
     exportToCsv(`track-returns-${new Date().toISOString().slice(0, 10)}`, CSV_COLUMNS, filtered);
   };
 
-  const handleUpdateStatus = (returnId, newStatus, extraData = {}) => {
-    updateReturnStatus(returnId, newStatus, extraData);
+  const handleUpdateStatus = async (returnId, newStatus, extraData = {}) => {
+    const result = await updateReturnStatus(returnId, newStatus, extraData);
+    if (result.success) {
+      toast.success(`Return status updated to ${newStatus}`);
+    } else {
+      toast.error(result.message || "Failed to update return status");
+    }
     setStatusItem(null);
   };
 
-  const handleDiscard = (returnId) => {
-    discardReturn(returnId);
+  const handleDiscard = async (returnId) => {
+    const result = await discardReturn(returnId);
+    if (result.success) {
+      toast.success("Return record discarded");
+    } else {
+      toast.error(result.message || "Failed to discard return record");
+    }
     setDiscardItem(null);
   };
 
-  const handleAddExchange = (data) => {
-    const item = inventoryOptions.find((i) => i.id === data.itemId);
-    addReturn({
+  const handleAddExchange = async (data) => {
+    const item = stock.find((s) => s.refNo === data.itemId || s.id === data.itemId);
+    const result = await addReturn({
       type: "exchange",
       refNo: data.itemId,
-      productName: item ? item.product : data.itemId,
-      batchNo: data.batchNo,
+      productName: item ? (item.product || item.productName) : data.itemId,
+      batchNo: data.batchNo || item?.lotNo,
       quantity: data.quantity,
       reason: data.reason,
-      returnDate: formatDate(data.returnDate),
+      returnDate: data.returnDate ? new Date(data.returnDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
     });
-    setExchangeModalOpen(false);
-    setPage(1);
+    if (result.success) {
+      toast.success("Exchange return created successfully");
+      setExchangeModalOpen(false);
+      setPage(1);
+    } else {
+      toast.error(result.message || "Failed to create exchange return");
+    }
   };
 
-  const handleAddCreditNote = (data) => {
-    const item = inventoryOptions.find((i) => i.id === data.itemId);
-    addReturn({
-      type: "return",
+  const handleAddCreditNote = async (data) => {
+    const item = stock.find((s) => s.refNo === data.itemId || s.id === data.itemId);
+    const result = await addReturn({
+      type: "creditNote",
       refNo: data.itemId,
-      productName: item ? item.product : data.itemId,
-      batchNo: data.batchNo,
+      productName: item ? (item.product || item.productName) : data.itemId,
+      batchNo: data.batchNo || item?.lotNo,
       quantity: data.quantity,
       reason: data.reason,
-      returnDate: formatDate(data.returnDate),
+      returnDate: data.returnDate ? new Date(data.returnDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
     });
-    setCreditModalOpen(false);
-    setPage(1);
+    if (result.success) {
+      toast.success("Credit note return created successfully");
+      setCreditModalOpen(false);
+      setPage(1);
+    } else {
+      toast.error(result.message || "Failed to create credit note return");
+    }
   };
 
   const columns = [
@@ -276,7 +297,7 @@ export default function TrackReturns() {
                         ? row.newBatchNo
                           ? `LOT: ${row.newBatchNo}`
                           : "—"
-                        : row.creditNote || "—"}
+                        : (row.status?.toLowerCase() === "completed" ? (row.creditNote || "—") : "—")}
                     </td>
                     <td>{row.returnDate}</td>
                     <td>

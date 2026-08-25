@@ -16,6 +16,7 @@ import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { useData } from "../context/DataContext.jsx";
+import { toast } from "sonner";  // ⭐ ADD THIS
 import "./IssuedItems.css";
 
 const PAGE_SIZE = 6;
@@ -45,17 +46,28 @@ function formatDate(isoOrDate) {
 
 export default function IssuedItems() {
   const onMenuClick = useMenuClick();
-  const { issuedItems, issueItem, returnIssuedItem, stock } = useInventory();
+  const { issuedItems, issueItem, returnIssuedItem, condemnIssuedItem, stock, getInventoryId } = useInventory();
   const { students } = useData();
 
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("All Status");
+  const [status, setStatus] = useState("Active");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
 
   const [detailItem, setDetailItem] = useState(null);
   const [returnItem, setReturnItem] = useState(null);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
+
+  const inventoryOptions = useMemo(
+    () =>
+      (stock || []).map((s) => ({
+        id: s.refNo || s.id,
+        product: s.product || s.productName,
+        lotNo: s.lotNo,
+        qty: s.qty,
+      })),
+    [stock]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -105,36 +117,45 @@ export default function IssuedItems() {
     );
   };
 
-  const handleConfirmReturn = (issueId, returnDateISO) => {
-    returnIssuedItem(issueId);
+  const handleConfirmReturn = async (issueId, returnDateISO, condition = "Good") => {
+    const result = await returnIssuedItem(issueId, returnDateISO, condition);
+    if (result.success) {
+      toast.success("Item returned to inventory successfully");
+    } else {
+      toast.error(result.message || "Failed to return item");
+    }
   };
 
-  const handleIssueNew = ({ studentId, itemId, lotId, qty }) => {
+  const handleCondemn = async (issueId, returnDate, reason) => {
+    console.log("🗑️ Condemning item:", issueId, "Reason:", reason);
+    const result = await condemnIssuedItem(issueId);
+    if (result.success) {
+      toast.success(`Item condemned: ${reason || "Discarded"}`);
+    } else {
+      toast.error(result.message || "Failed to condemn item");
+    }
+  };
+
+  const handleIssueNew = async ({ studentId, itemId, lotId, qty }) => {
     const student = students.find((s) => s.id === studentId);
     const stockMatch = stock.find((s) => s.refNo === itemId || s.id === itemId);
-    const item = stockMatch
-      ? { id: stockMatch.refNo, product: stockMatch.product || stockMatch.productName, lotNo: stockMatch.lotNo }
-      : inventoryOptions?.find((i) => i.id === itemId);
+    const invId = stockMatch?.id || getInventoryId(itemId);
 
-    const lotNo =
-      stockMatch?.lotNo ||
-      (typeof lotId === "string" && lotId.startsWith("LOT-")
-        ? lotId.replace("LOT-", "")
-        : lotId) ||
-      "4510315832";
-
-    issueItem({
+    const result = await issueItem({
       studentId,
-      student: student?.name ?? studentId,
-      product: item?.product ?? itemId,
-      lotNo,
-      refNo: itemId,
+      inventoryId: invId,
+      refNo: stockMatch?.refNo || itemId,
       qty: Number(qty),
-      date: formatDate(new Date().toISOString().slice(0, 10)),
+      issueDate: new Date().toISOString().slice(0, 10),
     });
 
-    setIssueModalOpen(false);
-    setPage(1);
+    if (result.success) {
+      toast.success(`Issued ${qty} item(s) to ${student?.name || studentId}`);
+      setIssueModalOpen(false);
+      setPage(1);
+    } else {
+      toast.error(result.message || "Failed to issue item");
+    }
   };
 
   const columns = [
@@ -176,9 +197,10 @@ export default function IssuedItems() {
                 setPage(1);
               }}
             >
-              <option>All Status</option>
               <option>Active</option>
               <option>Returned</option>
+              <option>Condemned</option>
+              <option>All Status</option>
             </select>
           </div>
 
@@ -292,6 +314,7 @@ export default function IssuedItems() {
           item={returnItem}
           onClose={() => setReturnItem(null)}
           onConfirm={handleConfirmReturn}
+          onCondemn={handleCondemn}  // ⭐ ADDED
         />
       )}
 

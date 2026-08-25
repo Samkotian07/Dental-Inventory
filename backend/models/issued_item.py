@@ -82,27 +82,26 @@ class IssuedItem:
             WHERE issue_id = %s
         """, (return_date, condition, returned_by, self.issue_id))
         
-        # If condition is 'Good', restore to inventory
-        if condition == 'Good':
-            inventory = Inventory.find_by_id(self.inventory_id)
-            if inventory:
-                inventory.update_quantity(self.quantity, returned_by)
+        # Restore quantity to inventory regardless of condition (or for Good/Damaged return)
+        inventory = None
+        if self.inventory_id:
+            inventory = Inventory.find_by_id(self.inventory_id) or Inventory.find_by_ref_no(self.inventory_id)
+        if not inventory and self.ref_no:
+            inventory = Inventory.find_by_ref_no(self.ref_no)
+
+        if inventory:
+            inventory.update_quantity(self.quantity, returned_by)
         
         return IssuedItem.find_by_id(self.issue_id)
 
     def condemn(self, condemned_by):
-        """Condemn an item (mark as condemned, remove from active stock)"""
+        """Condemn an item (mark as condemned)"""
         db = self.get_db()
         db.execute_query("""
             UPDATE issued_items 
             SET status = 'condemned', returned_by = %s 
             WHERE issue_id = %s
         """, (condemned_by, self.issue_id))
-        
-        # Update inventory status to condemned
-        inventory = Inventory.find_by_id(self.inventory_id)
-        if inventory:
-            inventory.update({'status': 'condemned'})
         
         return IssuedItem.find_by_id(self.issue_id)
 

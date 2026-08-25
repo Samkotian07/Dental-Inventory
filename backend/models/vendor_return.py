@@ -41,6 +41,17 @@ class VendorReturn:
         db = cls.get_db()
         return_id = data.get('return_id') or f"RET-{str(db.execute_query('SELECT IFNULL(MAX(CAST(SUBSTRING(return_id, 5) AS UNSIGNED)), 0) + 1 FROM vendor_returns')[0]['IFNULL(MAX(CAST(SUBSTRING(return_id, 5) AS UNSIGNED)), 0) + 1']).zfill(3)}"
         
+        # Populate old_batch_no if missing
+        old_batch = data.get('old_batch_no')
+        inventory = None
+        if data.get('inventory_id'):
+            inventory = Inventory.find_by_id(data['inventory_id'])
+        if not inventory and data.get('ref_no'):
+            inventory = Inventory.find_by_ref_no(data['ref_no'])
+            
+        if not old_batch and inventory:
+            old_batch = inventory.lot_no
+
         db.execute_query("""
             INSERT INTO vendor_returns (return_id, type, inventory_id, ref_no, product_name, old_batch_no, new_batch_no, quantity, reason, return_date, credit_note, created_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -48,9 +59,9 @@ class VendorReturn:
             return_id,
             data['type'],
             data.get('inventory_id'),
-            data.get('ref_no'),
-            data.get('product_name'),
-            data.get('old_batch_no'),
+            data.get('ref_no') or (inventory.ref_no if inventory else None),
+            data.get('product_name') or (inventory.product_name if inventory else None),
+            old_batch,
             data.get('new_batch_no'),
             data.get('quantity', 1),
             data.get('reason'),
@@ -58,12 +69,6 @@ class VendorReturn:
             data.get('credit_note'),
             data.get('created_by')
         ))
-        
-        # If exchange type, update inventory status
-        if data['type'] == 'exchange' and data.get('inventory_id'):
-            inventory = Inventory.find_by_id(data['inventory_id'])
-            if inventory:
-                inventory.update({'status': 'inactive'})
         
         return cls.find_by_id(return_id)
 
@@ -78,11 +83,12 @@ class VendorReturn:
         
         # If completed and exchange type, add new batch to inventory
         if status == 'completed' and self.type == 'exchange' and self.new_batch_no:
-            # Create new inventory entry with new batch
-            inventory = Inventory.find_by_id(self.inventory_id)
+            inventory = Inventory.find_by_id(self.inventory_id) if self.inventory_id else None
+            if not inventory and self.ref_no:
+                inventory = Inventory.find_by_ref_no(self.ref_no)
+
             if inventory:
                 new_inv_data = {
-                    'ref_no': inventory.ref_no,
                     'product_name': inventory.product_name,
                     'category': inventory.category,
                     'company_name': inventory.company_name,
@@ -92,13 +98,11 @@ class VendorReturn:
                     'expiry_date': inventory.expiry_date,
                     'low_stock_threshold': inventory.low_stock_threshold,
                     'is_returnable': inventory.is_returnable,
-                    'document_type': 'creditNote',
-                    'document_number': credit_note_number or self.credit_note,
+                    'document_type': 'exchange',
+                    'document_number': self.return_id,
                     'created_by': self.created_by
                 }
-                new_inventory = Inventory.create(new_inv_data)
-                # Update vendor return with new inventory id
-                db.execute_query("UPDATE vendor_returns SET new_batch_no = %s WHERE return_id = %s", (self.new_batch_no, self.return_id))
+                Inventory.create(new_inv_data)
         
         params.append(self.return_id)
         query = f"UPDATE vendor_returns SET {', '.join(updates)} WHERE return_id = %s"

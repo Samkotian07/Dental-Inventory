@@ -29,6 +29,7 @@ class AuditLog:
         db = cls.get_db()
         results = db.execute_query("""
             SELECT * FROM audit_logs 
+            WHERE action NOT IN ('LOGIN', 'LOGOUT', 'USER_LOGOUT', 'USER_LOGOUT_ALL')
             ORDER BY timestamp DESC 
             LIMIT %s
         """, (limit,))

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, Download, Eye, Pencil, Trash2, ArrowUpDown } from "lucide-react";
+import { Search, Download, Eye, Pencil, Trash2, ArrowUpDown, Power } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import ItemDetailsModal from "../components/stock/ItemDetailsModal.jsx";
@@ -9,6 +9,7 @@ import { CATEGORIES as categories } from "../components/utils/constants.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
+import { toast } from "sonner";
 import "./Stock.css";
 
 const PAGE_SIZE = 8;
@@ -42,7 +43,7 @@ function isExpiringSoon(iso) {
 
 export default function Stock() {
   const onMenuClick = useMenuClick();
-  const { stock: rows, updateStockItem, deleteStockItem } = useInventory();
+  const { stock: rows, updateStockItem, deleteStockItem, toggleStockStatus, getInventoryId } = useInventory();
 
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All Categories");
@@ -90,14 +91,44 @@ export default function Stock() {
     exportToCsv(`stock-${new Date().toISOString().slice(0, 10)}`, CSV_COLUMNS, filtered);
   };
 
-  const handleSaveEdit = (refNo, patch) => {
-    updateStockItem(refNo, patch);
+  const handleSaveEdit = async (refNo, patch) => {
+    const realId = getInventoryId(refNo);
+    const result = await updateStockItem(realId, {
+      product_name: patch.product,
+      category: patch.category,
+      company_name: patch.company,
+      size: patch.size,
+      lot_no: patch.lotNo,
+      quantity: Number(patch.qty),
+      expiry_date: patch.expiry,
+    });
+    if (result.success) {
+      toast.success("Stock item updated successfully");
+    } else {
+      toast.error(result.message || "Failed to update item");
+    }
     setEditItem(null);
   };
 
-  const handleConfirmDelete = (refNo, options) => {
-    deleteStockItem(refNo, options);
+  const handleConfirmDelete = async (refNo, options) => {
+    const realId = getInventoryId(refNo);
+    const result = await deleteStockItem(realId);
+    if (result.success) {
+      toast.success("Stock item deleted");
+    } else {
+      toast.error(result.message || "Failed to delete item");
+    }
     setDeleteItem(null);
+  };
+
+  const handleToggleStatus = async (row) => {
+    const realId = getInventoryId(row.refNo || row.id);
+    const result = await toggleStockStatus(realId);
+    if (result.success) {
+      toast.success(`Status updated for ${row.product}`);
+    } else {
+      toast.error(result.message || "Failed to toggle status");
+    }
   };
 
   const columns = [
@@ -195,6 +226,14 @@ export default function Stock() {
                     </td>
                     <td>
                       <div className="stock__row-actions">
+                        <button
+                          className="stock__icon-btn"
+                          onClick={() => handleToggleStatus(row)}
+                          aria-label={`Toggle status ${row.refNo}`}
+                          title={`Toggle status (Current: ${row.status || 'active'})`}
+                        >
+                          <Power size={15} strokeWidth={2} style={{ color: row.status === 'inactive' ? '#DC2626' : '#059669' }} />
+                        </button>
                         <button
                           className="stock__icon-btn"
                           onClick={() => setDetailItem(row)}

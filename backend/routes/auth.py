@@ -131,8 +131,46 @@ def get_current_user():
 
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
-    """Logout user (client-side token removal)"""
-    return jsonify({
-        'success': True,
-        'message': 'Logged out successfully'
-    }), 200
+    """Logout user (server-side token revocation & audit logging)"""
+    from middleware.auth import token_required
+    
+    @token_required
+    def _logout():
+        token = None
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+        
+        if token:
+            User.blacklist_token(token, request.current_user.id)
+            
+        return jsonify({
+            'success': True,
+            'message': 'Logged out successfully'
+        }), 200
+        
+    return _logout()
+
+@auth_bp.route('/logout-all', methods=['POST'])
+def logout_all():
+    """Logout user from all devices"""
+    from middleware.auth import token_required
+    
+    @token_required
+    def _logout_all():
+        token = None
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+        
+        if token:
+            User.blacklist_token(token, request.current_user.id)
+            
+        User.revoke_all_user_tokens(request.current_user.id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Logged out of all devices successfully'
+        }), 200
+        
+    return _logout_all()

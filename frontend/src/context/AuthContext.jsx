@@ -76,7 +76,23 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const logout = () => {
+  const logout = async (allDevices = false) => {
+    const token = localStorage.getItem("dental_token");
+    if (token) {
+      const endpoint = allDevices ? `${API_URL}/auth/logout-all` : `${API_URL}/auth/logout`;
+      try {
+        await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          }
+        });
+      } catch (error) {
+        console.error("Logout network request error:", error);
+      }
+    }
+
     setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem("dental_token");
@@ -84,7 +100,9 @@ export function AuthProvider({ children }) {
     window.location.href = "/login";
   };
 
-  const value = { user, isAuthenticated, loading, login, logout };
+  const logoutAll = () => logout(true);
+
+  const value = { user, isAuthenticated, loading, login, logout, logoutAll };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

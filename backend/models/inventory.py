@@ -102,11 +102,26 @@ class Inventory:
         updates = []
         params = []
         
+        # Map camelCase to snake_case
+        key_map = {
+            'lowStockThreshold': 'low_stock_threshold',
+            'productName': 'product_name',
+            'companyName': 'company_name',
+            'expiryDate': 'expiry_date',
+            'lotNo': 'lot_no',
+            'isReturnable': 'is_returnable'
+        }
+        
+        normalized_data = dict(data)
+        for camel, snake in key_map.items():
+            if camel in normalized_data and snake not in normalized_data:
+                normalized_data[snake] = normalized_data[camel]
+
         allowed_fields = ['product_name', 'category', 'company_name', 'size', 'lot_no', 'quantity', 'expiry_date', 'low_stock_threshold', 'status', 'is_returnable']
         for field in allowed_fields:
-            if field in data:
+            if field in normalized_data:
                 updates.append(f"{field} = %s")
-                params.append(data[field])
+                params.append(normalized_data[field])
         
         if not updates:
             return self

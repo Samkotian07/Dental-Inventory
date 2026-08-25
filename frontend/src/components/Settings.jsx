@@ -14,7 +14,7 @@ import "./Settings.css";
 
 export default function Settings() {
   const onMenuClick = useMenuClick();
-  const { user, logout } = useAuth();
+  const { user, logout, logoutAll } = useAuth();
   const { settings = { lowQuantityThreshold: 10, twoFactor: false }, updateSettings, updateStaffPassword } = useData();
   const { darkMode, toggleDarkMode } = useTheme();
 
@@ -198,7 +198,7 @@ export default function Settings() {
           onConfirm={() => {
             setLogoutAllOpen(false);
             toast.success("Signed out from all devices");
-            logout();
+            logoutAll();
           }}
           title="Logout All Devices"
           message="Are you sure you want to sign out from every active session? You will need to log in again on all devices."

@@ -33,6 +33,7 @@ function normalizeStock(item) {
 }
 
 function normalizeIssued(item) {
+  const s = String(item.status || "").toLowerCase();
   return {
     id: item.id || item.issue_id || item.issueId,
     issueId: item.id || item.issue_id || item.issueId,
@@ -47,11 +48,13 @@ function normalizeIssued(item) {
     qty: Number(item.quantity ?? item.qty ?? 1),
     date: item.issued_date || item.date || item.issuedDate || new Date().toISOString().slice(0, 10),
     issuedDate: item.issued_date || item.date || item.issuedDate || new Date().toISOString().slice(0, 10),
-    status: item.status === "returned" ? "Returned" : "Active",
+    status: s === "returned" ? "Returned" : s === "condemned" ? "Condemned" : "Active",
   };
 }
 
 function normalizeReturn(item) {
+  const oldB = item.old_batch_no || item.oldBatchNo || item.batchNo || item.lot_no || item.lotNo || "";
+  const newB = item.new_batch_no || item.newBatchNo || "";
   return {
     id: item.id || item.return_id || item.returnId,
     returnId: item.id || item.return_id || item.returnId,
@@ -64,7 +67,9 @@ function normalizeReturn(item) {
     creditNote: item.credit_note || item.creditNote || "",
     returnDate: item.return_date || item.returnDate || new Date().toISOString().slice(0, 10),
     status: item.status || "Pending",
-    batchNo: item.old_batch_no || item.batchNo || item.lot_no || item.lotNo || "",
+    batchNo: oldB,
+    oldBatchNo: oldB,
+    newBatchNo: newB,
   };
 }
 
@@ -188,6 +193,227 @@ export function InventoryProvider({ children }) {
     return () => clearInterval(interval);
   }, [stock, failed, issuedItems, returns, loadAllData]);
 
+  const getInventoryId = (refNoOrId) => {
+    const match = stock.find((s) => s.refNo === refNoOrId || s.id === refNoOrId);
+    return match?.id || refNoOrId;
+  };
+
+  const issueItem = async ({ studentId, inventoryId, refNo, qty, issueDate }) => {
+    try {
+      const invId = inventoryId || getInventoryId(refNo);
+      const res = await fetch(`${API_URL}/issued/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          student_id: studentId,
+          inventory_id: invId,
+          quantity: Number(qty || 1),
+          issue_date: issueDate || new Date().toISOString().slice(0, 10),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchIssued(), fetchStock()]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to issue item" };
+    } catch (err) {
+      console.error("issueItem error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const returnIssuedItem = async (issueId, returnDate, condition = "Good") => {
+    try {
+      const res = await fetch(`${API_URL}/issued/${issueId}/return`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          return_date: returnDate || new Date().toISOString().slice(0, 10),
+          return_condition: condition,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchIssued(), fetchStock()]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to return item" };
+    } catch (err) {
+      console.error("returnIssuedItem error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const condemnIssuedItem = async (issueId) => {
+    try {
+      const res = await fetch(`${API_URL}/issued/${issueId}/condemn`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchIssued();
+        await fetchStock();
+        return { success: true };
+      }
+      return { success: false, message: data.error?.message || "Failed to condemn item" };
+    } catch (err) {
+      console.error("condemnIssuedItem error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const updateStockItem = async (itemId, patch) => {
+    try {
+      const realId = getInventoryId(itemId);
+      const res = await fetch(`${API_URL}/inventory/${realId}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(patch),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to update item" };
+    } catch (err) {
+      console.error("updateStockItem error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const toggleStockStatus = async (itemId) => {
+    try {
+      const realId = getInventoryId(itemId);
+      const res = await fetch(`${API_URL}/inventory/${realId}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to toggle status" };
+    } catch (err) {
+      console.error("toggleStockStatus error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const deleteStockItem = async (itemId) => {
+    try {
+      const realId = getInventoryId(itemId);
+      const res = await fetch(`${API_URL}/inventory/${realId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true };
+      }
+      return { success: false, message: data.error?.message || "Failed to delete item" };
+    } catch (err) {
+      console.error("deleteStockItem error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const restoreFailedToStock = async (failedId, inventoryData) => {
+    try {
+      const res = await fetch(`${API_URL}/failed-inventory/${failedId}/restore`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ inventory_data: inventoryData || {} }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchFailed(), fetchStock()]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to restore item" };
+    } catch (err) {
+      console.error("restoreFailedToStock error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const markFailedDisposed = async (failedId) => {
+    try {
+      const res = await fetch(`${API_URL}/failed-inventory/${failedId}/dispose`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchFailed();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to dispose item" };
+    } catch (err) {
+      console.error("markFailedDisposed error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const addReturn = async (returnData) => {
+    try {
+      const invId = getInventoryId(returnData.inventoryId || returnData.refNo);
+      const res = await fetch(`${API_URL}/returns/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          type: returnData.type || "exchange",
+          inventory_id: invId,
+          quantity: Number(returnData.qty || returnData.quantity || 1),
+          reason: returnData.reason || "",
+          new_batch_no: returnData.newBatchNo || returnData.batchNo,
+          credit_note: returnData.creditNote,
+          return_date: returnData.returnDate || new Date().toISOString().slice(0, 10),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchReturns(), fetchStock()]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to add return" };
+    } catch (err) {
+      console.error("addReturn error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const updateReturnStatus = async (returnId, newStatus, extraData = {}) => {
+    try {
+      const res = await fetch(`${API_URL}/returns/${returnId}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          status: newStatus.toLowerCase(),
+          credit_note: extraData.creditNote,
+          new_batch_no: extraData.newBatchNo || extraData.batchNo,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchReturns(), fetchStock()]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to update return status" };
+    } catch (err) {
+      console.error("updateReturnStatus error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const discardReturn = async (returnId) => {
+    return updateReturnStatus(returnId, "rejected");
+  };
+
   const value = {
     stock,
     failed,
@@ -199,6 +425,18 @@ export function InventoryProvider({ children }) {
     fetchIssued,
     fetchReturns,
     loadAllData,
+    getInventoryId,
+    issueItem,
+    returnIssuedItem,
+    condemnIssuedItem,
+    updateStockItem,
+    toggleStockStatus,
+    deleteStockItem,
+    restoreFailedToStock,
+    markFailedDisposed,
+    addReturn,
+    updateReturnStatus,
+    discardReturn,
   };
 
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;
