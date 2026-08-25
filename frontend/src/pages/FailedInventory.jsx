@@ -4,8 +4,7 @@ import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import DisposeConfirmModal from "../components/failed-inventory/DisposeConfirmModal.jsx";
 import MoveToInventoryModal from "../components/failed-inventory/MoveToInventoryModal.jsx";
-import { categories } from "../data/stockData.js";
-import { failReasons } from "../data/failedInventoryData.js";
+import { CATEGORIES as categories, FAILED_REASONS as failReasons } from "../components/utils/constants.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
@@ -46,14 +45,14 @@ export default function FailedInventory() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    let list = (rows || []).filter((r) => {
       const matchesCategory = category === "All Categories" || r.category === category;
       const matchesReason = reason === "All Reasons" || r.reason === reason;
       const matchesQuery =
         !q ||
-        r.product.toLowerCase().includes(q) ||
-        r.refNo.toLowerCase().includes(q) ||
-        r.lotNo.toLowerCase().includes(q);
+        (r.product || "").toLowerCase().includes(q) ||
+        (r.refNo || "").toLowerCase().includes(q) ||
+        (r.lotNo || "").toLowerCase().includes(q);
       return matchesCategory && matchesReason && matchesQuery;
     });
 
@@ -193,8 +192,8 @@ export default function FailedInventory() {
                   <tr key={row.refNo}>
                     <td className="failed__mono">{row.refNo}</td>
                     <td>
-                      <span className={`stock-tag stock-tag--${row.category.toLowerCase()}`}>
-                        {row.category}
+                      <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>
+                        {row.category || "General"}
                       </span>
                     </td>
                     <td className="failed__strong">{row.product}</td>

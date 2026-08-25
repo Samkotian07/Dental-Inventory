@@ -46,13 +46,18 @@ export function AuthProvider({ children }) {
             localStorage.removeItem("dental_token");
             localStorage.removeItem("dental_user");
           }
+        })
+        .finally(() => {
+          setLoading(false);
         });
       } catch (e) {
         localStorage.removeItem("dental_token");
         localStorage.removeItem("dental_user");
+        setLoading(false);
       }
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   // Login function - calls backend API

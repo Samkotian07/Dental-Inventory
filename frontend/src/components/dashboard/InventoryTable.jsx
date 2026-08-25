@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Search, Maximize2, X } from "lucide-react";
-import { categories } from "../../data/dashboardData.js";
+import { CATEGORIES as categories } from "../utils/constants.js";
 import "./InventoryTable.css";
 
 function Rows({ items }) {

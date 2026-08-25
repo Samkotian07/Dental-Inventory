@@ -5,7 +5,7 @@ import Pagination from "../components/Pagination.jsx";
 import ItemDetailsModal from "../components/stock/ItemDetailsModal.jsx";
 import EditItemModal from "../components/stock/EditItemModal.jsx";
 import DeleteItemModal from "../components/stock/DeleteItemModal.jsx";
-import { categories } from "../data/stockData.js";
+import { CATEGORIES as categories } from "../components/utils/constants.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
@@ -55,14 +55,14 @@ export default function Stock() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = rows.filter((r) => {
+    let list = (rows || []).filter((r) => {
       const matchesCategory = category === "All Categories" || r.category === category;
       const matchesQuery =
         !q ||
-        r.product.toLowerCase().includes(q) ||
-        r.company.toLowerCase().includes(q) ||
-        r.refNo.toLowerCase().includes(q) ||
-        r.lotNo.toLowerCase().includes(q);
+        (r.product || "").toLowerCase().includes(q) ||
+        (r.company || "").toLowerCase().includes(q) ||
+        (r.refNo || "").toLowerCase().includes(q) ||
+        (r.lotNo || "").toLowerCase().includes(q);
       return matchesCategory && matchesQuery;
     });
 
@@ -181,8 +181,8 @@ export default function Stock() {
                   <tr key={row.refNo}>
                     <td className="stock__mono">{row.refNo}</td>
                     <td>
-                      <span className={`stock-tag stock-tag--${row.category.toLowerCase()}`}>
-                        {row.category}
+                      <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>
+                        {row.category || "General"}
                       </span>
                     </td>
                     <td>{row.company}</td>

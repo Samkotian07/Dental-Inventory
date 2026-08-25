@@ -1,12 +1,35 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Modal from "./Modal.jsx";
-import { students, inventoryOptions } from "../../data/issuedData.js";
+import { useData } from "../../context/DataContext.jsx";
+import { useInventory } from "../../context/InventoryContext.jsx";
 
 export default function IssueItemModal({ onClose, onConfirm }) {
+  const { students } = useData();
+  const { stock } = useInventory();
+  
   const [studentId, setStudentId] = useState("");
   const [itemId, setItemId] = useState("");
   const [lotId, setLotId] = useState("");
   const [qty, setQty] = useState(1);
+
+  // Create inventory options from stock
+  const inventoryOptions = useMemo(() => 
+    stock.map((item) => ({
+      id: item.refNo,
+      product: item.product,
+      lots: [
+        {
+          id: `LOT-${item.lotNo}`,
+          number: item.lotNo,
+          quantity: item.qty,
+          expiryDate: item.expiry,
+        },
+      ],
+      lotNo: item.lotNo,
+      qty: item.qty,
+    })),
+    [stock]
+  );
 
   // Get available lots for the selected item
   const getAvailableLots = () => {

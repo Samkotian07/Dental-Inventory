@@ -12,14 +12,10 @@ import Pagination from "../components/Pagination.jsx";
 import IssueDetailsModal from "../components/issued/IssueDetailsModal.jsx";
 import ReturnItemModal from "../components/issued/ReturnItemModal.jsx";
 import IssueItemModal from "../components/issued/IssueItemModal.jsx";
-import {
-  issuedItems as seedData,
-  students,
-  inventoryOptions,
-} from "../data/issuedData.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
+import { useData } from "../context/DataContext.jsx";
 import "./IssuedItems.css";
 
 const PAGE_SIZE = 6;
@@ -50,6 +46,7 @@ function formatDate(isoOrDate) {
 export default function IssuedItems() {
   const onMenuClick = useMenuClick();
   const { issuedItems, issueItem, returnIssuedItem, stock } = useInventory();
+  const { students } = useData();
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All Status");

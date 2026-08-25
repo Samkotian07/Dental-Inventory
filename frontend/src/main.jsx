@@ -7,6 +7,7 @@ import { DataProvider } from "./context/DataContext";
 import { AuthProvider } from "./context/AuthContext";
 import { InventoryProvider } from "./context/InventoryContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
+import { Toaster } from "sonner";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <AuthProvider>
           <DataProvider>
             <InventoryProvider>
+              <Toaster richColors position="top-right" />
               <App />
             </InventoryProvider>
           </DataProvider>

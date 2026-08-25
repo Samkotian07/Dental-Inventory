@@ -31,7 +31,6 @@ const EXCEL_HEADERS = [
 export default function StockInsertion() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { inventory, addInventory } = useData();
   const { addStockItem, returns } = useInventory();
   const [csvPreview, setCsvPreview] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -78,7 +77,6 @@ export default function StockInsertion() {
       expiry: form.expiryDate,
       status: "active",
     };
-    addInventory(itemData, user?.name);
     addStockItem(itemData);
     toast.success(`New inventory item added successfully with ${documentType === 'invoice' ? 'Invoice' : 'Credit Note'} number`);
     setForm({
@@ -139,7 +137,6 @@ export default function StockInsertion() {
         size: row.size || "",
         status: "active",
       };
-      addInventory(itemData, user?.name);
       addStockItem(itemData);
     });
     toast.success(`Imported ${csvPreview.length} items successfully`);

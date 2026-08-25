@@ -17,7 +17,6 @@ const PAGE_SIZE = 8;
 export default function StockHandle() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { updateInventory } = useData();
   const { stock, updateStockItem } = useInventory();
   const [searchRef, setSearchRef] = useState("");
   const [foundItem, setFoundItem] = useState(null);
@@ -26,7 +25,7 @@ export default function StockHandle() {
 
   const handleSearch = () => {
     const item = stock.find(
-      (i) => i.refNo.toLowerCase() === searchRef.trim().toLowerCase(),
+      (i) => (i.refNo || "").toLowerCase() === searchRef.trim().toLowerCase(),
     );
     if (item) {
       setFoundItem(item);
@@ -39,7 +38,6 @@ export default function StockHandle() {
   // Toggle item status (Active/Inactive)
   const handleToggleStatus = (itemId, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
-    updateInventory(itemId, { status: newStatus }, user?.name);
     updateStockItem(itemId, { status: newStatus });
     toast.success(`Item status updated to ${newStatus}`);
   };
@@ -113,7 +111,7 @@ export default function StockHandle() {
                       isOn={foundItem.status !== "inactive"}
                       onToggle={() => {
                         const newStatus = foundItem.status === "inactive" ? "active" : "inactive";
-                        updateInventory(foundItem.id, { status: newStatus }, user?.name);
+                        updateStockItem(foundItem.id, { status: newStatus });
                         setFoundItem({ ...foundItem, status: newStatus });
                         toast.success(`Status updated to ${newStatus}`);
                       }}
@@ -197,7 +195,7 @@ export default function StockHandle() {
                               isOn={isActive}
                               onToggle={() => {
                                 const newStatus = isActive ? "inactive" : "active";
-                                updateInventory(item.id, { status: newStatus }, user?.name);
+                                updateStockItem(item.id, { status: newStatus });
                                 toast.success(`Status updated to ${newStatus}`);
                               }}
                             />

@@ -6,7 +6,6 @@ import ReturnDetailsModal from "../components/track-exchange/ReturnDetailsModal.
 import UpdateStatusModal from "../components/track-exchange/UpdateStatusModal.jsx";
 import AddReturnModal from "../components/track-exchange/AddReturnModal.jsx";
 import DiscardConfirmModal from "../components/track-exchange/DiscardConfirmModal.jsx";
-import { returnItems as seedData, inventoryOptions } from "../data/returnData.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
@@ -33,8 +32,8 @@ function formatDate(isoOrDate) {
 
 export default function TrackReturns() {
   const onMenuClick = useMenuClick();
+  const { returns, addReturn, updateReturnStatus, discardReturn } = useInventory();
 
-  const [rows, setRows] = useState(seedData);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All Status");
   const [sort, setSort] = useState({ key: null, dir: 1 });
@@ -44,8 +43,6 @@ export default function TrackReturns() {
   const [statusItem, setStatusItem] = useState(null);
   const [discardItem, setDiscardItem] = useState(null);
   const [addModalOpen, setAddModalOpen] = useState(false);
-
-  const { returns } = useInventory();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

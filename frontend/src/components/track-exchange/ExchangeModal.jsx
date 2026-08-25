@@ -1,18 +1,29 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Modal from "./Modal.jsx";
-import { inventoryOptions } from "../../data/returnData.js";
+import { useInventory } from "../../context/InventoryContext.jsx";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function ExchangeModal({ onClose, onConfirm }) {
+  const { stock = [] } = useInventory();
   const [itemId, setItemId] = useState("");
   const [batchNo, setBatchNo] = useState("");
   const [customBatch, setCustomBatch] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState("");
   const [returnDate, setReturnDate] = useState(todayISO());
+
+  const inventoryOptions = useMemo(
+    () =>
+      stock.map((s) => ({
+        id: s.refNo || s.id,
+        product: s.product || s.productName,
+        batches: s.lotNo ? [s.lotNo] : [],
+      })),
+    [stock]
+  );
 
   const selectedItem = inventoryOptions.find((i) => i.id === itemId);
   const availableBatches = selectedItem?.batches || [];

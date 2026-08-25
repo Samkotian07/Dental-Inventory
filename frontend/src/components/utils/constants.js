@@ -1,6 +1,6 @@
-export const CATEGORIES = ['XYXX', 'CONSUMABLES', 'EQUIPMENT'];
+export const CATEGORIES = ["All Categories", "NP Implants", "RP Implants", "Universal Bases", "Healing Abutments", "Impression Copings", "Implant Replicas", "Snappy Abutments", "Esthetic Abutments", "Temporary Abutments", "Instruments & Tools", "Membrane"];
 
-export const FAILED_REASONS = ['Expired', 'Damaged', 'Quality Failed', 'Returned'];
+export const FAILED_REASONS = ["Damaged", "Expired", "Quality Failed", "Returned", "Other"];
 
 export const EXCHANGE_STATUSES = ['pending', 'completed', 'rejected'];
 

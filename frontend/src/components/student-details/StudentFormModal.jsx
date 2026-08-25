@@ -1,6 +1,15 @@
 import { useState } from "react";
 import Modal from "./Modal.jsx";
-import { courses, semesters } from "../../data/studentData.js";
+
+const courses = [
+  "Dental Surgery",
+  "Orthodontics",
+  "Periodontics",
+  "Endodontics",
+  "Pediatric Dentistry",
+];
+
+const semesters = ["1", "2", "3", "4", "5", "6", "7", "8"];
 
 export default function StudentFormModal({ student, onClose, onSave }) {
   const isEdit = Boolean(student);

@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, PackagePlus, PackageMinus } from "lucide-react";
-import { dailyActivity } from "../../data/dashboardData.js";
 import "./DashboardCalendar.css";
+
+// Mock daily activity data
+const dailyActivity = {};
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_NAMES = [

@@ -1,16 +1,26 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Modal from "./Modal.jsx";
-import { inventoryOptions } from "../../data/returnData.js";
+import { useInventory } from "../../context/InventoryContext.jsx";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function AddReturnModal({ onClose, onConfirm }) {
+  const { stock = [] } = useInventory();
   const [itemId, setItemId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState("");
   const [returnDate, setReturnDate] = useState(todayISO());
+
+  const inventoryOptions = useMemo(
+    () =>
+      stock.map((s) => ({
+        id: s.refNo || s.id,
+        product: s.product || s.productName,
+      })),
+    [stock]
+  );
 
   const canSubmit = itemId && quantity > 0 && reason.trim();
 

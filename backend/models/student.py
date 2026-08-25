@@ -3,8 +3,7 @@ import datetime
 
 class Student:
     def __init__(self, data):
-        self.campus_id = data.get('campus_id') or data.get('campusId') or data.get('id')
-        self.id = self.campus_id
+        self.campus_id = data.get('campus_id')
         self.name = data.get('name')
         self.email = data.get('email')
         self.course = data.get('course')
@@ -27,7 +26,8 @@ class Student:
         return [cls(row) for row in result]
     
     @classmethod
-    def find_by_campus_id(cls, campus_id):
+    def find_by_id(cls, campus_id):
+        """Find student by campus_id"""
         db = cls.get_db()
         result = db.execute_query(
             "SELECT * FROM students WHERE campus_id = %s",
@@ -36,10 +36,6 @@ class Student:
         if result:
             return cls(result[0])
         return None
-
-    @classmethod
-    def find_by_id(cls, campus_id):
-        return cls.find_by_campus_id(campus_id)
     
     @classmethod
     def search(cls, query_str):
@@ -55,13 +51,13 @@ class Student:
     @classmethod
     def create(cls, data):
         db = cls.get_db()
-        campus_id = data.get('campusId') or data.get('campus_id') or data.get('id')
         
+        # Generate campus_id if not provided
+        campus_id = data.get('campus_id') or data.get('id')
         if not campus_id:
-            # Fallback auto-generated Campus ID if none provided
             res = db.execute_query("SELECT COUNT(*) as cnt FROM students")
-            next_num = (res[0]['cnt'] if res else 0) + 1000
-            campus_id = f"STU-{next_num}"
+            next_num = (res[0]['cnt'] if res else 0) + 1
+            campus_id = f"STU-{str(next_num + 1000).zfill(3)}"
         
         added_date = data.get('added') or datetime.date.today().isoformat()
         
@@ -83,7 +79,7 @@ class Student:
             data.get('status', 'active'),
             added_date
         ))
-        return cls.find_by_campus_id(campus_id)
+        return cls.find_by_id(campus_id)
     
     def update(self, data):
         db = self.get_db()
@@ -104,7 +100,7 @@ class Student:
         params.append(self.campus_id)
         
         db.execute_query(query, tuple(params))
-        return Student.find_by_campus_id(self.campus_id)
+        return Student.find_by_id(self.campus_id)
     
     def delete(self):
         db = self.get_db()
@@ -118,7 +114,7 @@ class Student:
         
         return {
             'campusId': self.campus_id,
-            'id': self.campus_id,
+            'id': self.campus_id,  # Keep for backward compatibility
             'name': self.name,
             'email': self.email,
             'course': self.course,

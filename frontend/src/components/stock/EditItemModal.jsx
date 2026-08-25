@@ -1,8 +1,8 @@
 import { useState } from "react";
 import Modal from "./Modal.jsx";
-import { categories } from "../../data/stockData.js";
+import { CATEGORIES } from "../utils/constants.js";
 
-const editableCategories = categories.filter((c) => c !== "All Categories");
+const editableCategories = CATEGORIES.filter((c) => c !== "All Categories");
 
 export default function EditItemModal({ item, onClose, onSave }) {
   if (!item) return null;

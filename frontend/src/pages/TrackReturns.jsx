@@ -7,7 +7,6 @@ import UpdateStatusModal from "../components/track-exchange/UpdateStatusModal.js
 import ExchangeModal from "../components/track-exchange/ExchangeModal.jsx";
 import CreditNoteModal from "../components/track-exchange/CreditNoteModal.jsx";
 import DiscardConfirmModal from "../components/track-exchange/DiscardConfirmModal.jsx";
-import { returnItems as seedData, inventoryOptions } from "../data/returnData.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
@@ -35,7 +34,16 @@ function formatDate(isoOrDate) {
 
 export default function TrackReturns() {
   const onMenuClick = useMenuClick();
-  const { returns, addReturn, updateReturnStatus, discardReturn } = useInventory();
+  const { returns, addReturn, updateReturnStatus, discardReturn, stock = [] } = useInventory();
+
+  const inventoryOptions = useMemo(
+    () =>
+      stock.map((s) => ({
+        id: s.refNo || s.id,
+        product: s.product || s.productName,
+      })),
+    [stock]
+  );
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("All Status");
@@ -272,8 +280,8 @@ export default function TrackReturns() {
                     </td>
                     <td>{row.returnDate}</td>
                     <td>
-                      <span className={`ret-status-pill ret-status-pill--${row.status.toLowerCase().replace(/\s+/g, "-")}`}>
-                        {row.status.toLowerCase()}
+                      <span className={`ret-status-pill ret-status-pill--${(row.status || "Pending").toLowerCase().replace(/\s+/g, "-")}`}>
+                        {(row.status || "Pending").toLowerCase()}
                       </span>
                     </td>
                     <td>

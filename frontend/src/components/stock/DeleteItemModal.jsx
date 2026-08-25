@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { TriangleAlert } from "lucide-react";
 import Modal from "./Modal.jsx";
-import { failReasons } from "../../data/failedInventoryData.js";
+import { FAILED_REASONS } from "../utils/constants.js";
 import "./DeleteItemModal.css";
+
+const failReasons = FAILED_REASONS;
 
 export default function DeleteItemModal({ item, onClose, onConfirm }) {
   if (!item) return null;

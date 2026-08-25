@@ -256,6 +256,23 @@ export function DataProvider({ children }) {
     }
   };
 
+  // Search students
+  const searchStudents = async (query) => {
+    try {
+      const response = await fetch(`${API_URL}/students/search?q=${encodeURIComponent(query)}`, {
+        headers: getAuthHeaders()
+      });
+      const data = await response.json();
+      if (data.success) {
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Error searching students:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
   // Initialize - fetch students on mount
   useEffect(() => {
     fetchStudents();
@@ -267,6 +284,7 @@ export function DataProvider({ children }) {
     students,
     loading,
     fetchStudents,
+    searchStudents,
     addStudent,
     updateStudent,
     deleteStudent,
