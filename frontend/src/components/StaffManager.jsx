@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { Edit, Trash2, Plus, UserCheck, UserX } from "lucide-react";
 import { useData } from "../context/DataContext";
-import { useAuth } from "../context/AuthContext";
 import SearchBar from "./common/SearchBar";
 import Select from "./common/Select";
 import Table from "./common/Table";
@@ -11,16 +10,14 @@ import Badge from "./common/Badge";
 import ConfirmDialog from "./common/ConfirmDialog";
 import DashboardHeader from "./dashboard/DashboardHeader.jsx";
 import { useMenuClick } from "./Layout.jsx";
-import { validateEmail } from "./utils/validators"; // ← Fixed
-import { formatDate, exportToCSV } from "./utils/helpers"; // ← Fixed
+import { validateEmail } from "./utils/validators";
+import { formatDate, exportToCSV } from "./utils/helpers";
 import { toast } from "sonner";
 import "./StaffManager.css";
 
 export default function StaffManager() {
   const onMenuClick = useMenuClick();
-  const { user } = useAuth();
-  const { staff, addStaff, updateStaff, deleteStaff, toggleStaffStatus } =
-    useData();
+  const { staff, addStaff, updateStaff, deleteStaff, toggleStaffStatus } = useData();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
@@ -81,6 +78,7 @@ export default function StaffManager() {
     },
   ];
 
+  // ⭐ FIXED: Removed user?.name parameter
   const handleAdd = async () => {
     if (!form.name || !form.email || !form.password) {
       toast.error("All fields are required");
@@ -98,10 +96,11 @@ export default function StaffManager() {
       toast.error("Password must be at least 6 characters");
       return;
     }
-    const result = await addStaff(
-      { name: form.name, email: form.email, password: form.password },
-      user?.name,
-    );
+    const result = await addStaff({
+      name: form.name,
+      email: form.email,
+      password: form.password
+    });
     if (!result.success) {
       toast.error(result.message || "Failed to add staff member");
       return;
@@ -111,11 +110,11 @@ export default function StaffManager() {
     toast.success("Staff member added successfully");
   };
 
+  // ⭐ FIXED: Removed user?.name parameter
   const handleEditSave = async () => {
     const result = await updateStaff(
       editTarget.id,
-      { name: editTarget.name, email: editTarget.email },
-      user?.name,
+      { name: editTarget.name, email: editTarget.email }
     );
     if (!result.success) {
       toast.error(result.message || "Failed to update staff member");
@@ -125,8 +124,9 @@ export default function StaffManager() {
     toast.success("Staff member updated");
   };
 
+  // ⭐ FIXED: Removed user?.name parameter
   const handleDelete = async () => {
-    const result = await deleteStaff(deleteTarget.id, user?.name);
+    const result = await deleteStaff(deleteTarget.id);
     if (!result.success) {
       toast.error(result.message || "Failed to delete staff member");
       return;
@@ -145,135 +145,174 @@ export default function StaffManager() {
     toast.success("Excel exported successfully");
   };
 
+  // ⭐ FIXED: Removed user?.name parameter
+  const handleToggleStatus = async (id) => {
+    const result = await toggleStaffStatus(id);
+    if (!result.success) {
+      toast.error(result.message || "Failed to update staff status");
+    }
+  };
+
   return (
     <>
       <DashboardHeader title="Staff Management" onMenuClick={onMenuClick} />
       <main className="staff-manager">
-      {/* Controls */}
-      <div className="staff-controls">
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          placeholder="Search by name or email..."
-          className="staff-search"
-        />
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          options={[
-            { value: "all", label: "All Status" },
-            { value: "active", label: "Active" },
-            { value: "inactive", label: "Inactive" },
-          ]}
-          className="staff-filter-select"
-        />
-        <Button
-          variant="secondary"
-          onClick={handleExport}
-          className="staff-export-btn"
-        >
-          Export
-        </Button>
-        <Button onClick={() => setAddOpen(true)} className="staff-add-btn">
-          <Plus size={16} /> Add Staff
-        </Button>
-      </div>
+        {/* Controls */}
+        <div className="staff-controls">
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search by name or email..."
+            className="staff-search"
+          />
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            options={[
+              { value: "all", label: "All Status" },
+              { value: "active", label: "Active" },
+              { value: "inactive", label: "Inactive" },
+            ]}
+            className="staff-filter-select"
+          />
+          <Button
+            variant="secondary"
+            onClick={handleExport}
+            className="staff-export-btn"
+          >
+            Export
+          </Button>
+          <Button onClick={() => setAddOpen(true)} className="staff-add-btn">
+            <Plus size={16} /> Add Staff
+          </Button>
+        </div>
 
-      {/* Table */}
-      <div className="staff-table-wrapper">
-        <Table
-          columns={columns}
-          data={filtered}
-          actions={(item) => (
-            <div className="staff-actions">
-              <button
-                onClick={() => setEditTarget({ ...item })}
-                className="staff-action-btn staff-action-edit"
-                title="Edit"
-              >
-                <Edit size={16} />
-              </button>
-              <button
-                onClick={async () => {
-                  const result = await toggleStaffStatus(item.id, user?.name);
-                  if (!result.success) toast.error(result.message || "Failed to update staff status");
-                }}
-                className={`staff-action-btn ${item.status === "active" ? "staff-action-deactivate" : "staff-action-activate"}`}
-                title={item.status === "active" ? "Deactivate" : "Activate"}
-              >
-                {item.status === "active" ? (
-                  <UserX size={16} />
-                ) : (
-                  <UserCheck size={16} />
-                )}
-              </button>
-              {item.role !== "admin" && (
+        {/* Table */}
+        <div className="staff-table-wrapper">
+          <Table
+            columns={columns}
+            data={filtered}
+            actions={(item) => (
+              <div className="staff-actions">
                 <button
-                  onClick={() => setDeleteTarget(item)}
-                  className="staff-action-btn staff-action-delete"
-                  title="Delete"
+                  onClick={() => setEditTarget({ ...item })}
+                  className="staff-action-btn staff-action-edit"
+                  title="Edit"
                 >
-                  <Trash2 size={16} />
+                  <Edit size={16} />
                 </button>
-              )}
+                {/* ⭐ FIXED: Using handleToggleStatus without user?.name */}
+                <button
+                  onClick={() => handleToggleStatus(item.id)}
+                  className={`staff-action-btn ${item.status === "active" ? "staff-action-deactivate" : "staff-action-activate"}`}
+                  title={item.status === "active" ? "Deactivate" : "Activate"}
+                >
+                  {item.status === "active" ? (
+                    <UserX size={16} />
+                  ) : (
+                    <UserCheck size={16} />
+                  )}
+                </button>
+                {item.role !== "admin" && (
+                  <button
+                    onClick={() => setDeleteTarget(item)}
+                    className="staff-action-btn staff-action-delete"
+                    title="Delete"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
+            )}
+          />
+        </div>
+
+        {/* Add Modal */}
+        {addOpen && (
+          <Modal title="Add Staff Member" onClose={() => setAddOpen(false)} width={480}>
+            <div className="modal__field">
+              <label htmlFor="staff-name">Full Name</label>
+              <input
+                id="staff-name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="John Doe"
+              />
             </div>
-          )}
+            <div className="modal__field">
+              <label htmlFor="staff-email">Email Address</label>
+              <input
+                id="staff-email"
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="staff@yendental.com"
+              />
+            </div>
+            <div className="modal__field">
+              <label htmlFor="staff-password">Password</label>
+              <input
+                id="staff-password"
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                placeholder="Min 6 characters"
+              />
+            </div>
+            <div className="modal__field">
+              <label htmlFor="staff-confirm-password">Confirm Password</label>
+              <input
+                id="staff-confirm-password"
+                type="password"
+                value={form.confirmPassword}
+                onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+              />
+            </div>
+            <div className="staff-role-hint">
+              <p>Role: <Badge variant="primary">Staff</Badge> (fixed)</p>
+            </div>
+            <div className="modal__actions">
+              <button className="modal__btn" onClick={() => setAddOpen(false)}>Cancel</button>
+              <button className="modal__btn modal__btn--primary" onClick={handleAdd}>Add Staff</button>
+            </div>
+          </Modal>
+        )}
+
+        {/* Edit Modal */}
+        {editTarget && (
+          <Modal title="Edit Staff Member" onClose={() => setEditTarget(null)} width={480}>
+            <div className="modal__field">
+              <label htmlFor="edit-staff-name">Full Name</label>
+              <input
+                id="edit-staff-name"
+                value={editTarget.name}
+                onChange={(e) => setEditTarget({ ...editTarget, name: e.target.value })}
+              />
+            </div>
+            <div className="modal__field">
+              <label htmlFor="edit-staff-email">Email Address</label>
+              <input
+                id="edit-staff-email"
+                type="email"
+                value={editTarget.email}
+                onChange={(e) => setEditTarget({ ...editTarget, email: e.target.value })}
+              />
+            </div>
+            <div className="modal__actions">
+              <button className="modal__btn" onClick={() => setEditTarget(null)}>Cancel</button>
+              <button className="modal__btn modal__btn--primary" onClick={handleEditSave}>Save Changes</button>
+            </div>
+          </Modal>
+        )}
+
+        <ConfirmDialog
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+          title="Delete Staff Member"
+          message={`Are you sure you want to delete ${deleteTarget?.name} (${deleteTarget?.email})? This action cannot be undone.`}
+          confirmLabel="Delete"
         />
-      </div>
-
-      {/* Add Modal */}
-      {addOpen && (
-        <Modal title="Add Staff Member" onClose={() => setAddOpen(false)} width={480}>
-          <div className="modal__field">
-            <label htmlFor="staff-name">Full Name</label>
-            <input id="staff-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Doe" />
-          </div>
-          <div className="modal__field">
-            <label htmlFor="staff-email">Email Address</label>
-            <input id="staff-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="staff@yendental.com" />
-          </div>
-          <div className="modal__field">
-            <label htmlFor="staff-password">Password</label>
-            <input id="staff-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Min 6 characters" />
-          </div>
-          <div className="modal__field">
-            <label htmlFor="staff-confirm-password">Confirm Password</label>
-            <input id="staff-confirm-password" type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} />
-          </div>
-          <div className="staff-role-hint"><p>Role: <Badge variant="primary">Staff</Badge> (fixed)</p></div>
-          <div className="modal__actions">
-            <button className="modal__btn" onClick={() => setAddOpen(false)}>Cancel</button>
-            <button className="modal__btn modal__btn--primary" onClick={handleAdd}>Add Staff</button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Edit Modal */}
-      {editTarget && (
-        <Modal title="Edit Staff Member" onClose={() => setEditTarget(null)} width={480}>
-          <div className="modal__field">
-            <label htmlFor="edit-staff-name">Full Name</label>
-            <input id="edit-staff-name" value={editTarget.name} onChange={(e) => setEditTarget({ ...editTarget, name: e.target.value })} />
-          </div>
-          <div className="modal__field">
-            <label htmlFor="edit-staff-email">Email Address</label>
-            <input id="edit-staff-email" type="email" value={editTarget.email} onChange={(e) => setEditTarget({ ...editTarget, email: e.target.value })} />
-          </div>
-          <div className="modal__actions">
-            <button className="modal__btn" onClick={() => setEditTarget(null)}>Cancel</button>
-            <button className="modal__btn modal__btn--primary" onClick={handleEditSave}>Save Changes</button>
-          </div>
-        </Modal>
-      )}
-
-      <ConfirmDialog
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        title="Delete Staff Member"
-        message={`Are you sure you want to delete ${deleteTarget?.name} (${deleteTarget?.email})? This action cannot be undone.`}
-        confirmLabel="Delete"
-      />
       </main>
     </>
   );

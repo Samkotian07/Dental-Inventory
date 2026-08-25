@@ -56,15 +56,32 @@ class Inventory:
     @classmethod
     def create(cls, data):
         db = cls.get_db()
-        # Generate ID if not provided
-        item_id = data.get('id') or f"INV-{str(db.execute_query('SELECT IFNULL(MAX(CAST(SUBSTRING(id, 5) AS UNSIGNED)), 0) + 1 FROM inventory')[0]['IFNULL(MAX(CAST(SUBSTRING(id, 5) AS UNSIGNED)), 0) + 1']).zfill(3)}"
+        
+        # Generate a unique ref_no
+        ref_no = data.get('ref_no')
+        
+        # If ref_no is provided, check if it already exists
+        if ref_no:
+            existing = db.execute_query("SELECT id FROM inventory WHERE ref_no = %s", (ref_no,))
+            if existing:
+                # Ref_no exists, generate a new one
+                ref_no = None
+        
+        # Generate new ref_no if not provided or if it already exists
+        if not ref_no:
+            result = db.execute_query("SELECT MAX(CAST(SUBSTRING(ref_no, 5) AS UNSIGNED)) as max_ref FROM inventory")
+            next_num = (result[0]['max_ref'] if result and result[0]['max_ref'] else 0) + 1
+            ref_no = f"INV-{str(next_num).zfill(3)}"
+        
+        # Generate ID based on ref_no
+        item_id = data.get('id') or ref_no
         
         db.execute_query("""
             INSERT INTO inventory (id, ref_no, product_name, category, company_name, size, lot_no, quantity, expiry_date, low_stock_threshold, is_returnable, document_type, document_number, created_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             item_id,
-            data.get('ref_no') or f"INV-{item_id.split('-')[1]}",
+            ref_no,
             data['product_name'],
             data['category'],
             data.get('company_name'),

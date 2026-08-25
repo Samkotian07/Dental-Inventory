@@ -9,6 +9,7 @@ import TrackReturns from "./pages/TrackReturns.jsx";
 import StudentDetails from "./pages/StudentDetails.jsx";
 import Stock from "./pages/Stock.jsx";
 import FailedInventory from "./pages/FailedInventory.jsx";
+import AuditLog from "./pages/AuditLog.jsx";
 
 // Components
 import StaffManager from "./components/StaffManager.jsx";
@@ -69,6 +70,14 @@ export default function App() {
 
         {/* Admin Only Routes */}
         <Route
+          path="/low-stock"
+          element={
+            <AdminRoute>
+              <LowStockSettings />
+            </AdminRoute>
+          }
+        />
+        <Route
           path="/low-stock-settings"
           element={
             <AdminRoute>
@@ -81,6 +90,14 @@ export default function App() {
           element={
             <AdminRoute>
               <StaffManager />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/audit-log"
+          element={
+            <AdminRoute>
+              <AuditLog />
             </AdminRoute>
           }
         />

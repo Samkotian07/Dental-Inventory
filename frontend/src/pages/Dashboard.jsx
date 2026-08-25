@@ -12,19 +12,52 @@ import "./Dashboard.css";
 
 const CATEGORY_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#6366f1"];
 
-const monthlyTrends = [
-  { month: "Jan", issued: 12, returned: 8 },
-  { month: "Feb", issued: 15, returned: 10 },
-  { month: "Mar", issued: 18, returned: 12 },
-  { month: "Apr", issued: 22, returned: 14 },
-  { month: "May", issued: 25, returned: 16 },
-  { month: "Jun", issued: 28, returned: 18 },
-];
-
 export default function Dashboard() {
   const onMenuClick = useMenuClick();
-  const { stock = [], failed = [], issuedItems = [] } = useInventory();
+  const { stock = [], failed = [], issuedItems = [], returns = [] } = useInventory();
   const [activeCategory, setActiveCategory] = useState("All Categories");
+
+  const monthlyTrends = useMemo(() => {
+    const months = [];
+    const now = new Date();
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthLabel = d.toLocaleString("default", { month: "short" });
+      const year = d.getFullYear();
+      const monthIndex = d.getMonth();
+
+      let issuedCount = 0;
+      issuedItems.forEach((item) => {
+        const itemDateStr = item.date || item.issuedDate || item.issueDate;
+        if (itemDateStr) {
+          const itemDate = new Date(itemDateStr);
+          if (!isNaN(itemDate.getTime()) && itemDate.getMonth() === monthIndex && itemDate.getFullYear() === year) {
+            issuedCount += Number(item.qty || item.quantity || 1);
+          }
+        }
+      });
+
+      let returnedCount = 0;
+      returns.forEach((item) => {
+        const returnDateStr = item.returnDate || item.date;
+        if (returnDateStr) {
+          const returnDate = new Date(returnDateStr);
+          if (!isNaN(returnDate.getTime()) && returnDate.getMonth() === monthIndex && returnDate.getFullYear() === year) {
+            returnedCount += Number(item.quantity || item.qty || 1);
+          }
+        }
+      });
+
+      months.push({
+        month: monthLabel,
+        issued: issuedCount,
+        returned: returnedCount,
+      });
+    }
+
+    return months;
+  }, [issuedItems, returns]);
 
   const totalItemsCount = useMemo(() => {
     return stock.reduce((sum, item) => sum + Number(item.qty || item.quantity || 0), 0);

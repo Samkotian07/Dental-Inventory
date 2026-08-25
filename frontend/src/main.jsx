@@ -5,7 +5,7 @@ import App from "./App.jsx";
 import "./index.css";
 import { DataProvider } from "./context/DataContext";
 import { AuthProvider } from "./context/AuthContext";
-import { InventoryProvider } from "./context/InventoryContext.jsx";
+import { InventoryProvider } from "./context/InventoryContext.jsx";  // ✅ CORRECT
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { Toaster } from "sonner";
 

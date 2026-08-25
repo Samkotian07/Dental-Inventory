@@ -13,6 +13,7 @@ import {
   LogOut,
   HomeIcon,
   AlertCircle,
+  ScrollText,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import "./Sidebar.css";
@@ -30,10 +31,10 @@ const navItems = [
   { label: "Settings", to: "/settings", icon: Settings },
 ];
 
-// Only these 2 are admin-only
 const adminOnlyItems = [
   { label: "Low Stock Settings", to: "/low-stock-settings", icon: AlertCircle },
   { label: "Staff Manager", to: "/staff-manager", icon: UserCog },
+  { label: "Audit Log", to: "/audit-log", icon: ScrollText },
 ];
 
 export default function Sidebar({ open, onClose }) {

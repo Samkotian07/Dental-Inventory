@@ -37,18 +37,13 @@ function toShortSemester(semester) {
 export default function StudentDetails() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { students, loading, addStudent, updateStudent, deleteStudent, bulkImportStudents, fetchStudents } = useData();
+  const { students, loading, addStudent, updateStudent, deleteStudent, bulkImportStudents } = useData();
 
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
   const [formStudent, setFormStudent] = useState(undefined);
   const [deleteTarget, setDeleteTarget] = useState(null);
-
-  // Fetch students on mount
-  useEffect(() => {
-    fetchStudents();
-  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

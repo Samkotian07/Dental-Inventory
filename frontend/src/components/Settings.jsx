@@ -14,21 +14,13 @@ import "./Settings.css";
 
 export default function Settings() {
   const onMenuClick = useMenuClick();
-  const { user } = useAuth();
-  const { settings = { lowQuantityThreshold: 10, twoFactor: false }, updateSettings } = useData();
+  const { user, logout } = useAuth();
+  const { settings = { lowQuantityThreshold: 10, twoFactor: false }, updateSettings, updateStaffPassword } = useData();
   const { darkMode, toggleDarkMode } = useTheme();
-  // const [emailUpdates, setEmailUpdates] = useState(
-  //   settings?.emailUpdates || false,
-  // );
+
   const [twoFactor, setTwoFactor] = useState(settings?.twoFactor || false);
   const [pwd, setPwd] = useState({ current: "", new: "", confirm: "" });
   const [logoutAllOpen, setLogoutAllOpen] = useState(false);
-
-  // const handleEmailToggle = () => {
-  //   setEmailUpdates(!emailUpdates);
-  //   updateSettings({ emailUpdates: !emailUpdates });
-  //   toast.success(`Email updates ${!emailUpdates ? "enabled" : "disabled"}`);
-  // };
 
   const handle2FAToggle = () => {
     setTwoFactor(!twoFactor);
@@ -43,7 +35,7 @@ export default function Settings() {
     toast.success(`Dark mode ${!darkMode ? "enabled" : "disabled"}`);
   };
 
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
     if (!pwd.current || !pwd.new || !pwd.confirm) {
       toast.error("Please fill all password fields");
       return;
@@ -56,8 +48,17 @@ export default function Settings() {
       toast.error("Password must be at least 6 characters");
       return;
     }
-    toast.success("Password changed successfully");
-    setPwd({ current: "", new: "", confirm: "" });
+    if (user?.id) {
+      const result = await updateStaffPassword(user.id, pwd.new);
+      if (result.success) {
+        toast.success("Password changed successfully");
+        setPwd({ current: "", new: "", confirm: "" });
+      } else {
+        toast.error(result.message || "Failed to update password");
+      }
+    } else {
+      toast.error("User context missing");
+    }
   };
 
   const sections = [
@@ -197,6 +198,7 @@ export default function Settings() {
           onConfirm={() => {
             setLogoutAllOpen(false);
             toast.success("Signed out from all devices");
+            logout();
           }}
           title="Logout All Devices"
           message="Are you sure you want to sign out from every active session? You will need to log in again on all devices."

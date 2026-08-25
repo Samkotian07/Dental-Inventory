@@ -88,12 +88,12 @@ export default function IssuedItems() {
   const currentPage = Math.min(page, totalPages);
   const pageRows = filtered.slice(
     (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
+    currentPage * PAGE_SIZE
   );
 
   const toggleSort = (key) => {
     setSort((prev) =>
-      prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 },
+      prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 }
     );
   };
 
@@ -101,7 +101,7 @@ export default function IssuedItems() {
     exportToCsv(
       `issued-items-${new Date().toISOString().slice(0, 10)}`,
       CSV_COLUMNS,
-      filtered,
+      filtered
     );
   };
 
@@ -111,11 +111,10 @@ export default function IssuedItems() {
 
   const handleIssueNew = ({ studentId, itemId, lotId, qty }) => {
     const student = students.find((s) => s.id === studentId);
-    // Find item from stock or inventoryOptions
     const stockMatch = stock.find((s) => s.refNo === itemId || s.id === itemId);
     const item = stockMatch
       ? { id: stockMatch.refNo, product: stockMatch.product || stockMatch.productName, lotNo: stockMatch.lotNo }
-      : inventoryOptions.find((i) => i.id === itemId);
+      : inventoryOptions?.find((i) => i.id === itemId);
 
     const lotNo =
       stockMatch?.lotNo ||

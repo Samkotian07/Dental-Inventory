@@ -1,66 +1,50 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext();
-
-// Backend API URL
-const API_URL = "http://localhost:5000/api";
+const API_URL = "http://127.0.0.1:5000/api";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Check if user was previously logged in (check token validity)
   useEffect(() => {
     const token = localStorage.getItem("dental_token");
     const savedUser = localStorage.getItem("dental_user");
 
     if (token && savedUser) {
       try {
-        // Verify token with backend
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+
         fetch(`${API_URL}/auth/me`, {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
+          headers: { "Authorization": `Bearer ${token}` }
         })
         .then(res => res.json())
         .then(data => {
-          if (data.success) {
+          if (data.success && data.data) {
             setUser(data.data);
             setIsAuthenticated(true);
-          } else {
-            // Token invalid - clear storage
-            localStorage.removeItem("dental_token");
-            localStorage.removeItem("dental_user");
-            setUser(null);
-            setIsAuthenticated(false);
+            localStorage.setItem("dental_user", JSON.stringify(data.data));
           }
         })
-        .catch(() => {
-          // Network error - try using saved user
-          try {
-            const parsedUser = JSON.parse(savedUser);
-            setUser(parsedUser);
-            setIsAuthenticated(true);
-          } catch (e) {
-            localStorage.removeItem("dental_token");
-            localStorage.removeItem("dental_user");
-          }
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+        .catch(() => {})
+        .finally(() => setLoading(false));
       } catch (e) {
         localStorage.removeItem("dental_token");
         localStorage.removeItem("dental_user");
+        setUser(null);
+        setIsAuthenticated(false);
         setLoading(false);
       }
     } else {
+      setUser(null);
+      setIsAuthenticated(false);
       setLoading(false);
     }
   }, []);
 
-  // Login function - calls backend API
   const login = async (email, password) => {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
@@ -80,42 +64,32 @@ export function AuthProvider({ children }) {
         localStorage.setItem("dental_token", token);
         localStorage.setItem("dental_user", JSON.stringify(userData));
         
+        // ⭐ FORCE PAGE RELOAD - SIMPLEST FIX
+        window.location.href = "/dashboard";
+        
         return { success: true, user: userData };
-      } else {
-        return { success: false, message: data.error?.message || "Login failed" };
       }
+      return { success: false, message: data.error?.message || "Login failed" };
     } catch (error) {
       console.error("Login error:", error);
-      return { success: false, message: "Network error. Please try again." };
+      return { success: false, message: "Network error" };
     }
   };
 
-  // Logout function
   const logout = () => {
-    // Optional: Call logout API
-    // fetch(`${API_URL}/auth/logout`, { method: "POST" });
-    
     setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem("dental_token");
     localStorage.removeItem("dental_user");
+    window.location.href = "/login";
   };
 
-  const value = {
-    user,
-    isAuthenticated,
-    loading,
-    login,
-    logout,
-  };
-
+  const value = { user, isAuthenticated, loading, login, logout };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 }

@@ -1,18 +1,21 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { useAuth } from "./AuthContext";
 
 const DataContext = createContext();
-const API_URL = "http://localhost:5000/api";
+const API_URL = "http://127.0.0.1:5000/api"; // ⭐ Changed to 127.0.0.1
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem("dental_token");
-  return {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${token}`
-  };
+  const headers = { "Content-Type": "application/json" };
+  if (token && token !== "null" && token !== "undefined") {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
 };
 
 export function DataProvider({ children }) {
+  const { isAuthenticated } = useAuth();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [staff, setStaff] = useState([]);
@@ -41,16 +44,17 @@ export function DataProvider({ children }) {
 
   // ========== STUDENT FUNCTIONS ==========
 
-  // Fetch all students
   const fetchStudents = async () => {
     setLoading(true);
     try {
+      console.log("📡 Fetching students...");
       const response = await fetch(`${API_URL}/students/`, {
         headers: getAuthHeaders()
       });
       const data = await response.json();
       if (data.success) {
-        setStudents(data.data);
+        console.log("✅ Students loaded:", data.data?.length || 0);
+        setStudents(data.data || []);
       }
     } catch (error) {
       console.error("Error fetching students:", error);
@@ -59,7 +63,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Add a new student
   const addStudent = async (studentData) => {
     try {
       const response = await fetch(`${API_URL}/students/`, {
@@ -79,7 +82,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Update a student
   const updateStudent = async (id, studentData) => {
     try {
       const response = await fetch(`${API_URL}/students/${id}`, {
@@ -100,7 +102,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Delete a student
   const deleteStudent = async (id) => {
     try {
       const response = await fetch(`${API_URL}/students/${id}`, {
@@ -119,7 +120,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Bulk import students
   const bulkImportStudents = async (studentsData) => {
     try {
       const response = await fetch(`${API_URL}/students/bulk`, {
@@ -141,15 +141,16 @@ export function DataProvider({ children }) {
 
   // ========== STAFF FUNCTIONS ==========
 
-  // Fetch all staff
   const fetchStaff = async () => {
     try {
+      console.log("📡 Fetching staff...");
       const response = await fetch(`${API_URL}/users/`, {
         headers: getAuthHeaders()
       });
       const data = await response.json();
       if (data.success) {
-        setStaff(data.data);
+        console.log("✅ Staff loaded:", data.data?.length || 0);
+        setStaff(data.data || []);
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message };
@@ -159,7 +160,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Add a new staff member
   const addStaff = async (staffData) => {
     try {
       const response = await fetch(`${API_URL}/users/`, {
@@ -179,7 +179,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Update a staff member
   const updateStaff = async (id, staffData) => {
     try {
       const response = await fetch(`${API_URL}/users/${id}`, {
@@ -199,7 +198,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Toggle staff status
   const toggleStaffStatus = async (id) => {
     try {
       const response = await fetch(`${API_URL}/users/${id}/status`, {
@@ -218,7 +216,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Delete a staff member
   const deleteStaff = async (id) => {
     try {
       const response = await fetch(`${API_URL}/users/${id}`, {
@@ -237,7 +234,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Update staff password
   const updateStaffPassword = async (id, password) => {
     try {
       const response = await fetch(`${API_URL}/users/${id}/password`, {
@@ -256,7 +252,6 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Search students
   const searchStudents = async (query) => {
     try {
       const response = await fetch(`${API_URL}/students/search?q=${encodeURIComponent(query)}`, {
@@ -273,14 +268,33 @@ export function DataProvider({ children }) {
     }
   };
 
-  // Initialize - fetch students on mount
+  // ⭐ FIXED: All useEffect hooks are INSIDE the component
+  // Initialize - fetch students/staff when authenticated
   useEffect(() => {
+    if (!isAuthenticated) {
+      setStudents([]);
+      setStaff([]);
+      setLoading(false);
+      return;
+    }
     fetchStudents();
     fetchStaff();
-  }, []);
+  }, [isAuthenticated]);
+
+  // ⭐ FIXED: Interval is INSIDE the component
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const token = localStorage.getItem("dental_token");
+      if (token && token !== "null" && token !== "undefined" && students.length === 0) {
+        console.log("🔄 Token found, reloading students...");
+        fetchStudents();
+        fetchStaff();
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [students.length]);
 
   const value = {
-    // Students
     students,
     loading,
     fetchStudents,
@@ -289,7 +303,6 @@ export function DataProvider({ children }) {
     updateStudent,
     deleteStudent,
     bulkImportStudents,
-    // Staff
     staff,
     fetchStaff,
     addStaff,
@@ -297,7 +310,6 @@ export function DataProvider({ children }) {
     toggleStaffStatus,
     deleteStaff,
     updateStaffPassword,
-    // Settings
     settings,
     updateSettings,
   };
