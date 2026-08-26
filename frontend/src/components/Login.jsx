@@ -62,7 +62,7 @@ export default function Login() {
       <div className="login-card">
         <div className="login-header">
           <div className="login-brand">
-            <h1>🦷 YEN DENTAL</h1>
+            <h1>🦷 YEN Ledger</h1>
           </div>
           <p>Inventory Management System</p>
         </div>

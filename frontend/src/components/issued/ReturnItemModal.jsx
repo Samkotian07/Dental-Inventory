@@ -103,7 +103,7 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn })
         </head>
         <body>
           <div class="container">
-            <div class="header">YEN DENTAL - RETURN STICKER</div>
+            <div class="header">YEN Ledger - RETURN STICKER</div>
             <div id="qrcode"></div>
             <div class="action-badge">✅ RETURNED</div>
             <p class="product">${item.product}</p>
