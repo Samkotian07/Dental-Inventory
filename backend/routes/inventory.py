@@ -183,3 +183,34 @@ def toggle_inventory_status(item_id):
         'data': updated_item.to_dict(),
         'message': f'Inventory status changed to {new_status}'
     }), 200
+
+@inventory_bp.route('/<item_id>', methods=['DELETE'])
+@token_required
+@admin_required
+def delete_inventory_item(item_id):
+    """Permanently delete an inventory item (Admin only)."""
+    item = Inventory.find_by_id(item_id)
+    if not item:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'NOT_FOUND',
+                'message': 'Inventory item not found'
+            }
+        }), 404
+
+    current_user = request.current_user
+    item.delete()
+    AuditLog.create(
+        action='DELETE',
+        entity_type='INVENTORY',
+        entity_id=item_id,
+        details=f"Deleted inventory item: {item.product_name} ({item.ref_no})",
+        user_id=current_user.id if current_user else None,
+        user_name=current_user.name if current_user else 'Admin'
+    )
+
+    return jsonify({
+        'success': True,
+        'message': 'Inventory item deleted successfully'
+    }), 200

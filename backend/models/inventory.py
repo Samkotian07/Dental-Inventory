@@ -139,6 +139,11 @@ class Inventory:
         self.quantity = new_qty
         return self
 
+    def delete(self):
+        db = self.get_db()
+        db.execute_query("DELETE FROM inventory WHERE id = %s", (self.id,))
+        return True
+
     def to_dict(self):
         return {
             'id': self.id,

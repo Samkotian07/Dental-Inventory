@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Upload, FileSpreadsheet } from "lucide-react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import "./BulkImportPanel.css";
 
 // Minimal CSV parser for simple, unquoted-comma files with a header row.
@@ -12,19 +12,25 @@ function parseCsv(text) {
 
   if (lines.length < 2) return [];
 
-  const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  const header = lines[0]
+    .split(",")
+    .map((h) => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
   const nameIdx = header.indexOf("name");
   const campusIdx = header.indexOf("campusid");
+  const emailIdx = header.indexOf("email");
   const courseIdx = header.indexOf("course");
   const semIdx = header.indexOf("semester");
+  const addedIdx = header.indexOf("added");
 
   return lines.slice(1).map((line) => {
     const cells = line.split(",").map((c) => c.trim());
     return {
       name: cells[nameIdx] ?? "",
       campusId: cells[campusIdx] ?? "",
+      email: cells[emailIdx] ?? "",
       course: cells[courseIdx] ?? "",
       semester: cells[semIdx] ?? "",
+      added: cells[addedIdx] ?? "",
     };
   });
 }
@@ -60,13 +66,20 @@ export default function BulkImportPanel({ onImport }) {
         const jsonData = XLSX.utils.sheet_to_json(firstSheet);
         
         rows = jsonData
-          .filter((r) => r.name && r.campusId)
-          .map((r) => ({
-            name: r.name,
-            campusId: r.campusId || r.campusid,
-            course: r.course || "",
-            semester: r.semester || "",
-          }));
+          .map((row) => {
+            const normalized = Object.fromEntries(
+              Object.entries(row).map(([key, value]) => [key.toLowerCase().replace(/[^a-z0-9]/g, ""), value])
+            );
+            return {
+              name: normalized.name || "",
+              campusId: normalized.campusid || "",
+              email: normalized.email || "",
+              course: normalized.course || "",
+              semester: normalized.semester || "",
+              added: normalized.added || "",
+            };
+          })
+          .filter((r) => r.name && r.campusId);
       }
 
       if (rows.length === 0) {
@@ -78,7 +91,7 @@ export default function BulkImportPanel({ onImport }) {
       }
 
       const today = new Date().toISOString().slice(0, 10);
-      onImport(rows.map((r) => ({ ...r, added: today })));
+      onImport(rows.map((r) => ({ ...r, added: r.added || today })));
       setFeedback({ type: "success", text: `Imported ${rows.length} student(s) from ${file.name}.` });
     } catch {
       setFeedback({ type: "error", text: "Couldn't read that file. Please try again." });
@@ -87,27 +100,36 @@ export default function BulkImportPanel({ onImport }) {
 
   // Download Excel Template (headers only)
   const downloadTemplate = () => {
-    // Create headers only (no sample data)
-    const headers = ["name", "campusId", "course", "semester"];
-    
-    // Create workbook with headers only
+    const headers = ["Campus ID", "Name", "Email", "Course", "Semester", "Added"];
+
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet([
-      {
-        name: "",
-        campusId: "",
-        course: "",
-        semester: ""
-      }
-    ]);
-    
-    // Set column widths
+    const ws = XLSX.utils.aoa_to_sheet([headers]);
+
+    // Highlight the editable column headers in the downloaded Excel template.
+    const headerStyle = {
+      fill: { fgColor: { rgb: "1F4E78" } },
+      font: { bold: true, color: { rgb: "FFFFFF" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: {
+        top: { style: "thin", color: { rgb: "17365D" } },
+        bottom: { style: "thin", color: { rgb: "17365D" } },
+        left: { style: "thin", color: { rgb: "17365D" } },
+        right: { style: "thin", color: { rgb: "17365D" } },
+      },
+    };
+    headers.forEach((_, index) => {
+      ws[XLSX.utils.encode_cell({ r: 0, c: index })].s = headerStyle;
+    });
+
     ws['!cols'] = [
-      { wch: 25 }, // name
-      { wch: 15 }, // campusId
-      { wch: 20 }, // course
-      { wch: 15 }, // semester
+      { wch: 16 },
+      { wch: 25 },
+      { wch: 30 },
+      { wch: 22 },
+      { wch: 12 },
+      { wch: 14 },
     ];
+    ws['!rows'] = [{ hpt: 24 }];
     
     XLSX.utils.book_append_sheet(wb, ws, "Students");
 

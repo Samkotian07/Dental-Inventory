@@ -130,7 +130,12 @@ export default function Dashboard() {
           </div>
 
           <div className="dashboard__col dashboard__col--side">
-            <DashboardCalendar />
+            <DashboardCalendar
+              stock={stock}
+              issuedItems={issuedItems}
+              returns={returns}
+              failed={failed}
+            />
             <LowStockAlerts alerts={lowStockAlerts} />
           </div>
         </div>

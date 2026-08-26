@@ -2,9 +2,6 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, PackagePlus, PackageMinus } from "lucide-react";
 import "./DashboardCalendar.css";
 
-// Mock daily activity data
-const dailyActivity = {};
-
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -17,10 +14,59 @@ function toKey(date) {
   ).padStart(2, "0")}`;
 }
 
-export default function DashboardCalendar() {
-  const today = useMemo(() => new Date(2026, 6, 15), []);
-  const [cursor, setCursor] = useState(new Date(2026, 6, 1));
+function dateKey(value) {
+  if (!value) return null;
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : toKey(date);
+}
+
+export default function DashboardCalendar({ stock = [], issuedItems = [], returns = [], failed = [] }) {
+  const today = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }, []);
+  const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState(today);
+
+  const dailyActivity = useMemo(() => {
+    const activities = {};
+    const add = (date, type, activity) => {
+      const key = dateKey(date);
+      if (!key) return;
+      (activities[key] ||= { added: [], issued: [] })[type].push(activity);
+    };
+
+    stock.forEach((item) => add(item.createdAt, "added", {
+      qty: item.quantity ?? item.qty ?? 0,
+      product: item.productName || item.product || "Inventory item",
+      company: item.companyName || item.company || "Vendor",
+      id: item.refNo || item.id || "",
+      verb: "added",
+    }));
+    issuedItems.forEach((item) => add(item.issueDate || item.date, "issued", {
+      qty: item.quantity ?? item.qty ?? 1,
+      product: item.productName || item.product || "Inventory item",
+      to: item.studentName || item.student || "Student",
+      id: item.issueId || item.id || "",
+      verb: "issued",
+    }));
+    returns.forEach((item) => add(item.returnDate, "issued", {
+      qty: item.quantity ?? item.qty ?? 1,
+      product: item.productName || item.product || "Inventory item",
+      to: "Vendor return",
+      id: item.returnId || item.id || "",
+      verb: "returned",
+    }));
+    failed.forEach((item) => add(item.createdAt, "issued", {
+      qty: item.quantity ?? item.qty ?? 1,
+      product: item.productName || item.product || "Inventory item",
+      to: item.reason || "Failed inventory",
+      id: item.refNo || item.id || "",
+      verb: "moved to failed inventory",
+    }));
+    return activities;
+  }, [stock, issuedItems, returns, failed]);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -97,7 +143,7 @@ export default function DashboardCalendar() {
                 </span>
                 <div>
                   <p>
-                    <strong>{item.qty}</strong> {item.product} added
+                    <strong>{item.qty}</strong> {item.product} {item.verb || "added"}
                   </p>
                   <span>{item.company} · {item.id}</span>
                 </div>
@@ -110,7 +156,7 @@ export default function DashboardCalendar() {
                 </span>
                 <div>
                   <p>
-                    <strong>{item.qty}</strong> {item.product} issued
+                    <strong>{item.qty}</strong> {item.product} {item.verb || "issued"}
                   </p>
                   <span>{item.to} · {item.id}</span>
                 </div>

@@ -52,7 +52,7 @@ export default function StockInsertion() {
     expiryDate: "",
   });
 
-  const handleNewSubmit = () => {
+  const handleNewSubmit = async () => {
     if (
       !form.documentNumber ||
       !form.companyName ||
@@ -77,18 +77,22 @@ export default function StockInsertion() {
       expiry: form.expiryDate,
       status: "active",
     };
-    addStockItem(itemData);
-    toast.success(`New inventory item added successfully with ${documentType === 'invoice' ? 'Invoice' : 'Credit Note'} number`);
-    setForm({
-      documentNumber: "",
-      category: CATEGORIES[0],
-      companyName: "",
-      productName: "",
-      size: "",
-      lotNo: "",
-      quantity: "",
-      expiryDate: "",
-    });
+    const result = await addStockItem(itemData);
+    if (result.success) {
+      toast.success(`New inventory item added successfully with ${documentType === 'invoice' ? 'Invoice' : 'Credit Note'} number`);
+      setForm({
+        documentNumber: "",
+        category: CATEGORIES[0],
+        companyName: "",
+        productName: "",
+        size: "",
+        lotNo: "",
+        quantity: "",
+        expiryDate: "",
+      });
+    } else {
+      toast.error(result.message || "Failed to add inventory item");
+    }
   };
 
   const handleFile = (file) => {

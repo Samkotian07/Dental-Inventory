@@ -17,6 +17,7 @@ export default function StudentFormModal({ student, onClose, onSave }) {
   const [form, setForm] = useState({
     name: student?.name ?? "",
     campusId: student?.campusId ?? student?.id ?? "",
+    email: student?.email ?? "",
     course: student?.course ?? courses[0],
     semester: student?.semester ?? semesters[0],
   });
@@ -31,6 +32,7 @@ export default function StudentFormModal({ student, onClose, onSave }) {
       name: form.name.trim(),
       campusId: form.campusId.trim(),
       id: form.campusId.trim(),
+      email: form.email.trim(),
       course: form.course,
       semester: form.semester,
     });
@@ -46,6 +48,17 @@ export default function StudentFormModal({ student, onClose, onSave }) {
           placeholder="John Doe"
           value={form.name}
           onChange={set("name")}
+        />
+      </div>
+
+      <div className="modal__field">
+        <label htmlFor="student-email">Email Address</label>
+        <input
+          id="student-email"
+          type="email"
+          placeholder="student@example.com"
+          value={form.email}
+          onChange={set("email")}
         />
       </div>
 

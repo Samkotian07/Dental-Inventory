@@ -43,7 +43,7 @@ function isExpiringSoon(iso) {
 
 export default function Stock() {
   const onMenuClick = useMenuClick();
-  const { stock: rows, updateStockItem, deleteStockItem, toggleStockStatus, getInventoryId } = useInventory();
+  const { stock: rows, updateStockItem, deleteStockItem, moveStockToFailed, toggleStockStatus, getInventoryId } = useInventory();
 
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All Categories");
@@ -112,9 +112,11 @@ export default function Stock() {
 
   const handleConfirmDelete = async (refNo, options) => {
     const realId = getInventoryId(refNo);
-    const result = await deleteStockItem(realId);
+    const result = options?.moveToFailed
+      ? await moveStockToFailed(realId, options.reason)
+      : await deleteStockItem(realId);
     if (result.success) {
-      toast.success("Stock item deleted");
+      toast.success(options?.moveToFailed ? "Stock item moved to Failed Inventory" : "Stock item deleted");
     } else {
       toast.error(result.message || "Failed to delete item");
     }

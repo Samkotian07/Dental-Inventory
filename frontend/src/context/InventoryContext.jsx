@@ -29,6 +29,7 @@ function normalizeStock(item) {
     expiryDate: item.expiry_date || item.expiry || item.expiryDate || "",
     status: item.status || "active",
     lowStockThreshold: item.low_stock_threshold || item.lowStockThreshold || 5,
+    createdAt: item.created_at || item.createdAt || "",
   };
 }
 
@@ -87,6 +88,7 @@ function normalizeFailed(item) {
     failedDate: item.failed_date || item.failedDate || new Date().toISOString().slice(0, 10),
     reason: item.failure_reason || item.failureReason || item.reason || "Failed",
     status: item.status || "failed",
+    createdAt: item.created_at || item.createdAt || "",
   };
 }
 
@@ -196,6 +198,38 @@ export function InventoryProvider({ children }) {
   const getInventoryId = (refNoOrId) => {
     const match = stock.find((s) => s.refNo === refNoOrId || s.id === refNoOrId);
     return match?.id || refNoOrId;
+  };
+
+  const addStockItem = async (itemData) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          ref_no: itemData.refNo || itemData.ref_no,
+          product_name: itemData.productName || itemData.product_name || itemData.product,
+          category: itemData.category,
+          company_name: itemData.companyName || itemData.company_name || itemData.company,
+          size: itemData.size || null,
+          lot_no: itemData.lotNo || itemData.lot_no,
+          quantity: Number(itemData.quantity ?? itemData.qty ?? 0),
+          expiry_date: itemData.expiryDate || itemData.expiry_date || itemData.expiry || null,
+          low_stock_threshold: Number(itemData.lowStockThreshold ?? itemData.low_stock_threshold ?? 10),
+          is_returnable: itemData.isReturnable ?? itemData.is_returnable ?? true,
+          document_type: itemData.documentType || itemData.document_type || null,
+          document_number: itemData.documentNumber || itemData.document_number || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to add inventory item" };
+    } catch (err) {
+      console.error("addStockItem error:", err);
+      return { success: false, message: "Network error" };
+    }
   };
 
   const issueItem = async ({ studentId, inventoryId, refNo, qty, issueDate }) => {
@@ -322,6 +356,29 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  const moveStockToFailed = async (itemId, failureReason, quantity) => {
+    try {
+      const res = await fetch(`${API_URL}/failed-inventory/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          inventory_id: getInventoryId(itemId),
+          failure_reason: failureReason,
+          ...(quantity ? { quantity: Number(quantity) } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchStock(), fetchFailed()]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Failed to move item to failed inventory" };
+    } catch (err) {
+      console.error("moveStockToFailed error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
   const restoreFailedToStock = async (failedId, inventoryData) => {
     try {
       const res = await fetch(`${API_URL}/failed-inventory/${failedId}/restore`, {
@@ -426,12 +483,14 @@ export function InventoryProvider({ children }) {
     fetchReturns,
     loadAllData,
     getInventoryId,
+    addStockItem,
     issueItem,
     returnIssuedItem,
     condemnIssuedItem,
     updateStockItem,
     toggleStockStatus,
     deleteStockItem,
+    moveStockToFailed,
     restoreFailedToStock,
     markFailedDisposed,
     addReturn,

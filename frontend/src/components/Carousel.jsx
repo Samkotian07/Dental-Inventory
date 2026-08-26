@@ -38,7 +38,7 @@ const slides = [
     key: "analytics",
     title: "Analytics",
     copy: "Track usage patterns and optimize inventory flow.",
-    to: "/analytics",
+    to: "/audit-log",
     icon: TrendingUp, // Growth/trends analysis
   },
   {
