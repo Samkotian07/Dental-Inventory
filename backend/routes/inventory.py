@@ -7,43 +7,56 @@ import datetime
 
 inventory_bp = Blueprint('inventory', __name__, url_prefix='/api/inventory')
 
+
+# ⭐⭐⭐ PUBLIC ENDPOINT - NO AUTH REQUIRED ⭐⭐⭐
+# This must be at the TOP to avoid route conflicts with /<item_id>
 @inventory_bp.route('/public-history/<ref_no>', methods=['GET'])
 def get_public_product_history(ref_no):
     """Public endpoint to get product details and full cycle history by ref_no (No auth required for QR scans)"""
     try:
+        print(f"🔍 QR SCAN: Looking for ref_no: {ref_no}")
+        
+        # Try multiple ways to find the item
         item = Inventory.find_by_ref_no(ref_no)
         if not item:
+            print(f"   ⚠️ Not found by ref_no, trying by id...")
             item = Inventory.find_by_id(ref_no)
+        if not item:
+            print(f"   ⚠️ Not found by id, trying case-insensitive...")
+            db = Inventory.get_db()
+            results = db.execute_query(
+                "SELECT * FROM inventory WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(id) = LOWER(%s) LIMIT 1",
+                (ref_no, ref_no)
+            )
+            if results:
+                item = Inventory(results[0])
+                print(f"   ✅ Found with case-insensitive: {item.ref_no}")
+        
+        if not item:
+            print(f"❌ Item NOT FOUND for: {ref_no}")
+            return jsonify({
+                'success': False,
+                'message': f'Product with reference {ref_no} not found'
+            }), 404
 
         db = Inventory.get_db()
         inv_id = item.id if item else ref_no
+        
+        # Get issued history
         sql = """
             SELECT * FROM issued_items 
-            WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(inventory_id) = LOWER(%s) OR LOWER(inventory_id) = LOWER(%s)
+            WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(inventory_id) = LOWER(%s)
             ORDER BY created_at ASC
         """
-        results = db.execute_query(sql, (ref_no, str(inv_id), ref_no))
+        results = db.execute_query(sql, (ref_no, str(inv_id)))
         issued_list = [IssuedItem(row).to_dict() for row in results]
+        
+        print(f"   ✅ Found {len(issued_list)} issued records for {ref_no}")
 
-        if item:
-            product_dict = item.to_dict()
-        elif issued_list:
-            product_dict = {
-                'refNo': ref_no,
-                'productName': issued_list[0].get('productName') or f'Item ({ref_no})',
-                'lotNo': issued_list[0].get('lotNo') or '—',
-                'expiryDate': '—',
-                'category': 'General'
-            }
-        else:
-            product_dict = {
-                'refNo': ref_no,
-                'productName': f'Item ({ref_no})',
-                'lotNo': '—',
-                'expiryDate': '—',
-                'category': 'General'
-            }
+        # Build product dict
+        product_dict = item.to_dict()
 
+        # Build cycle history
         cycles = []
         for idx, iss in enumerate(issued_list, 1):
             status_str = str(iss.get('status') or '').lower()
@@ -64,19 +77,25 @@ def get_public_product_history(ref_no):
                 'rawStatus': status_str
             })
 
+        print(f"✅ QR SCAN SUCCESS: {len(cycles)} cycles found for {ref_no}")
+
         return jsonify({
             'success': True,
             'product': product_dict,
             'history': cycles,
             'summary': f"Summary: {len(cycles)} {'cycle' if len(cycles) == 1 else 'cycles'}"
         }), 200
+        
     except Exception as e:
-        print(f"Error in get_public_product_history: {e}")
+        print(f"❌ Error in get_public_product_history: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e),
             'message': f"Error loading history for {ref_no}"
         }), 500
+
 
 @inventory_bp.route('/', methods=['GET'])
 @token_required
@@ -88,6 +107,7 @@ def get_inventory():
         'data': [item.to_dict() for item in items]
     }), 200
 
+
 @inventory_bp.route('/low-stock', methods=['GET'])
 @token_required
 def get_low_stock():
@@ -97,6 +117,7 @@ def get_low_stock():
         'success': True,
         'data': [item.to_dict() for item in items]
     }), 200
+
 
 @inventory_bp.route('/<item_id>', methods=['GET'])
 @token_required
@@ -117,7 +138,7 @@ def get_inventory_item(item_id):
         'data': item.to_dict()
     }), 200
 
-# ⭐ FIXED: Removed @admin_required - Staff can create inventory
+
 @inventory_bp.route('/', methods=['POST'])
 @token_required
 def create_inventory_item():
@@ -178,7 +199,7 @@ def create_inventory_item():
         'message': 'Inventory item created successfully'
     }), 201
 
-# ⭐ FIXED: Removed @admin_required - Staff can update inventory
+
 @inventory_bp.route('/<item_id>', methods=['PUT'])
 @token_required
 def update_inventory_item(item_id):
@@ -222,7 +243,7 @@ def update_inventory_item(item_id):
         'message': 'Inventory item updated successfully'
     }), 200
 
-# ⭐ FIXED: Removed @admin_required - Staff can toggle status
+
 @inventory_bp.route('/<item_id>/status', methods=['PUT'])
 @token_required
 def toggle_inventory_status(item_id):
@@ -256,7 +277,7 @@ def toggle_inventory_status(item_id):
         'message': f'Inventory status changed to {new_status}'
     }), 200
 
-# ⭐ FIXED: Removed @admin_required - Staff can delete inventory
+
 @inventory_bp.route('/<item_id>', methods=['DELETE'])
 @token_required
 def delete_inventory_item(item_id):

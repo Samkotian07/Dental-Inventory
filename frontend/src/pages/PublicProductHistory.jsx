@@ -32,29 +32,41 @@ export default function PublicProductHistory() {
 
       for (const baseUrl of API_URLS) {
         try {
-          const res = await fetch(`${baseUrl}/inventory/public-history/${encodeURIComponent(refNo)}`);
+          const url = `${baseUrl}/inventory/public-history/${encodeURIComponent(refNo)}`;
+          console.log(`🔍 Trying: ${url}`);
+          
+          const res = await fetch(url);
           if (res.ok) {
             const json = await res.json();
             if (json.success) {
               successData = json;
+              console.log("✅ Successfully fetched history!");
               break;
             }
+          } else {
+            const text = await res.text();
+            console.log(`⚠️ Response status ${res.status}: ${text}`);
           }
         } catch (err) {
           lastErr = err;
+          console.log(`❌ Error with ${baseUrl}: ${err.message}`);
         }
       }
 
       if (successData) {
         setData(successData);
       } else {
-        console.error("Fetch error:", lastErr);
-        setError("Unable to connect to inventory server.");
+        console.error("All fetch attempts failed:", lastErr);
+        setError("Unable to connect to inventory server or product not found.");
       }
       setLoading(false);
     }
+    
     if (refNo) {
       fetchHistory();
+    } else {
+      setError("No product reference provided.");
+      setLoading(false);
     }
   }, [refNo]);
 
@@ -76,6 +88,9 @@ export default function PublicProductHistory() {
             <h3 style={{ color: "#DC2626", margin: "0 0 8px" }}>⚠️ Product Not Found</h3>
             <p style={{ color: "#64748B", margin: 0 }}>
               {error || "Could not retrieve details for this item."}
+            </p>
+            <p style={{ color: "#94A3B8", marginTop: "12px", fontSize: "14px" }}>
+              Ref No: <strong>{refNo}</strong>
             </p>
           </div>
         </div>
