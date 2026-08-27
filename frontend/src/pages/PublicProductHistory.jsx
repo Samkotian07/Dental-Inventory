@@ -3,7 +3,12 @@ import { useParams } from "react-router-dom";
 import { Package } from "lucide-react";
 import "./PublicProductHistory.css";
 
-const API_URL = "http://localhost:5000/api";
+const API_BASE_HOST = window.location.hostname || "localhost";
+const API_URLS = [
+  `http://${API_BASE_HOST}:5000/api`,
+  "http://127.0.0.1:5000/api",
+  "http://localhost:5000/api",
+];
 
 function formatDate(iso) {
   if (!iso || iso === "NULL" || iso === "-") return "-";
@@ -20,27 +25,48 @@ export default function PublicProductHistory() {
 
   useEffect(() => {
     async function fetchHistory() {
-      try {
-        setLoading(true);
-        const res = await fetch(`${API_URL}/inventory/public-history/${refNo}`);
-        if (!res.ok) {
-          throw new Error("Failed to load product history");
+      setLoading(true);
+      setError(null);
+      let successData = null;
+      let lastErr = null;
+
+      for (const baseUrl of API_URLS) {
+        try {
+          const url = `${baseUrl}/inventory/public-history/${encodeURIComponent(refNo)}`;
+          console.log(`🔍 Trying: ${url}`);
+          
+          const res = await fetch(url);
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success) {
+              successData = json;
+              console.log("✅ Successfully fetched history!");
+              break;
+            }
+          } else {
+            const text = await res.text();
+            console.log(`⚠️ Response status ${res.status}: ${text}`);
+          }
+        } catch (err) {
+          lastErr = err;
+          console.log(`❌ Error with ${baseUrl}: ${err.message}`);
         }
-        const json = await res.json();
-        if (json.success) {
-          setData(json);
-        } else {
-          setError(json.message || "Product not found");
-        }
-      } catch (err) {
-        console.error("Fetch error:", err);
-        setError("Unable to connect to inventory server.");
-      } finally {
-        setLoading(false);
       }
+
+      if (successData) {
+        setData(successData);
+      } else {
+        console.error("All fetch attempts failed:", lastErr);
+        setError("Unable to connect to inventory server or product not found.");
+      }
+      setLoading(false);
     }
+    
     if (refNo) {
       fetchHistory();
+    } else {
+      setError("No product reference provided.");
+      setLoading(false);
     }
   }, [refNo]);
 
@@ -62,6 +88,9 @@ export default function PublicProductHistory() {
             <h3 style={{ color: "#DC2626", margin: "0 0 8px" }}>⚠️ Product Not Found</h3>
             <p style={{ color: "#64748B", margin: 0 }}>
               {error || "Could not retrieve details for this item."}
+            </p>
+            <p style={{ color: "#94A3B8", marginTop: "12px", fontSize: "14px" }}>
+              Ref No: <strong>{refNo}</strong>
             </p>
           </div>
         </div>

@@ -65,6 +65,7 @@ export function AuthProvider({ children }) {
         localStorage.setItem("dental_user", JSON.stringify(userData));
         
         // ⭐ FORCE PAGE RELOAD - SIMPLEST FIX
+        // ⭐ LAND ON HOME PAGE
         window.location.href = "/";
         
         return { success: true, user: userData };
