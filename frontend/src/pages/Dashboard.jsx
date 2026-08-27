@@ -8,7 +8,7 @@ import CategoryDonut from "../components/dashboard/CategoryDonut.jsx";
 import MonthlyTrendsChart from "../components/dashboard/MonthlyTrendsChart.jsx";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
-import "./Dashboard.css";
+import "./css/Dashboard.css";
 
 const CATEGORY_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#6366f1"];
 

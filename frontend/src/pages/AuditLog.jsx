@@ -3,7 +3,7 @@ import { Search, ScrollText, Filter, ArrowUpDown } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import { useMenuClick } from "../components/Layout.jsx";
-import "./AuditLog.css";
+import "./css/AuditLog.css";
 
 const PAGE_SIZE = 10;
 const API_URL = "http://localhost:5000/api";

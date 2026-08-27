@@ -17,7 +17,7 @@ import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { useData } from "../context/DataContext.jsx";
 import { toast } from "sonner";  // ⭐ ADD THIS
-import "./IssuedItems.css";
+import "./css/IssuedItems.css";
 
 const PAGE_SIZE = 6;
 

@@ -10,7 +10,7 @@ import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { toast } from "sonner";
-import "./Stock.css";
+import "./css/Stock.css";
 
 const PAGE_SIZE = 8;
 const EXPIRY_WARNING_DAYS = 365;
