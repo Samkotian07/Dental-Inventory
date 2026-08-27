@@ -118,12 +118,16 @@ def issue_item():
     
     # Create issued item
     current_user = request.current_user
+    stock_type = data.get('stock_type', 'fresh')
+    custom_lot = data.get('lot_no')
+    lot_number = custom_lot if custom_lot else inventory_item.lot_no
+
     issued_data = {
         'student_id': data['student_id'],
         'student_name': student.name,
         'inventory_id': data['inventory_id'],
         'product_name': inventory_item.product_name,
-        'lot_no': inventory_item.lot_no,
+        'lot_no': lot_number,
         'ref_no': inventory_item.ref_no,
         'quantity': quantity,
         'issue_date': data.get('issue_date', datetime.date.today().isoformat()),
@@ -137,7 +141,7 @@ def issue_item():
         action='ISSUE',
         entity_type='ISSUED',
         entity_id=issued_item.issue_id,
-        details=f"Issued {quantity} x {inventory_item.product_name} to {student.name}",
+        details=f"Issued {quantity} x {inventory_item.product_name} (Lot: {lot_number}, Source: {stock_type.title()}) to {student.name}",
         user_id=current_user.id if current_user else None,
         user_name=current_user.name if current_user else 'Admin'
     )

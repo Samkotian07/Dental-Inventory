@@ -1,10 +1,63 @@
 from flask import Blueprint, request, jsonify
 from middleware.auth import token_required, admin_required
 from models.inventory import Inventory
+from models.issued_item import IssuedItem
 from models.audit_log import AuditLog
 import datetime
 
 inventory_bp = Blueprint('inventory', __name__, url_prefix='/api/inventory')
+
+@inventory_bp.route('/public-history/<ref_no>', methods=['GET'])
+def get_public_product_history(ref_no):
+    """Public endpoint to get product details and full cycle history by ref_no (No auth required for QR scans)"""
+    item = Inventory.find_by_ref_no(ref_no)
+    if not item:
+        item = Inventory.find_by_id(ref_no)
+
+    db = Inventory.get_db()
+    inv_id = item.id if item else ref_no
+    sql = """
+        SELECT * FROM issued_items 
+        WHERE ref_no = %s OR inventory_id = %s
+        ORDER BY created_at ASC
+    """
+    results = db.execute_query(sql, (ref_no, inv_id))
+    issued_list = [IssuedItem(row).to_dict() for row in results]
+
+    product_dict = item.to_dict() if item else {
+        'refNo': ref_no,
+        'productName': 'Dental Inventory Item',
+        'lotNo': '—',
+        'expiryDate': '—',
+        'category': 'General'
+    }
+
+    cycles = []
+    for idx, iss in enumerate(issued_list, 1):
+        status_str = str(iss.get('status') or '').lower()
+        if status_str == 'returned':
+            status_label = '✅ Complete'
+        elif status_str == 'condemned':
+            status_label = '❌ Condemned'
+        else:
+            status_label = '🔄 Current'
+
+        cycles.append({
+            'cycle': idx,
+            'student': iss.get('studentName') or iss.get('student') or 'Student',
+            'studentId': iss.get('studentId') or '',
+            'issued': iss.get('issueDate') or iss.get('createdAt') or '—',
+            'returned': iss.get('returnDate') if status_str in ['returned', 'condemned'] else 'NULL',
+            'status': status_label,
+            'rawStatus': status_str
+        })
+
+    return jsonify({
+        'success': True,
+        'product': product_dict,
+        'history': cycles,
+        'summary': f"Summary: {len(cycles)} {'cycle' if len(cycles) == 1 else 'cycles'}"
+    }), 200
 
 @inventory_bp.route('/', methods=['GET'])
 @token_required
@@ -45,11 +98,11 @@ def get_inventory_item(item_id):
         'data': item.to_dict()
     }), 200
 
+# ⭐ FIXED: Removed @admin_required - Staff can create inventory
 @inventory_bp.route('/', methods=['POST'])
 @token_required
-@admin_required
 def create_inventory_item():
-    """Create a new inventory item (Admin only)"""
+    """Create a new inventory item"""
     data = request.get_json()
     
     if not data:
@@ -106,11 +159,11 @@ def create_inventory_item():
         'message': 'Inventory item created successfully'
     }), 201
 
+# ⭐ FIXED: Removed @admin_required - Staff can update inventory
 @inventory_bp.route('/<item_id>', methods=['PUT'])
 @token_required
-@admin_required
 def update_inventory_item(item_id):
-    """Update an inventory item (Admin only)"""
+    """Update an inventory item"""
     item = Inventory.find_by_id(item_id)
     if not item:
         return jsonify({
@@ -150,11 +203,11 @@ def update_inventory_item(item_id):
         'message': 'Inventory item updated successfully'
     }), 200
 
+# ⭐ FIXED: Removed @admin_required - Staff can toggle status
 @inventory_bp.route('/<item_id>/status', methods=['PUT'])
 @token_required
-@admin_required
 def toggle_inventory_status(item_id):
-    """Toggle inventory item status (Admin only)"""
+    """Toggle inventory item status"""
     item = Inventory.find_by_id(item_id)
     if not item:
         return jsonify({
@@ -184,11 +237,11 @@ def toggle_inventory_status(item_id):
         'message': f'Inventory status changed to {new_status}'
     }), 200
 
+# ⭐ FIXED: Removed @admin_required - Staff can delete inventory
 @inventory_bp.route('/<item_id>', methods=['DELETE'])
 @token_required
-@admin_required
 def delete_inventory_item(item_id):
-    """Permanently delete an inventory item (Admin only)."""
+    """Permanently delete an inventory item."""
     item = Inventory.find_by_id(item_id)
     if not item:
         return jsonify({

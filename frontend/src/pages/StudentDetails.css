@@ -98,6 +98,37 @@
 .students__table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
+}
+
+.students__table th:nth-child(1),
+.students__table td:nth-child(1) {
+  width: 15%;
+}
+
+.students__table th:nth-child(2),
+.students__table td:nth-child(2) {
+  width: 25%;
+}
+
+.students__table th:nth-child(3),
+.students__table td:nth-child(3) {
+  width: 27%;
+}
+
+.students__table th:nth-child(4),
+.students__table td:nth-child(4) {
+  width: 13%;
+}
+
+.students__table th:nth-child(5),
+.students__table td:nth-child(5) {
+  width: 10%;
+}
+
+.students__table th:nth-child(6),
+.students__table td:nth-child(6) {
+  width: 10%;
 }
 
 .students__table th {
@@ -127,13 +158,18 @@
 
 .students__actions-head {
   text-align: right;
-  padding: 14px 16px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--line);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-soft);
+}
+
+.students__actions-cell {
+  text-align: right;
+  padding: 10px 20px !important;
 }
 
 .students__table td {
@@ -165,33 +201,48 @@
 }
 
 .students__row-actions {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
 }
 
 .students__icon-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: transparent;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
   color: var(--ink-soft);
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.students__icon-btn:hover {
-  border-color: var(--line);
-  background: var(--accent-soft);
-  color: var(--ink);
+.students__icon-btn--view:hover {
+  background: #EFF6FF;
+  color: #2563EB;
+  border-color: #BFDBFE;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(37, 99, 235, 0.15);
+}
+
+.students__icon-btn--edit:hover {
+  background: #ECFDF5;
+  color: #059669;
+  border-color: #A7F3D0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(5, 150, 105, 0.15);
 }
 
 .students__icon-btn--danger:hover {
-  border-color: #F5C7BC;
-  background: #FDEDEA;
-  color: var(--danger);
+  background: #FEF2F2;
+  color: #DC2626;
+  border-color: #FECACA;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(220, 38, 38, 0.15);
 }
 
 .students__card > .pagination {

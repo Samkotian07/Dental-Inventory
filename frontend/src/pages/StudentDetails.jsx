@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect } from "react";
-import { Search, Download, Plus, Pencil, Trash2, ArrowUpDown } from "lucide-react";
+import { Search, Download, Plus, Pencil, Trash2, Eye, ArrowUpDown } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import BulkImportPanel from "../components/student-details/BulkImportPanel.jsx";
 import StudentFormModal from "../components/student-details/StudentFormModal.jsx";
 import DeleteStudentModal from "../components/student-details/DeleteStudentModal.jsx";
+import StudentHistoryModal from "../components/student-details/StudentHistoryModal.jsx";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
 import { exportToCsv } from "../utils/csv.js";
@@ -20,15 +21,7 @@ const CSV_COLUMNS = [
   { key: "email", label: "Email" },
   { key: "course", label: "Course" },
   { key: "semester", label: "Semester" },
-  { key: "added", label: "Added" },
 ];
-
-function formatDisplayDate(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-}
 
 function toShortSemester(semester) {
   return semester?.replace(/^Semester/, "Sem") || "—";
@@ -44,6 +37,7 @@ export default function StudentDetails() {
   const [page, setPage] = useState(1);
   const [formStudent, setFormStudent] = useState(undefined);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [historyStudent, setHistoryStudent] = useState(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -83,7 +77,6 @@ export default function StudentDetails() {
 
   const handleSaveStudent = async (existingId, formData) => {
     if (existingId) {
-      // Update existing student - use the student's id (not campusId)
       const result = await updateStudent(existingId, formData);
       if (result.success) {
         toast.success("Student updated successfully!");
@@ -92,7 +85,6 @@ export default function StudentDetails() {
         toast.error(result.message || "Failed to update student");
       }
     } else {
-      // Add new student
       const result = await addStudent(formData);
       if (result.success) {
         toast.success("Student added successfully!");
@@ -115,7 +107,6 @@ export default function StudentDetails() {
   };
 
   const handleConfirmDelete = async (studentId) => {
-    // Use the student's id (not campusId)
     const result = await deleteStudent(studentId);
     if (result.success) {
       toast.success("Student deleted successfully!");
@@ -131,7 +122,6 @@ export default function StudentDetails() {
     { key: "email", label: "Email" },
     { key: "course", label: "Course" },
     { key: "semester", label: "Semester" },
-    { key: "added", label: "Added" },
   ];
 
   return (
@@ -206,11 +196,18 @@ export default function StudentDetails() {
                         <span className="students-tag">{row.course || "—"}</span>
                       </td>
                       <td>{toShortSemester(row.semester)}</td>
-                      <td>{formatDisplayDate(row.added)}</td>
-                      <td>
+                      <td className="students__actions-cell">
                         <div className="students__row-actions">
                           <button
-                            className="students__icon-btn"
+                            className="students__icon-btn students__icon-btn--view"
+                            onClick={() => setHistoryStudent(row)}
+                            aria-label={`View history for ${row.name}`}
+                            title="View student history"
+                          >
+                            <Eye size={15} strokeWidth={2} />
+                          </button>
+                          <button
+                            className="students__icon-btn students__icon-btn--edit"
                             onClick={() => setFormStudent(row)}
                             aria-label={`Edit ${row.name}`}
                             title="Edit student"
@@ -257,6 +254,13 @@ export default function StudentDetails() {
           student={deleteTarget}
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
+        />
+      )}
+
+      {historyStudent && (
+        <StudentHistoryModal
+          student={historyStudent}
+          onClose={() => setHistoryStudent(null)}
         />
       )}
     </>

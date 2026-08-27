@@ -233,25 +233,13 @@ export default function TrackReturns() {
               <Download size={15} strokeWidth={2.2} />
               Export
             </button>
-            <div className="returns__dropdown" ref={dropdownRef}>
-              <button
-                className="returns__btn returns__btn--primary"
-                onClick={() => setShowCreateMenu(!showCreateMenu)}
-              >
-                <Plus size={15} strokeWidth={2.4} />
-                Create Return
-              </button>
-              {showCreateMenu && (
-                <div className="returns__dropdown-menu">
-                  <button onClick={() => { setExchangeModalOpen(true); setShowCreateMenu(false); }}>
-                    🔄 Exchange (Damaged)
-                  </button>
-                  <button onClick={() => { setCreditModalOpen(true); setShowCreateMenu(false); }}>
-                    📄 Return (Overstock / Defective)
-                  </button>
-                </div>
-              )}
-            </div>
+            <button
+              className="returns__btn returns__btn--primary"
+              onClick={() => setCreditModalOpen(true)}
+            >
+              <Plus size={15} strokeWidth={2.4} />
+              Create Return
+            </button>
           </div>
         </div>
 

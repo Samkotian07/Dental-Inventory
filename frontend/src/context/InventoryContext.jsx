@@ -49,6 +49,7 @@ function normalizeIssued(item) {
     qty: Number(item.quantity ?? item.qty ?? 1),
     date: item.issued_date || item.date || item.issuedDate || new Date().toISOString().slice(0, 10),
     issuedDate: item.issued_date || item.date || item.issuedDate || new Date().toISOString().slice(0, 10),
+    returnDate: item.return_date || item.returnDate || item.returned_date || item.returnedDate || null,
     status: s === "returned" ? "Returned" : s === "condemned" ? "Condemned" : "Active",
   };
 }
@@ -232,7 +233,7 @@ export function InventoryProvider({ children }) {
     }
   };
 
-  const issueItem = async ({ studentId, inventoryId, refNo, qty, issueDate }) => {
+  const issueItem = async ({ studentId, inventoryId, refNo, lotNo, stockType, qty, issueDate }) => {
     try {
       const invId = inventoryId || getInventoryId(refNo);
       const res = await fetch(`${API_URL}/issued/`, {
@@ -242,6 +243,8 @@ export function InventoryProvider({ children }) {
           student_id: studentId,
           inventory_id: invId,
           quantity: Number(qty || 1),
+          lot_no: lotNo,
+          stock_type: stockType || "fresh",
           issue_date: issueDate || new Date().toISOString().slice(0, 10),
         }),
       });

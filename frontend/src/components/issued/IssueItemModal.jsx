@@ -5,70 +5,110 @@ import { useInventory } from "../../context/InventoryContext.jsx";
 
 export default function IssueItemModal({ onClose, onConfirm }) {
   const { students } = useData();
-  const { stock } = useInventory();
+  const { stock = [], issuedItems = [] } = useInventory();
   
   const [studentId, setStudentId] = useState("");
   const [itemId, setItemId] = useState("");
   const [lotId, setLotId] = useState("");
+  const [stockSource, setStockSource] = useState("all"); // 'all' | 'fresh' | 'returned'
   const [qty, setQty] = useState(1);
 
   // Create inventory options from stock
   const inventoryOptions = useMemo(() => 
     stock.map((item) => ({
-      id: item.refNo,
-      product: item.product,
-      lots: [
-        {
-          id: `LOT-${item.lotNo}`,
-          number: item.lotNo,
-          quantity: item.qty,
-          expiryDate: item.expiry,
-        },
-      ],
+      id: item.refNo || item.id,
+      product: item.product || item.productName,
       lotNo: item.lotNo,
       qty: item.qty,
+      expiry: item.expiry,
     })),
     [stock]
   );
 
-  // Get available lots for the selected item
-  const getAvailableLots = () => {
-    if (!itemId) return [];
-    const selectedItem = inventoryOptions.find(item => item.id === itemId);
-    if (!selectedItem) return [];
-    if (selectedItem.lots && selectedItem.lots.length > 0) {
-      return selectedItem.lots;
+  const selectedItem = useMemo(
+    () => inventoryOptions.find((i) => i.id === itemId),
+    [inventoryOptions, itemId]
+  );
+
+  // Aggregate lots from both fresh stock and returned items
+  const allLots = useMemo(() => {
+    if (!itemId || !selectedItem) return [];
+
+    const lots = [];
+
+    // 1. Fresh stock lot
+    if (selectedItem.qty > 0) {
+      lots.push({
+        id: `FRESH-${selectedItem.lotNo || "LOT-001"}`,
+        number: selectedItem.lotNo || "LOT-001",
+        source: "fresh",
+        quantity: selectedItem.qty,
+        expiryDate: selectedItem.expiry || "",
+        label: `📦 Lot #${selectedItem.lotNo || "LOT-001"} (Fresh Stock) - ${selectedItem.qty} available${
+          selectedItem.expiry ? ` (Exp: ${selectedItem.expiry})` : ""
+        }`,
+      });
     }
-    if (selectedItem.lotNo || selectedItem.lot) {
-      const lotNum = selectedItem.lotNo || selectedItem.lot;
-      return [{
-        id: `LOT-${lotNum}`,
-        number: lotNum,
-        quantity: selectedItem.quantity || selectedItem.qty || 10,
-        expiryDate: selectedItem.expiryDate || selectedItem.expiry || ""
-      }];
-    }
-    return [];
-  };
+
+    // 2. Returned stock lots from issuedItems (where status is Returned)
+    const returnedMap = {};
+    (issuedItems || [])
+      .filter((i) => (i.status || "").toLowerCase() === "returned")
+      .filter(
+        (i) =>
+          i.refNo === itemId ||
+          (i.product || i.productName) === selectedItem.product
+      )
+      .forEach((ret) => {
+        const lNo = ret.lotNo || "LOT-001";
+        if (!returnedMap[lNo]) {
+          returnedMap[lNo] = {
+            qty: 0,
+            latestDate: ret.returnDate || ret.date || ret.issuedDate,
+          };
+        }
+        returnedMap[lNo].qty += Number(ret.qty ?? ret.quantity ?? 1);
+      });
+
+    Object.entries(returnedMap).forEach(([lNo, info]) => {
+      if (info.qty > 0) {
+        lots.push({
+          id: `RETURNED-${lNo}`,
+          number: lNo,
+          source: "returned",
+          quantity: info.qty,
+          label: `🔄 Lot #${lNo} (Returned Stock) - ${info.qty} available (Returned: ${info.latestDate})`,
+        });
+      }
+    });
+
+    return lots;
+  }, [itemId, selectedItem, issuedItems]);
+
+  // Filter lots by selected stockSource filter ('all' | 'fresh' | 'returned')
+  const availableLots = useMemo(() => {
+    if (stockSource === "fresh") return allLots.filter((l) => l.source === "fresh");
+    if (stockSource === "returned") return allLots.filter((l) => l.source === "returned");
+    return allLots;
+  }, [allLots, stockSource]);
 
   // Get max available quantity for selected lot
-  const getMaxAvailableQty = () => {
-    if (!lotId) return 0;
-    const availableLots = getAvailableLots();
-    const selectedLot = availableLots.find(lot => lot.id === lotId);
-    return selectedLot?.quantity || 0;
-  };
+  const selectedLot = useMemo(
+    () => availableLots.find((l) => l.id === lotId) || allLots.find((l) => l.id === lotId),
+    [availableLots, allLots, lotId]
+  );
+  const maxQty = selectedLot?.quantity || 0;
 
-  const availableLots = getAvailableLots();
-  const maxQty = getMaxAvailableQty();
   const canSubmit = studentId && itemId && lotId && qty > 0 && qty <= maxQty;
 
   const handleSubmit = () => {
-    if (!canSubmit) return;
+    if (!canSubmit || !selectedLot) return;
     onConfirm({ 
       studentId, 
       itemId, 
       lotId,
+      lotNo: selectedLot.number,
+      stockType: selectedLot.source,
       qty: Number(qty) 
     });
   };
@@ -80,12 +120,11 @@ export default function IssueItemModal({ onClose, onConfirm }) {
     setQty(1);
 
     if (selectedItemId) {
-      const selectedItem = inventoryOptions.find(i => i.id === selectedItemId);
-      const lots = selectedItem?.lots || [];
-      if (lots.length > 0) {
-        setLotId(lots[0].id);
-      } else if (selectedItem?.lotNo) {
-        setLotId(`LOT-${selectedItem.lotNo}`);
+      // Pick first available lot
+      const matchItem = inventoryOptions.find((i) => i.id === selectedItemId);
+      if (matchItem) {
+        const freshId = `FRESH-${matchItem.lotNo || "LOT-001"}`;
+        setLotId(freshId);
       } else {
         setLotId("");
       }
@@ -96,12 +135,13 @@ export default function IssueItemModal({ onClose, onConfirm }) {
 
   // Reset quantity when lot changes
   const handleLotChange = (e) => {
-    setLotId(e.target.value);
-    setQty(1); // Reset quantity to 1
+    const selectedLotId = e.target.value;
+    setLotId(selectedLotId);
+    setQty(1);
   };
 
   return (
-    <Modal title="Issue Item" onClose={onClose} width={440}>
+    <Modal title="Issue Item" onClose={onClose} width={460}>
       <div className="modal__field">
         <label htmlFor="issue-student">Student</label>
         <select 
@@ -134,6 +174,77 @@ export default function IssueItemModal({ onClose, onConfirm }) {
         </select>
       </div>
 
+      {/* Stock Source Toggle - Only show when item is selected */}
+      {itemId && (
+        <div className="modal__field">
+          <label>Stock Source</label>
+          <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+            <button
+              type="button"
+              onClick={() => {
+                setStockSource("all");
+                if (allLots.length > 0) setLotId(allLots[0].id);
+              }}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                borderRadius: "6px",
+                fontSize: "13px",
+                fontWeight: stockSource === "all" ? "600" : "400",
+                border: stockSource === "all" ? "2px solid #2563EB" : "1px solid #D1D5DB",
+                background: stockSource === "all" ? "#EFF6FF" : "white",
+                color: stockSource === "all" ? "#1D4ED8" : "#374151",
+                cursor: "pointer",
+              }}
+            >
+              All Stock
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStockSource("fresh");
+                const freshMatch = allLots.find((l) => l.source === "fresh");
+                if (freshMatch) setLotId(freshMatch.id);
+              }}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                borderRadius: "6px",
+                fontSize: "13px",
+                fontWeight: stockSource === "fresh" ? "600" : "400",
+                border: stockSource === "fresh" ? "2px solid #059669" : "1px solid #D1D5DB",
+                background: stockSource === "fresh" ? "#D1FAE5" : "white",
+                color: stockSource === "fresh" ? "#059669" : "#374151",
+                cursor: "pointer",
+              }}
+            >
+              📦 Fresh Stock
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStockSource("returned");
+                const retMatch = allLots.find((l) => l.source === "returned");
+                if (retMatch) setLotId(retMatch.id);
+              }}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                borderRadius: "6px",
+                fontSize: "13px",
+                fontWeight: stockSource === "returned" ? "600" : "400",
+                border: stockSource === "returned" ? "2px solid #D97706" : "1px solid #D1D5DB",
+                background: stockSource === "returned" ? "#FEF3C7" : "white",
+                color: stockSource === "returned" ? "#D97706" : "#374151",
+                cursor: "pointer",
+              }}
+            >
+              🔄 Returned Stock
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Lot Selection - Only show when item is selected */}
       {itemId && (
         <div className="modal__field">
@@ -146,14 +257,13 @@ export default function IssueItemModal({ onClose, onConfirm }) {
             <option value="">Choose lot...</option>
             {availableLots.map((lot) => (
               <option key={lot.id} value={lot.id}>
-                Lot #{lot.number} - {lot.quantity} units available 
-                {lot.expiryDate && ` (Exp: ${lot.expiryDate})`}
+                {lot.label}
               </option>
             ))}
           </select>
           {availableLots.length === 0 && (
-            <small style={{ color: '#dc3545' }}>
-              No lots available for this item
+            <small style={{ color: '#dc3545', marginTop: "4px", display: "block" }}>
+              No {stockSource !== "all" ? stockSource : ""} lots available for this item
             </small>
           )}
         </div>
@@ -177,10 +287,12 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           }}
         />
         {lotId && maxQty > 0 && (
-          <small>Max available: {maxQty} units</small>
+          <small style={{ display: "block", marginTop: "4px" }}>
+            Max available in selected lot: <strong>{maxQty} units</strong>
+          </small>
         )}
         {lotId && qty > maxQty && (
-          <small style={{ color: '#dc3545' }}>
+          <small style={{ color: '#dc3545', display: "block", marginTop: "4px" }}>
             Quantity exceeds available stock ({maxQty} units)
           </small>
         )}

@@ -37,11 +37,11 @@ def get_return(return_id):
         'data': item.to_dict()
     }), 200
 
+# ⭐ FIXED: Removed @admin_required - Staff can create returns
 @returns_bp.route('/', methods=['POST'])
 @token_required
-@admin_required
 def create_return():
-    """Create a new vendor return (Admin only)"""
+    """Create a new vendor return"""
     data = request.get_json()
     
     if not data:
@@ -118,11 +118,11 @@ def create_return():
         'message': 'Vendor return created successfully'
     }), 201
 
+# ⭐ FIXED: Removed @admin_required - Staff can update return status
 @returns_bp.route('/<return_id>/status', methods=['PUT'])
 @token_required
-@admin_required
 def update_return_status(return_id):
-    """Update vendor return status (Admin only)"""
+    """Update vendor return status"""
     vendor_return = VendorReturn.find_by_id(return_id)
     if not vendor_return:
         return jsonify({

@@ -46,7 +46,7 @@ function formatDate(isoOrDate) {
 
 export default function IssuedItems() {
   const onMenuClick = useMenuClick();
-  const { issuedItems, issueItem, returnIssuedItem, condemnIssuedItem, stock, getInventoryId } = useInventory();
+  const { issuedItems, issueItem, returnIssuedItem, condemnIssuedItem, addReturn, stock, getInventoryId } = useInventory();
   const { students } = useData();
 
   const [query, setQuery] = useState("");
@@ -136,7 +136,28 @@ export default function IssuedItems() {
     }
   };
 
-  const handleIssueNew = async ({ studentId, itemId, lotId, qty }) => {
+  const handleExchange = async (issueId, returnDate, reason) => {
+    const item = (issuedItems || []).find((i) => (i.issueId || i.id) === issueId);
+    console.log("🔄 Processing Exchange for issue:", issueId, "Reason:", reason);
+    const condemnRes = await condemnIssuedItem(issueId);
+    const refNoVal = item?.refNo || "";
+    const returnRes = await addReturn({
+      type: "exchange",
+      refNo: refNoVal,
+      inventoryId: refNoVal,
+      quantity: item?.qty ?? item?.quantity ?? 1,
+      reason: reason ? `Failed: ${reason}` : "Failed item returned by student - Send for exchange",
+      returnDate: returnDate || new Date().toISOString().slice(0, 10),
+    });
+
+    if (condemnRes.success || returnRes.success) {
+      toast.success("Item marked as failed & exchange request added to Track Returns");
+    } else {
+      toast.error("Failed to process exchange request");
+    }
+  };
+
+  const handleIssueNew = async ({ studentId, itemId, lotId, lotNo, stockType, qty }) => {
     const student = students.find((s) => s.id === studentId);
     const stockMatch = stock.find((s) => s.refNo === itemId || s.id === itemId);
     const invId = stockMatch?.id || getInventoryId(itemId);
@@ -145,12 +166,15 @@ export default function IssuedItems() {
       studentId,
       inventoryId: invId,
       refNo: stockMatch?.refNo || itemId,
+      lotNo,
+      stockType,
       qty: Number(qty),
       issueDate: new Date().toISOString().slice(0, 10),
     });
 
     if (result.success) {
-      toast.success(`Issued ${qty} item(s) to ${student?.name || studentId}`);
+      const sourceLabel = stockType === "returned" ? " (from Returned Stock)" : "";
+      toast.success(`Issued ${qty} item(s) to ${student?.name || studentId}${sourceLabel}`);
       setIssueModalOpen(false);
       setPage(1);
     } else {
@@ -314,7 +338,8 @@ export default function IssuedItems() {
           item={returnItem}
           onClose={() => setReturnItem(null)}
           onConfirm={handleConfirmReturn}
-          onCondemn={handleCondemn}  // ⭐ ADDED
+          onCondemn={handleCondemn}
+          onExchange={handleExchange}
         />
       )}
 

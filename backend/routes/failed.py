@@ -36,11 +36,11 @@ def get_failed_item(failed_id):
         'data': item.to_dict()
     }), 200
 
+# ⭐ FIXED: Removed @admin_required - Staff can move to failed
 @failed_bp.route('/', methods=['POST'])
 @token_required
-@admin_required
 def create_failed_item():
-    """Move an item to failed inventory (Admin only)"""
+    """Move an item to failed inventory"""
     data = request.get_json()
     
     if not data:
@@ -120,11 +120,11 @@ def create_failed_item():
         'message': 'Item moved to failed inventory'
     }), 201
 
+# ⭐ FIXED: Removed @admin_required - Staff can mark sent to vendor
 @failed_bp.route('/<failed_id>/sent-to-vendor', methods=['PUT'])
 @token_required
-@admin_required
 def mark_sent_to_vendor(failed_id):
-    """Mark failed item as sent to vendor (Admin only)"""
+    """Mark failed item as sent to vendor"""
     item = FailedInventory.find_by_id(failed_id)
     if not item:
         return jsonify({
@@ -153,11 +153,11 @@ def mark_sent_to_vendor(failed_id):
         'message': 'Item marked as sent to vendor'
     }), 200
 
+# ⭐ FIXED: Removed @admin_required - Staff can restore failed item
 @failed_bp.route('/<failed_id>/restore', methods=['PUT'])
 @token_required
-@admin_required
 def restore_failed_item(failed_id):
-    """Restore a failed item back to inventory (Admin only)"""
+    """Restore a failed item back to inventory"""
     item = FailedInventory.find_by_id(failed_id)
     if not item:
         return jsonify({
@@ -219,11 +219,11 @@ def restore_failed_item(failed_id):
         'message': 'Item restored to inventory successfully'
     }), 200
 
+# ⭐ FIXED: Removed @admin_required - Staff can dispose failed item
 @failed_bp.route('/<failed_id>/dispose', methods=['PUT'])
 @token_required
-@admin_required
 def dispose_failed_item(failed_id):
-    """Dispose a failed item (Admin only)"""
+    """Dispose a failed item"""
     item = FailedInventory.find_by_id(failed_id)
     if not item:
         return jsonify({
