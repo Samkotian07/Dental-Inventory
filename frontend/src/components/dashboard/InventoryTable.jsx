@@ -4,6 +4,8 @@ import { CATEGORIES as categories } from "../utils/constants.js";
 import Pagination from "../Pagination.jsx";
 import "./InventoryTable.css";
 
+const FULL_VIEW_PAGE_SIZE = 10;
+
 function Rows({ items }) {
   if (items.length === 0) {
     return (
@@ -33,8 +35,6 @@ function Rows({ items }) {
 export default function InventoryTable({ items, activeCategory, onCategoryChange }) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(7);
 
   const filtered = useMemo(() => {
     return items.filter((item) => {
@@ -49,24 +49,7 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
     });
   }, [items, activeCategory, query]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const handleSearchChange = (e) => {
-    setQuery(e.target.value);
-    setPage(1);
-  };
-
-  const handleCatChange = (e) => {
-    onCategoryChange(e.target.value);
-    setPage(1);
-  };
-
-  const handlePageSizeChange = (newSize) => {
-    setPageSize(newSize);
-    setPage(1);
-  };
+  const visible = expanded ? filtered : filtered.slice(0, 7);
 
   const controls = (
     <div className="inv-table__controls">
@@ -76,10 +59,10 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
           type="text"
           placeholder="Search..."
           value={query}
-          onChange={handleSearchChange}
+          onChange={(e) => setQuery(e.target.value)}
         />
       </div>
-      <select value={activeCategory} onChange={handleCatChange}>
+      <select value={activeCategory} onChange={(e) => onCategoryChange(e.target.value)}>
         {categories.map((c) => (
           <option key={c} value={c}>
             {c}
@@ -114,7 +97,10 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
           {controls}
           <button
             className="inv-table__expand"
-            onClick={() => setExpanded(true)}
+            onClick={() => {
+              setFullViewPage(1);
+              setExpanded(true);
+            }}
             aria-label="View full table"
             title="View full table"
           >
@@ -124,15 +110,11 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
 
         <div className="inv-table__scroll">{renderTable(visible)}</div>
 
-        <Pagination
-          page={currentPage}
-          totalPages={totalPages}
-          totalItems={filtered.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={handlePageSizeChange}
-          pageSizeOptions={[7, 15, 25, 50]}
-        />
+        {!expanded && filtered.length > visible.length && (
+          <button className="inv-table__more" onClick={() => setExpanded(true)}>
+            View all {filtered.length} items
+          </button>
+        )}
       </section>
 
       {expanded && (
@@ -145,7 +127,7 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
               </button>
             </div>
             <div className="inv-modal__controls">{controls}</div>
-            <div className="inv-modal__scroll">{renderTable(filtered)}</div>
+            <div className="inv-modal__scroll">{table}</div>
           </div>
         </div>
       )}

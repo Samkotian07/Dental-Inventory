@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Package } from "lucide-react";
-import "./PublicProductHistory.css";
+import "./css/PublicProductHistory.css";
 
 const API_BASE_HOST = window.location.hostname || "localhost";
 const API_URLS = [

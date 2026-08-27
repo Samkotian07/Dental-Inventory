@@ -8,7 +8,7 @@ import CategoryDonut from "../components/dashboard/CategoryDonut.jsx";
 import MonthlyTrendsChart from "../components/dashboard/MonthlyTrendsChart.jsx";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
-import "./Dashboard.css";
+import "./css/Dashboard.css";
 
 const CATEGORY_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#6366f1"];
 
@@ -109,6 +109,7 @@ export default function Dashboard() {
       <DashboardHeader onMenuClick={onMenuClick} />
 
       <main className="dashboard">
+        <LowStockAlerts alerts={lowStockAlerts} />
         <StatCards stats={stats} />
 
         <div className="dashboard__grid">
@@ -119,7 +120,14 @@ export default function Dashboard() {
               onCategoryChange={setActiveCategory}
             />
 
-            <LowStockAlerts alerts={lowStockAlerts} />
+            <div className="dashboard__row">
+              <CategoryDonut
+                data={categoryDistribution}
+                activeCategory={activeCategory}
+                onSelect={setActiveCategory}
+              />
+              <MonthlyTrendsChart data={monthlyTrends} />
+            </div>
           </div>
 
           <div className="dashboard__col dashboard__col--side">
@@ -129,12 +137,7 @@ export default function Dashboard() {
               returns={returns}
               failed={failed}
             />
-            <CategoryDonut
-              data={categoryDistribution}
-              activeCategory={activeCategory}
-              onSelect={setActiveCategory}
-            />
-            <MonthlyTrendsChart data={monthlyTrends} />
+            <LowStockAlerts alerts={lowStockAlerts} />
           </div>
         </div>
       </main>

@@ -1,8 +1,11 @@
 .stock-insertion {
+  height: calc(100dvh - 57px);
   padding: 24px 28px 60px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
 }
 
 .stock-insertion__toolbar {
@@ -333,6 +336,12 @@
 @media (max-width: 1024px) {
   .stock-insertion {
     padding: 18px 20px 50px;
+  }
+}
+
+@media (max-width: 768px) {
+  .stock-insertion {
+    height: calc(100dvh - 49px);
   }
 }
 

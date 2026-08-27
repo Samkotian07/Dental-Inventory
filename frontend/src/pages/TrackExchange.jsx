@@ -9,7 +9,7 @@ import DiscardConfirmModal from "../components/track-exchange/DiscardConfirmModa
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
-import "./TrackExchange.css";
+import "./css/TrackExchange.css";
 
 const PAGE_SIZE = 6;
 

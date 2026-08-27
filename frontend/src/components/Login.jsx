@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
+import inventoryIcon from "./icons/inventory.svg";
 import "./Login.css";
 
 export default function Login() {
@@ -62,7 +63,8 @@ export default function Login() {
       <div className="login-card">
         <div className="login-header">
           <div className="login-brand">
-            <h1>🦷 YEN Ledger</h1>
+            <img src={inventoryIcon} alt="" className="login-brand-icon" />
+            <h1>YEN LEDGER</h1>
           </div>
           <p>Inventory Management System</p>
         </div>

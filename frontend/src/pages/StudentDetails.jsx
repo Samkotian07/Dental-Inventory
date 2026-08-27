@@ -11,7 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { toast } from "sonner";
-import "./StudentDetails.css";
+import "./css/StudentDetails.css";
 
 const PAGE_SIZE = 6;
 
