@@ -1,0 +1,105 @@
+.common-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: common-modal-fade-in 0.18s ease-out;
+}
+
+.common-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+}
+
+.common-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 90vh;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+  animation: common-modal-slide-up 0.2s ease-out;
+}
+
+.common-modal--sm { max-width: 448px; }
+.common-modal--md { max-width: 512px; }
+.common-modal--lg { max-width: 672px; }
+.common-modal--xl { max-width: 896px; }
+
+.common-modal__header,
+.common-modal__footer {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 16px 24px;
+  border-color: var(--line);
+}
+
+.common-modal__header {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+
+.common-modal__header h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.common-modal__close {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.common-modal__close:hover {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.common-modal__body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px 24px;
+  overflow-y: auto;
+}
+
+.common-modal__footer {
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+}
+
+@keyframes common-modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes common-modal-slide-up {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 640px) {
+  .common-modal-overlay { padding: 12px; }
+  .common-modal__header,
+  .common-modal__footer { padding: 14px 16px; }
+  .common-modal__body { padding: 16px; }
+  .common-modal__footer { gap: 8px; }
+}

@@ -206,8 +206,16 @@
 }
 
 .inv-modal__scroll {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 16px 22px 22px;
+}
+
+.inv-modal__pagination {
+  flex-shrink: 0;
+  padding: 0 22px 14px;
+  border-top: 1px solid var(--line);
 }
 
 @media (max-width: 640px) {

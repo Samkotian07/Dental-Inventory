@@ -1,9 +1,17 @@
+.alerts-card--marquee {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  overflow: hidden;
+  padding: 10px 14px;
+}
+
 .alerts-card__head {
   display: flex;
   align-items: center;
   gap: 8px;
   color: #E7A02B;
-  margin-bottom: 12px;
+  flex: 0 0 auto;
 }
 
 .alerts-card__head h2 {
@@ -20,24 +28,42 @@
   margin: 0;
 }
 
+.alerts-card__viewport {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+
+.alerts-card__track {
+  display: flex;
+  width: max-content;
+  gap: 16px;
+  animation: alerts-marquee 26s linear infinite;
+}
+
+.alerts-card__viewport:hover .alerts-card__track {
+  animation-play-state: paused;
+}
+
 .alerts-card__list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  flex: 0 0 auto;
 }
 
 .alerts-card__list li {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   background: #FDF6E7;
   border: 1px solid #F5E4BA;
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  padding: 7px 10px;
+  white-space: nowrap;
 }
 
 .alerts-card__list li.is-severe {
@@ -57,6 +83,11 @@
   color: var(--ink-soft);
 }
 
+.alerts-card__list li > span:not(.alerts-card__pill) {
+  padding-left: 8px;
+  border-left: 1px solid currentColor;
+}
+
 .alerts-card__pill {
   background: #E7A02B;
   color: #fff;
@@ -69,6 +100,29 @@
 
 .is-severe .alerts-card__pill {
   background: var(--danger);
+}
+
+@keyframes alerts-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-50% - 8px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alerts-card__track {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .alerts-card--marquee {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .alerts-card__viewport {
+    width: 100%;
+  }
 }
 
 /* Dark Mode Overrides for Low Stock Alerts */

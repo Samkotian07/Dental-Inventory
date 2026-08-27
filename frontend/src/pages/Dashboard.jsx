@@ -109,6 +109,7 @@ export default function Dashboard() {
       <DashboardHeader onMenuClick={onMenuClick} />
 
       <main className="dashboard">
+        <LowStockAlerts alerts={lowStockAlerts} />
         <StatCards stats={stats} />
 
         <div className="dashboard__grid">
@@ -117,8 +118,7 @@ export default function Dashboard() {
               items={stock}
               activeCategory={activeCategory}
               onCategoryChange={setActiveCategory}
-            />
-
+            />{/*
             <div className="dashboard__row">
               <CategoryDonut
                 data={categoryDistribution}
@@ -126,7 +126,7 @@ export default function Dashboard() {
                 onSelect={setActiveCategory}
               />
               <MonthlyTrendsChart data={monthlyTrends} />
-            </div>
+            </div>*/}
           </div>
 
           <div className="dashboard__col dashboard__col--side">
@@ -136,7 +136,6 @@ export default function Dashboard() {
               returns={returns}
               failed={failed}
             />
-            <LowStockAlerts alerts={lowStockAlerts} />
           </div>
         </div>
       </main>
