@@ -6,7 +6,7 @@ import { useMenuClick } from "../components/Layout.jsx";
 import "./AuditLog.css";
 
 const PAGE_SIZE = 10;
-const API_URL = "http://localhost:5000/api";
+const API_URL = "http://127.0.0.1:5000/api";  // ⭐ Changed to 127.0.0.1
 
 function formatTimestamp(ts) {
   if (!ts) return "—";
@@ -65,6 +65,7 @@ export default function AuditLog() {
         });
         const data = await res.json();
         if (data.success && data.data) {
+          console.log("📋 Audit logs loaded:", data.data.length);
           setLogs(data.data);
         }
       } catch (err) {
@@ -86,7 +87,8 @@ export default function AuditLog() {
       const matchQuery =
         !q ||
         (log.details || "").toLowerCase().includes(q) ||
-        (log.user_name || "").toLowerCase().includes(q) ||
+        // ⭐ FIXED: Support both camelCase and snake_case
+        (log.userName || log.user_name || "").toLowerCase().includes(q) ||
         (log.entity_type || "").toLowerCase().includes(q) ||
         (log.entity_id || "").toLowerCase().includes(q);
       return matchAction && matchQuery;
@@ -207,7 +209,8 @@ export default function AuditLog() {
                         {log.entity_type} (#{log.entity_id})
                       </td>
                       <td className="audit-log__strong">
-                        {log.user_name || log.user_id || "System"}
+                        {/* ⭐ FIXED: Support both camelCase and snake_case */}
+                        {log.userName || log.user_name || log.user_id || "System"}
                       </td>
                       <td>{log.details}</td>
                     </tr>

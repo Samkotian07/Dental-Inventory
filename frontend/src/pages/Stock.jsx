@@ -49,6 +49,7 @@ export default function Stock() {
   const [category, setCategory] = useState("All Categories");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [detailItem, setDetailItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
@@ -79,9 +80,9 @@ export default function Stock() {
     return list;
   }, [rows, query, category, sort]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleSort = (key) => {
     setSort((prev) => (prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 }));
@@ -272,8 +273,12 @@ export default function Stock() {
             page={currentPage}
             totalPages={totalPages}
             totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
           />
         </section>
       </main>

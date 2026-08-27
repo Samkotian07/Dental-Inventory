@@ -188,9 +188,18 @@ def update_user(user_id):
 
 @users_bp.route('/<int:user_id>/password', methods=['PUT'])
 @token_required
-@admin_required
 def update_user_password(user_id):
-    """Update a user's password (Admin only)"""
+    """Update a user's password (Admin or self)"""
+    current_user = request.current_user
+    if current_user.role != 'admin' and current_user.id != user_id:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'FORBIDDEN',
+                'message': 'You can only update your own password'
+            }
+        }), 403
+
     user = User.find_by_id(user_id)
     if not user:
         return jsonify({

@@ -72,6 +72,11 @@ class VendorReturn:
         
         return cls.find_by_id(return_id)
 
+    def delete(self):
+        db = self.get_db()
+        db.execute_query("DELETE FROM vendor_returns WHERE return_id = %s", (self.return_id,))
+        return True
+
     def update_status(self, status, credit_note_number=None):
         db = self.get_db()
         updates = ["status = %s"]

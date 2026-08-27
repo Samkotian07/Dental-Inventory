@@ -32,7 +32,7 @@ const navItems = [
 ];
 
 const adminOnlyItems = [
-  { label: "Low Stock Settings", to: "/low-stock-settings", icon: AlertCircle },
+  { label: "Stock Settings", to: "/low-stock-settings", icon: AlertCircle },
   { label: "Staff Manager", to: "/staff-manager", icon: UserCog },
   { label: "Audit Log", to: "/audit-log", icon: ScrollText },
 ];

@@ -18,13 +18,13 @@
 }
 
 :root.dark {
-  --bg: #0F0F11;
-  --surface: #18181B;
-  --panel: #27272A;
-  --panel-dark: #3F3F46;
+  --bg: #09090B;
+  --surface: #121215;
+  --panel: #1A1A1E;
+  --panel-dark: #24242A;
   --accent: #A1A1AA;
-  --accent-deep: #FFFFFF;
-  --accent-soft: #202024;
+  --accent-deep: #2563EB;
+  --accent-soft: #1E293B;
   --ink: #F4F4F5;
   --ink-soft: #A1A1AA;
   --line: #27272A;
@@ -91,35 +91,51 @@ button {
   transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-/* High-contrast text overrides for active dark mode elements (white background in dark mode) */
+/* Dark mode button & active element styles - rich dark tones of black/charcoal */
 :root.dark [class*="__btn--primary"],
 :root.dark [class*="-search-btn"],
 :root.dark [class*="-add-btn"],
 :root.dark [class*="-save-btn"],
 :root.dark [class*="-update-btn"],
 :root.dark [class*="-details-btn"],
-:root.dark .sidebar__link.is-active,
-:root.dark .sidebar__avatar,
-:root.dark .tooth-mark,
-:root.dark .settings-card:hover .settings-card-icon,
 :root.dark .btn-primary,
-:root.dark [class*="btn-primary"],
-:root.dark .cal__cell.is-selected,
-:root.dark .pagination__page.is-active,
-:root.dark .status-pill--active,
-:root.dark .failed-status-pill--failed,
-:root.dark .exch-status-pill--pending {
-  color: #0F0F11 !important;
+:root.dark [class*="btn-primary"] {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+  color: #F4F4F5 !important;
 }
 
-/* Restore white text color when hovered (since hover background is dark) */
-:root.dark [class*="__btn--primary"]:hover,
-:root.dark [class*="-search-btn"]:hover,
-:root.dark [class*="-add-btn"]:hover,
-:root.dark [class*="-save-btn"]:hover,
-:root.dark [class*="-update-btn"]:hover,
-:root.dark [class*="-details-btn"]:hover,
-:root.dark .btn-primary:hover,
-:root.dark [class*="btn-primary"]:hover {
-  color: #FFFFFF !important;
+:root.dark .sidebar__link.is-active {
+  background: #1F1F24 !important;
+  border-color: #27272A !important;
+  color: #60A5FA !important;
+}
+
+:root.dark .cal__cell.is-selected {
+  background: #2563EB !important;
+  color: #F4F4F5 !important;
+}
+
+/* Global Dark Mode Scrollbar Styling - Eliminates white scrollbars across app */
+:root.dark ::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+:root.dark ::-webkit-scrollbar-track {
+  background: #121215;
+}
+
+:root.dark ::-webkit-scrollbar-thumb {
+  background: #27272A;
+  border-radius: 999px;
+}
+
+:root.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3F3F46;
+}
+
+:root.dark * {
+  scrollbar-color: #27272A #121215;
+  scrollbar-width: thin;
 }

@@ -79,6 +79,38 @@
   overflow-x: auto;
 }
 
+.inv-table__scroll::-webkit-scrollbar,
+.inv-modal__scroll::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.inv-table__scroll::-webkit-scrollbar-track,
+.inv-modal__scroll::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+.inv-table__scroll::-webkit-scrollbar-thumb,
+.inv-modal__scroll::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
+:root.dark .inv-table__scroll::-webkit-scrollbar-track,
+:root.dark .inv-modal__scroll::-webkit-scrollbar-track {
+  background: #121215;
+}
+
+:root.dark .inv-table__scroll::-webkit-scrollbar-thumb,
+:root.dark .inv-modal__scroll::-webkit-scrollbar-thumb {
+  background: #27272A;
+}
+
+:root.dark .inv-table__scroll::-webkit-scrollbar-thumb:hover,
+:root.dark .inv-modal__scroll::-webkit-scrollbar-thumb:hover {
+  background: #3F3F46;
+}
+
 .inv-table__grid {
   width: 100%;
   border-collapse: collapse;

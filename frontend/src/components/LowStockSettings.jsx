@@ -1,31 +1,41 @@
 import { useState, useMemo } from "react";
-import { Sliders, Search, AlertTriangle, TrendingDown } from "lucide-react";
+import { Sliders, Search, TrendingDown, Receipt, Trash2 } from "lucide-react";
 import DashboardHeader from "./dashboard/DashboardHeader.jsx";
 import { useMenuClick } from "./Layout.jsx";
 import { useData } from "../context/DataContext";
 import { useInventory } from "../context/InventoryContext";
 import { useAuth } from "../context/AuthContext";
 import Button from "./common/Button"; 
-import Input from "./common/Input"; 
 import { toast } from "sonner";
 import "./LowStockSettings.css";
 
 export default function LowStockSettings() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { stock = [], updateStockItem } = useInventory();
-  const { settings = { lowQuantityThreshold: 10 }, updateSettings } = useData();
+  const { stock = [], updateStockItem, returns = [], deleteReturn } = useInventory();
+  const { settings = { lowQuantityThreshold: 10 } } = useData();
 
   const inventory = stock;
   const defaultThreshold = settings?.lowQuantityThreshold ?? 10;
 
-  const [lowQty, setLowQty] = useState(defaultThreshold);
   const [thresholdSearch, setThresholdSearch] = useState("");
   const [thresholdEdits, setThresholdEdits] = useState({});
 
-  const handleLowQty = () => {
-    updateSettings({ lowQuantityThreshold: Number(lowQty) });
-    toast.success("Default low quantity threshold updated");
+  const creditNotes = useMemo(() => {
+    return (returns || []).filter(
+      (r) => r.type === "creditNote" || r.type === "credit_note" || Boolean(r.creditNote)
+    );
+  }, [returns]);
+
+  const handleRemoveCreditNote = async (returnId, product) => {
+    if (window.confirm(`Are you sure you want to remove credit note ${returnId} for "${product}"?`)) {
+      const res = await deleteReturn(returnId);
+      if (res?.success) {
+        toast.success(`Credit note ${returnId} removed successfully`);
+      } else {
+        toast.error(res?.message || "Failed to remove credit note");
+      }
+    }
   };
 
   const handleSaveThresholds = () => {
@@ -77,7 +87,7 @@ export default function LowStockSettings() {
 
   return (
     <>
-      <DashboardHeader title="Low Stock Management" onMenuClick={onMenuClick} />
+      <DashboardHeader title="Stock Settings" onMenuClick={onMenuClick} />
       
       <main className="low-stock-settings">
         {/* Summary cards */}
@@ -102,32 +112,89 @@ export default function LowStockSettings() {
               <p className="lss-stat-label">Total tracked products</p>
             </div>
           </div>
-        </section>
-
-        {/* Default threshold section */}
-        <section className="card lss-default-section">
-          <div className="lss-default-header">
-            <div className="lss-default-icon">
-              <Sliders size={18} />
+          <div className="lss-stat-card">
+            <div className="lss-stat-icon" style={{ background: "#FEF2F2", color: "#EF4444" }}>
+              <Receipt size={18} />
             </div>
             <div>
-              <h3 className="lss-default-title">Default Threshold</h3>
+              <p className="lss-stat-number">{creditNotes.length}</p>
+              <p className="lss-stat-label">Active credit notes</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Credit Notes Management Section (Replaces Default Threshold) */}
+        <section className="card lss-default-section">
+          <div className="lss-default-header">
+            <div className="lss-default-icon" style={{ background: "#FEF2F2", color: "#EF4444" }}>
+              <Receipt size={18} />
+            </div>
+            <div>
+              <h3 className="lss-default-title">Credit Notes Management</h3>
               <p className="lss-default-subtitle">
-                Applied to newly inserted items that don't have a specific threshold set.
+                View and remove vendor credit note records.
               </p>
             </div>
           </div>
-          <div className="lss-default-controls">
-            <Input
-              label="Default Low Quantity Threshold"
-              type="number"
-              value={lowQty}
-              onChange={(e) => setLowQty(e.target.value)}
-              className="lss-default-input"
-            />
-            <Button onClick={handleLowQty} className="lss-default-btn">
-              Save Default
-            </Button>
+
+          <div style={{ marginTop: "14px" }}>
+            {creditNotes.length === 0 ? (
+              <div style={{ padding: "16px", background: "#F8FAFC", borderRadius: "8px", color: "#64748B", fontSize: "13px", textAlign: "center" }}>
+                No active credit notes currently recorded.
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="lss-table" style={{ fontSize: "13px" }}>
+                  <thead>
+                    <tr>
+                      <th>Return ID</th>
+                      <th>Ref No</th>
+                      <th>Product</th>
+                      <th>Credit Note #</th>
+                      <th className="lss-th-center">Qty</th>
+                      <th>Return Date</th>
+                      <th className="lss-th-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {creditNotes.map((cn) => (
+                      <tr key={cn.returnId} className="lss-table-row">
+                        <td className="lss-ref-no">{cn.returnId}</td>
+                        <td>{cn.refNo}</td>
+                        <td className="lss-product-name">{cn.productName}</td>
+                        <td style={{ fontWeight: "600", color: "#2563EB" }}>
+                          {cn.creditNote || "—"}
+                        </td>
+                        <td className="lss-qty-cell">{cn.quantity}</td>
+                        <td>{cn.returnDate ? new Date(cn.returnDate).toLocaleDateString() : "—"}</td>
+                        <td className="lss-th-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCreditNote(cn.returnId, cn.productName)}
+                            style={{
+                              background: "#FEE2E2",
+                              color: "#DC2626",
+                              border: "none",
+                              padding: "6px 12px",
+                              borderRadius: "6px",
+                              fontWeight: "600",
+                              fontSize: "12px",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </section>
 

@@ -80,6 +80,35 @@
   overflow-y: auto;
 }
 
+.notif-pop__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notif-pop__list::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+.notif-pop__list::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
+.notif-pop__list::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-soft);
+}
+
+:root.dark .notif-pop__list::-webkit-scrollbar-track {
+  background: #121215;
+}
+
+:root.dark .notif-pop__list::-webkit-scrollbar-thumb {
+  background: #27272A;
+}
+
+:root.dark .notif-pop__list::-webkit-scrollbar-thumb:hover {
+  background: #3F3F46;
+}
+
 .notif-pop__empty {
   padding: 22px 16px;
   text-align: center;

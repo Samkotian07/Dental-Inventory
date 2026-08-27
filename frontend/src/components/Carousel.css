@@ -355,8 +355,7 @@
   }
 
   .carousel__arrow {
-    width: 34px;
-    height: 34px;
+    display: none !important;
   }
 
   .carousel__dots {

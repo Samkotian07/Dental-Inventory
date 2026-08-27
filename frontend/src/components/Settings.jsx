@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Moon, Mail, Shield, Lock, LogOut, Sliders } from "lucide-react";
+import { Moon, Mail, Shield, Lock, LogOut, Sliders, Laptop } from "lucide-react";
 import { useData } from "../context/DataContext";
 import { useTheme } from "../context/ThemeContext";
 import { useAuth } from "../context/AuthContext";
@@ -15,7 +15,7 @@ import "./Settings.css";
 export default function Settings() {
   const onMenuClick = useMenuClick();
   const { user, logout, logoutAll } = useAuth();
-  const { settings = { lowQuantityThreshold: 10, twoFactor: false }, updateSettings, updateStaffPassword } = useData();
+  const { settings = { lowQuantityThreshold: 10, twoFactor: false }, updateSettings, changePassword } = useData();
   const { darkMode, toggleDarkMode } = useTheme();
 
   const [twoFactor, setTwoFactor] = useState(settings?.twoFactor || false);
@@ -48,16 +48,12 @@ export default function Settings() {
       toast.error("Password must be at least 6 characters");
       return;
     }
-    if (user?.id) {
-      const result = await updateStaffPassword(user.id, pwd.new);
-      if (result.success) {
-        toast.success("Password changed successfully");
-        setPwd({ current: "", new: "", confirm: "" });
-      } else {
-        toast.error(result.message || "Failed to update password");
-      }
+    const result = await changePassword(pwd.current, pwd.new);
+    if (result.success) {
+      toast.success(result.message || "Password changed successfully");
+      setPwd({ current: "", new: "", confirm: "" });
     } else {
-      toast.error("User context missing");
+      toast.error(result.message || "Failed to update password");
     }
   };
 

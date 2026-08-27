@@ -51,6 +51,7 @@ export default function TrackReturns() {
   const [type, setType] = useState("All Types");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [detailItem, setDetailItem] = useState(null);
   const [statusItem, setStatusItem] = useState(null);
@@ -79,9 +80,8 @@ export default function TrackReturns() {
         !q ||
         (r.returnId || "").toLowerCase().includes(q) ||
         (r.refNo || "").toLowerCase().includes(q) ||
-        (r.creditNote || "").toLowerCase().includes(q) ||
-        (r.reason || "").toLowerCase().includes(q) ||
-        (r.productName || r.product || "").toLowerCase().includes(q);
+        (r.product || "").toLowerCase().includes(q) ||
+        (r.company || "").toLowerCase().includes(q);
       return matchesStatus && matchesType && matchesQuery;
     });
 
@@ -97,9 +97,9 @@ export default function TrackReturns() {
     return list;
   }, [returns, query, status, type, sort]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleSort = (key) => {
     setSort((prev) => (prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 }));
@@ -335,8 +335,12 @@ export default function TrackReturns() {
             page={currentPage}
             totalPages={totalPages}
             totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
           />
         </section>
       </main>

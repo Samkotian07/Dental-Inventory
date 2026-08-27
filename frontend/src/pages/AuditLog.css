@@ -16,8 +16,8 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
   width: 320px;
@@ -29,15 +29,15 @@
   background: transparent;
   width: 100%;
   font-size: 0.875rem;
-  color: var(--text-main, #0f172a);
+  color: var(--ink);
 }
 
 .audit-log__filter {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 0.5rem;
   padding: 0.5rem 0.75rem;
 }
@@ -45,15 +45,17 @@
 .audit-log__filter select {
   border: none;
   outline: none;
-  background: transparent;
+  background: var(--surface);
   font-size: 0.875rem;
-  color: var(--text-main, #0f172a);
+  color: var(--ink);
   cursor: pointer;
 }
 
 .audit-log__card {
   padding: 0;
   overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
 }
 
 .audit-log__scroll {
@@ -70,13 +72,13 @@
 .audit-log__table th,
 .audit-log__table td {
   padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  border-bottom: 1px solid var(--line);
 }
 
 .audit-log__table th {
-  background: var(--bg-muted, #f8fafc);
+  background: var(--bg);
   font-weight: 600;
-  color: var(--text-muted, #64748b);
+  color: var(--ink-soft);
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
@@ -96,18 +98,18 @@
 .audit-log__mono {
   font-family: monospace;
   font-size: 0.8125rem;
-  color: var(--text-muted, #64748b);
+  color: var(--ink-soft);
 }
 
 .audit-log__strong {
   font-weight: 600;
-  color: var(--text-main, #0f172a);
+  color: var(--ink);
 }
 
 .audit-log__empty {
   text-align: center;
   padding: 3rem;
-  color: var(--text-muted, #64748b);
+  color: var(--ink-soft);
 }
 
 /* Badges */
@@ -147,4 +149,40 @@
 .audit-badge--neutral {
   background: #f1f5f9;
   color: #475569;
+}
+
+/* Dark Mode Overrides for Audit Log */
+:root.dark .audit-log__filter select option {
+  background: #141416;
+  color: #F4F4F5;
+}
+
+:root.dark .audit-badge--green {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ADE80;
+}
+
+:root.dark .audit-badge--blue {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+}
+
+:root.dark .audit-badge--purple {
+  background: rgba(168, 85, 247, 0.15);
+  color: #C084FC;
+}
+
+:root.dark .audit-badge--amber {
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+}
+
+:root.dark .audit-badge--red {
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+}
+
+:root.dark .audit-badge--neutral {
+  background: rgba(148, 163, 184, 0.15);
+  color: #CBD5E1;
 }

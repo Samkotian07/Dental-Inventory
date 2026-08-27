@@ -103,6 +103,50 @@ export default function Carousel() {
     }
   };
 
+  // Touch and Mouse Swipe gesture navigation
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+  const [mouseStart, setMouseStart] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const minSwipeDistance = 40;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    if (distance > minSwipeDistance) {
+      handleNext();
+    } else if (distance < -minSwipeDistance) {
+      handlePrev();
+    }
+  };
+
+  const onMouseDown = (e) => {
+    setMouseStart(e.clientX);
+    setIsDragging(true);
+  };
+
+  const onMouseUp = (e) => {
+    if (!isDragging || mouseStart === null) return;
+    const distance = mouseStart - e.clientX;
+    if (distance > minSwipeDistance) {
+      handleNext();
+    } else if (distance < -minSwipeDistance) {
+      handlePrev();
+    }
+    setIsDragging(false);
+    setMouseStart(null);
+  };
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -117,7 +161,15 @@ export default function Carousel() {
   const visibleSlides = getVisibleSlides();
 
   return (
-    <section className="carousel" aria-label="Quick access shortcuts">
+    <section
+      className="carousel"
+      aria-label="Quick access shortcuts"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onMouseDown={onMouseDown}
+      onMouseUp={onMouseUp}
+    >
       <button
         className="carousel__arrow"
         onClick={handlePrev}

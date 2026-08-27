@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import Modal from "./Modal.jsx";
 import { useInventory } from "../../context/InventoryContext.jsx";
+import { toRomanSemester } from "../../pages/StudentDetails.jsx";
 
 function formatDate(iso) {
   if (!iso) return "-";
@@ -34,7 +35,7 @@ export default function StudentHistoryModal({ student, onClose }) {
           Student: <strong>{student.name}</strong> ({student.campusId || student.id})
         </h3>
         <p style={{ margin: 0, fontSize: "13px", color: "#6B7280" }}>
-          Course: {student.course || "—"} | Semester: {student.semester || "—"} | Email: {student.email || "—"}
+          Course: {student.course || "—"} | Semester: {toRomanSemester(student.semester)} | Email: {student.email || "—"}
         </p>
       </div>
 

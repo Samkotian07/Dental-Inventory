@@ -474,6 +474,24 @@ export function InventoryProvider({ children }) {
     return updateReturnStatus(returnId, "rejected");
   };
 
+  const deleteReturn = async (returnId) => {
+    try {
+      const res = await fetch(`${API_URL}/returns/${returnId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchReturns();
+        return { success: true };
+      }
+      return { success: false, message: data.error?.message || "Failed to remove return record" };
+    } catch (err) {
+      console.error("deleteReturn error:", err);
+      return { success: false, message: "Network error" };
+    }
+  };
+
   const value = {
     stock,
     failed,
@@ -499,6 +517,7 @@ export function InventoryProvider({ children }) {
     addReturn,
     updateReturnStatus,
     discardReturn,
+    deleteReturn,
   };
 
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;

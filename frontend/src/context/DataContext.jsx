@@ -252,6 +252,27 @@ export function DataProvider({ children }) {
     }
   };
 
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      const response = await fetch(`${API_URL}/auth/change-password`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.error?.message || "Failed to change password" };
+    } catch (error) {
+      console.error("Error changing password:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
   const searchStudents = async (query) => {
     try {
       const response = await fetch(`${API_URL}/students/search?q=${encodeURIComponent(query)}`, {
@@ -310,6 +331,7 @@ export function DataProvider({ children }) {
     toggleStaffStatus,
     deleteStaff,
     updateStaffPassword,
+    changePassword,
     settings,
     updateSettings,
   };

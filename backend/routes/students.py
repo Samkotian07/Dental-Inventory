@@ -108,21 +108,46 @@ def update_student(campus_id):
 @token_required
 def delete_student(campus_id):
     """Delete a student"""
-    student = Student.find_by_campus_id(campus_id)
-    if not student:
+    try:
+        student = Student.find_by_campus_id(campus_id)
+        if not student:
+            return jsonify({
+                'success': False,
+                'error': {
+                    'code': 'STUDENT_NOT_FOUND',
+                    'message': 'Student not found'
+                }
+            }), 404
+        
+        student_name = student.name
+        student.delete()
+
+        try:
+            from models.audit_log import AuditLog
+            AuditLog.create(
+                action='DELETE_STUDENT',
+                entity_type='STUDENT',
+                entity_id=campus_id,
+                details=f'Deleted student {student_name} ({campus_id})',
+                user_id=request.current_user.id,
+                user_name=request.current_user.name
+            )
+        except Exception:
+            pass
+
+        return jsonify({
+            'success': True,
+            'message': 'Student deleted successfully'
+        }), 200
+    except Exception as e:
+        print(f"❌ Error deleting student {campus_id}: {e}")
         return jsonify({
             'success': False,
             'error': {
-                'code': 'STUDENT_NOT_FOUND',
-                'message': 'Student not found'
+                'code': 'DELETE_FAILED',
+                'message': f'Failed to delete student: {str(e)}'
             }
-        }), 404
-    
-    student.delete()
-    return jsonify({
-        'success': True,
-        'message': 'Student deleted successfully'
-    }), 200
+        }), 500
 
 @students_bp.route('/bulk', methods=['POST'])
 @token_required

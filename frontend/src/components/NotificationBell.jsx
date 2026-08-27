@@ -6,7 +6,14 @@ import "./NotificationBell.css";
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const { stock = [], failed = [], returns = [] } = useInventory();
-  const [dismissedIds, setDismissedIds] = useState(new Set());
+  const [dismissedIds, setDismissedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem("dental_dismissed_notifs");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const popRef = useRef(null);
 
   const notifications = useMemo(() => {
@@ -56,8 +63,38 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const dismiss = (id) => {
-    setDismissedIds((prev) => new Set([...prev, id]));
+  const dismiss = (id, e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem("dental_dismissed_notifs", JSON.stringify([...next]));
+      } catch (err) {
+        console.error("Failed to save dismissed notifs:", err);
+      }
+      return next;
+    });
+  };
+
+  const dismissAll = (e) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    const allIds = notifications.map((n) => n.id);
+    setDismissedIds((prev) => {
+      const next = new Set([...prev, ...allIds]);
+      try {
+        localStorage.setItem("dental_dismissed_notifs", JSON.stringify([...next]));
+      } catch (err) {
+        console.error("Failed to save dismissed notifs:", err);
+      }
+      return next;
+    });
   };
 
   return (
@@ -69,9 +106,28 @@ export default function NotificationBell() {
 
       {open && (
         <div className="notif-pop">
-          <div className="notif-pop__head">
-            <span>Notifications</span>
-            {notifications.length > 0 && <span className="notif-pop__badge">{notifications.length} New</span>}
+          <div className="notif-pop__head" style={{ justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>Notifications</span>
+              {notifications.length > 0 && <span className="notif-pop__badge">{notifications.length} New</span>}
+            </div>
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                onClick={dismissAll}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#2563EB",
+                  fontSize: "11px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  padding: "2px 6px",
+                }}
+              >
+                Dismiss All
+              </button>
+            )}
           </div>
 
           <div className="notif-pop__list">
@@ -82,8 +138,8 @@ export default function NotificationBell() {
                   <p>{n.text}</p>
                   <span>{n.time}</span>
                 </div>
-                <button onClick={() => dismiss(n.id)} aria-label="Dismiss">
-                  <X size={14} />
+                <button type="button" onClick={(e) => dismiss(n.id, e)} aria-label="Dismiss" title="Dismiss notification">
+                  <X size={15} />
                 </button>
               </div>
             ))}

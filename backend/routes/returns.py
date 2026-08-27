@@ -189,3 +189,34 @@ def update_return_status(return_id):
         'data': updated_return.to_dict(),
         'message': f'Return status updated to {status}'
     }), 200
+
+@returns_bp.route('/<return_id>', methods=['DELETE'])
+@token_required
+def delete_return(return_id):
+    """Delete / remove a credit note or vendor return record"""
+    vendor_return = VendorReturn.find_by_id(return_id)
+    if not vendor_return:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'NOT_FOUND',
+                'message': 'Return record not found'
+            }
+        }), 404
+
+    current_user = request.current_user
+    vendor_return.delete()
+
+    AuditLog.create(
+        action='DELETE_RETURN',
+        entity_type='VENDOR_RETURN',
+        entity_id=return_id,
+        details=f"Deleted return/credit note for {vendor_return.product_name} ({vendor_return.ref_no})",
+        user_id=current_user.id if current_user else None,
+        user_name=current_user.name if current_user else 'Admin'
+    )
+
+    return jsonify({
+        'success': True,
+        'message': 'Return record deleted successfully'
+    }), 200

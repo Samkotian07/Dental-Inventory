@@ -18,6 +18,14 @@ class AuditLog:
     @classmethod
     def create(cls, action, entity_type, entity_id, details, user_id=None, user_name=None):
         db = cls.get_db()
+        
+        # ⭐ If user_name is None or 'System', try to get from current request
+        if not user_name or user_name == 'System':
+            from flask import request
+            if hasattr(request, 'current_user') and request.current_user:
+                user_name = request.current_user.name
+                user_id = request.current_user.id
+        
         db.execute_query("""
             INSERT INTO audit_logs (action, entity_type, entity_id, details, user_id, user_name)
             VALUES (%s, %s, %s, %s, %s, %s)

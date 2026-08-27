@@ -36,6 +36,11 @@ class Student:
         if result:
             return cls(result[0])
         return None
+
+    @classmethod
+    def find_by_campus_id(cls, campus_id):
+        """Find student by campus_id alias"""
+        return cls.find_by_id(campus_id)
     
     @classmethod
     def search(cls, query_str):
@@ -104,6 +109,10 @@ class Student:
     
     def delete(self):
         db = self.get_db()
+        try:
+            db.execute_query("UPDATE issued_items SET student_id = NULL WHERE student_id = %s", (self.campus_id,))
+        except Exception:
+            pass
         db.execute_query("DELETE FROM students WHERE campus_id = %s", (self.campus_id,))
         return True
     

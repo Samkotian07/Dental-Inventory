@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from middleware.auth import token_required, admin_required
+from middleware.rate_limiter import rate_limit
 from models.inventory import Inventory
 from models.issued_item import IssuedItem
 from models.audit_log import AuditLog
@@ -11,6 +12,7 @@ inventory_bp = Blueprint('inventory', __name__, url_prefix='/api/inventory')
 # ⭐⭐⭐ PUBLIC ENDPOINT - NO AUTH REQUIRED ⭐⭐⭐
 # This must be at the TOP to avoid route conflicts with /<item_id>
 @inventory_bp.route('/public-history/<ref_no>', methods=['GET'])
+@rate_limit(limit=30, period=60)
 def get_public_product_history(ref_no):
     """Public endpoint to get product details and full cycle history by ref_no (No auth required for QR scans)"""
     try:

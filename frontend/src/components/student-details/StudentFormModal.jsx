@@ -9,7 +9,16 @@ const courses = [
   "Pediatric Dentistry",
 ];
 
-const semesters = ["1", "2", "3", "4", "5", "6", "7", "8"];
+const semesters = [
+  { value: "1", label: "Sem I" },
+  { value: "2", label: "Sem II" },
+  { value: "3", label: "Sem III" },
+  { value: "4", label: "Sem IV" },
+  { value: "5", label: "Sem V" },
+  { value: "6", label: "Sem VI" },
+  { value: "7", label: "Sem VII" },
+  { value: "8", label: "Sem VIII" },
+];
 
 export default function StudentFormModal({ student, onClose, onSave }) {
   const isEdit = Boolean(student);
@@ -19,7 +28,7 @@ export default function StudentFormModal({ student, onClose, onSave }) {
     campusId: student?.campusId ?? student?.id ?? "",
     email: student?.email ?? "",
     course: student?.course ?? courses[0],
-    semester: student?.semester ?? semesters[0],
+    semester: student?.semester ?? semesters[0].value,
   });
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -90,8 +99,8 @@ export default function StudentFormModal({ student, onClose, onSave }) {
         <label htmlFor="student-semester">Semester</label>
         <select id="student-semester" value={form.semester} onChange={set("semester")}>
           {semesters.map((s) => (
-            <option key={s} value={s}>
-              {s}
+            <option key={s.value} value={s.value}>
+              {s.label}
             </option>
           ))}
         </select>

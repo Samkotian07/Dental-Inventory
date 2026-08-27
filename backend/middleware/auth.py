@@ -53,7 +53,7 @@ def token_required(f):
                 }
             }), 403
         
-        # Add user to request context
+        # ⭐ Add user to request context
         request.current_user = user
         
         return f(*args, **kwargs)
@@ -76,3 +76,30 @@ def admin_required(f):
         return f(*args, **kwargs)
     
     return decorated
+
+
+# ⭐ NEW: Helper function to get current user safely
+def get_current_user():
+    """Get current user from request context or token"""
+    if hasattr(request, 'current_user') and request.current_user:
+        return request.current_user
+    
+    # Try to get from token
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        payload = User.verify_token(token)
+        if payload:
+            user = User.find_by_id(payload['user_id'])
+            if user:
+                request.current_user = user
+                return user
+    
+    return None
+
+
+# ⭐ NEW: Helper to get user name for audit logs
+def get_user_name():
+    """Get current user name for audit logs"""
+    user = get_current_user()
+    return user.name if user else 'System'

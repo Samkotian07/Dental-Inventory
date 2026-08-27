@@ -119,14 +119,7 @@ export default function Dashboard() {
               onCategoryChange={setActiveCategory}
             />
 
-            <div className="dashboard__row">
-              <CategoryDonut
-                data={categoryDistribution}
-                activeCategory={activeCategory}
-                onSelect={setActiveCategory}
-              />
-              <MonthlyTrendsChart data={monthlyTrends} />
-            </div>
+            <LowStockAlerts alerts={lowStockAlerts} />
           </div>
 
           <div className="dashboard__col dashboard__col--side">
@@ -136,7 +129,12 @@ export default function Dashboard() {
               returns={returns}
               failed={failed}
             />
-            <LowStockAlerts alerts={lowStockAlerts} />
+            <CategoryDonut
+              data={categoryDistribution}
+              activeCategory={activeCategory}
+              onSelect={setActiveCategory}
+            />
+            <MonthlyTrendsChart data={monthlyTrends} />
           </div>
         </div>
       </main>
