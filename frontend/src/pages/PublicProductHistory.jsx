@@ -3,7 +3,12 @@ import { useParams } from "react-router-dom";
 import { Package } from "lucide-react";
 import "./PublicProductHistory.css";
 
-const API_URL = "http://localhost:5000/api";
+const API_BASE_HOST = window.location.hostname || "localhost";
+const API_URLS = [
+  `http://${API_BASE_HOST}:5000/api`,
+  "http://127.0.0.1:5000/api",
+  "http://localhost:5000/api",
+];
 
 function formatDate(iso) {
   if (!iso || iso === "NULL" || iso === "-") return "-";
@@ -20,24 +25,33 @@ export default function PublicProductHistory() {
 
   useEffect(() => {
     async function fetchHistory() {
-      try {
-        setLoading(true);
-        const res = await fetch(`${API_URL}/inventory/public-history/${refNo}`);
-        if (!res.ok) {
-          throw new Error("Failed to load product history");
+      setLoading(true);
+      setError(null);
+      let successData = null;
+      let lastErr = null;
+
+      for (const baseUrl of API_URLS) {
+        try {
+          const res = await fetch(`${baseUrl}/inventory/public-history/${encodeURIComponent(refNo)}`);
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success) {
+              successData = json;
+              break;
+            }
+          }
+        } catch (err) {
+          lastErr = err;
         }
-        const json = await res.json();
-        if (json.success) {
-          setData(json);
-        } else {
-          setError(json.message || "Product not found");
-        }
-      } catch (err) {
-        console.error("Fetch error:", err);
-        setError("Unable to connect to inventory server.");
-      } finally {
-        setLoading(false);
       }
+
+      if (successData) {
+        setData(successData);
+      } else {
+        console.error("Fetch error:", lastErr);
+        setError("Unable to connect to inventory server.");
+      }
+      setLoading(false);
     }
     if (refNo) {
       fetchHistory();

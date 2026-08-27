@@ -10,54 +10,73 @@ inventory_bp = Blueprint('inventory', __name__, url_prefix='/api/inventory')
 @inventory_bp.route('/public-history/<ref_no>', methods=['GET'])
 def get_public_product_history(ref_no):
     """Public endpoint to get product details and full cycle history by ref_no (No auth required for QR scans)"""
-    item = Inventory.find_by_ref_no(ref_no)
-    if not item:
-        item = Inventory.find_by_id(ref_no)
+    try:
+        item = Inventory.find_by_ref_no(ref_no)
+        if not item:
+            item = Inventory.find_by_id(ref_no)
 
-    db = Inventory.get_db()
-    inv_id = item.id if item else ref_no
-    sql = """
-        SELECT * FROM issued_items 
-        WHERE ref_no = %s OR inventory_id = %s
-        ORDER BY created_at ASC
-    """
-    results = db.execute_query(sql, (ref_no, inv_id))
-    issued_list = [IssuedItem(row).to_dict() for row in results]
+        db = Inventory.get_db()
+        inv_id = item.id if item else ref_no
+        sql = """
+            SELECT * FROM issued_items 
+            WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(inventory_id) = LOWER(%s) OR LOWER(inventory_id) = LOWER(%s)
+            ORDER BY created_at ASC
+        """
+        results = db.execute_query(sql, (ref_no, str(inv_id), ref_no))
+        issued_list = [IssuedItem(row).to_dict() for row in results]
 
-    product_dict = item.to_dict() if item else {
-        'refNo': ref_no,
-        'productName': 'Dental Inventory Item',
-        'lotNo': '—',
-        'expiryDate': '—',
-        'category': 'General'
-    }
-
-    cycles = []
-    for idx, iss in enumerate(issued_list, 1):
-        status_str = str(iss.get('status') or '').lower()
-        if status_str == 'returned':
-            status_label = '✅ Complete'
-        elif status_str == 'condemned':
-            status_label = '❌ Condemned'
+        if item:
+            product_dict = item.to_dict()
+        elif issued_list:
+            product_dict = {
+                'refNo': ref_no,
+                'productName': issued_list[0].get('productName') or f'Item ({ref_no})',
+                'lotNo': issued_list[0].get('lotNo') or '—',
+                'expiryDate': '—',
+                'category': 'General'
+            }
         else:
-            status_label = '🔄 Current'
+            product_dict = {
+                'refNo': ref_no,
+                'productName': f'Item ({ref_no})',
+                'lotNo': '—',
+                'expiryDate': '—',
+                'category': 'General'
+            }
 
-        cycles.append({
-            'cycle': idx,
-            'student': iss.get('studentName') or iss.get('student') or 'Student',
-            'studentId': iss.get('studentId') or '',
-            'issued': iss.get('issueDate') or iss.get('createdAt') or '—',
-            'returned': iss.get('returnDate') if status_str in ['returned', 'condemned'] else 'NULL',
-            'status': status_label,
-            'rawStatus': status_str
-        })
+        cycles = []
+        for idx, iss in enumerate(issued_list, 1):
+            status_str = str(iss.get('status') or '').lower()
+            if status_str == 'returned':
+                status_label = '✅ Complete'
+            elif status_str == 'condemned':
+                status_label = '❌ Condemned'
+            else:
+                status_label = '🔄 Current'
 
-    return jsonify({
-        'success': True,
-        'product': product_dict,
-        'history': cycles,
-        'summary': f"Summary: {len(cycles)} {'cycle' if len(cycles) == 1 else 'cycles'}"
-    }), 200
+            cycles.append({
+                'cycle': idx,
+                'student': iss.get('studentName') or iss.get('student') or 'Student',
+                'studentId': iss.get('studentId') or '',
+                'issued': iss.get('issueDate') or iss.get('createdAt') or '—',
+                'returned': iss.get('returnDate') if status_str in ['returned', 'condemned'] else 'NULL',
+                'status': status_label,
+                'rawStatus': status_str
+            })
+
+        return jsonify({
+            'success': True,
+            'product': product_dict,
+            'history': cycles,
+            'summary': f"Summary: {len(cycles)} {'cycle' if len(cycles) == 1 else 'cycles'}"
+        }), 200
+    except Exception as e:
+        print(f"Error in get_public_product_history: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': f"Error loading history for {ref_no}"
+        }), 500
 
 @inventory_bp.route('/', methods=['GET'])
 @token_required
