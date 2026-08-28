@@ -1,9 +1,9 @@
-.alerts-card--marquee {
+.alerts-card {
   display: flex;
   align-items: center;
   gap: 16px;
-  overflow: hidden;
   padding: 10px 14px;
+  overflow: hidden;
 }
 
 .alerts-card__head {
@@ -51,8 +51,8 @@
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  gap: 12px;
 }
 
 .alerts-card__list li {
@@ -114,7 +114,7 @@
 }
 
 @media (max-width: 640px) {
-  .alerts-card--marquee {
+  .alerts-card {
     align-items: flex-start;
     flex-direction: column;
     gap: 7px;

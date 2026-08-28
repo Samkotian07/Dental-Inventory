@@ -2,12 +2,12 @@ import { TriangleAlert } from "lucide-react";
 import "./LowStockAlerts.css";
 
 export default function LowStockAlerts({ alerts }) {
-  const alertItems = (hidden = false) => (
-    <ul className="alerts-card__list" aria-hidden={hidden || undefined}>
+  const alertItems = (isCopy = false) => (
+    <ul className="alerts-card__list">
       {alerts.map((a) => {
         const severe = a.left <= 3;
         return (
-          <li key={`${hidden ? "copy-" : ""}${a.id}`} className={severe ? "is-severe" : ""}>
+          <li key={`${isCopy ? "copy-" : ""}${a.id}`} className={severe ? "is-severe" : ""}>
             <p>{a.product}</p>
             <span>{a.id}</span>
             <span className="alerts-card__pill">{a.left} left</span>
@@ -30,7 +30,7 @@ export default function LowStockAlerts({ alerts }) {
         <div className="alerts-card__viewport">
           <div className="alerts-card__track">
             {alertItems()}
-            {alertItems(true)}
+            <div aria-hidden="true">{alertItems(true)}</div>
           </div>
         </div>
       )}

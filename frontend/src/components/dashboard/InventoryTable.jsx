@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Search, Maximize2, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { CATEGORIES as categories } from "../utils/constants.js";
 import Pagination from "../Pagination.jsx";
 import "./InventoryTable.css";
@@ -33,8 +34,10 @@ function Rows({ items }) {
 }
 
 export default function InventoryTable({ items, activeCategory, onCategoryChange }) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [fullViewPage, setFullViewPage] = useState(1);
 
   const filtered = useMemo(() => {
     return items.filter((item) => {
@@ -49,7 +52,13 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
     });
   }, [items, activeCategory, query]);
 
-  const visible = expanded ? filtered : filtered.slice(0, 7);
+  const totalFullViewPages = Math.max(1, Math.ceil(filtered.length / FULL_VIEW_PAGE_SIZE));
+  const currentFullViewPage = Math.min(fullViewPage, totalFullViewPages);
+  const fullViewItems = filtered.slice(
+    (currentFullViewPage - 1) * FULL_VIEW_PAGE_SIZE,
+    currentFullViewPage * FULL_VIEW_PAGE_SIZE
+  );
+  const visible = filtered.slice(0, 7);
 
   const controls = (
     <div className="inv-table__controls">
@@ -59,10 +68,16 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
           type="text"
           placeholder="Search..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setFullViewPage(1);
+          }}
         />
       </div>
-      <select value={activeCategory} onChange={(e) => onCategoryChange(e.target.value)}>
+      <select value={activeCategory} onChange={(e) => {
+        onCategoryChange(e.target.value);
+        setFullViewPage(1);
+      }}>
         {categories.map((c) => (
           <option key={c} value={c}>
             {c}
@@ -110,8 +125,8 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
 
         <div className="inv-table__scroll">{renderTable(visible)}</div>
 
-        {!expanded && filtered.length > visible.length && (
-          <button className="inv-table__more" onClick={() => setExpanded(true)}>
+        {filtered.length > visible.length && (
+          <button className="inv-table__more" onClick={() => navigate("/stock")}>
             View all {filtered.length} items
           </button>
         )}
@@ -127,7 +142,16 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
               </button>
             </div>
             <div className="inv-modal__controls">{controls}</div>
-            <div className="inv-modal__scroll">{table}</div>
+            <div className="inv-modal__scroll">{renderTable(fullViewItems)}</div>
+            <div className="inv-modal__pagination">
+              <Pagination
+                page={currentFullViewPage}
+                totalPages={totalFullViewPages}
+                totalItems={filtered.length}
+                pageSize={FULL_VIEW_PAGE_SIZE}
+                onPageChange={setFullViewPage}
+              />
+            </div>
           </div>
         </div>
       )}
