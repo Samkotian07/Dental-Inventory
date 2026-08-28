@@ -5,7 +5,8 @@ class VendorReturn:
     def __init__(self, data):
         self.return_id = data.get('return_id')
         self.type = data.get('type')
-        self.inventory_id = data.get('inventory_id')
+        self.unit_id = data.get('unit_id') or data.get('inventory_id')
+        self.inventory_id = data.get('unit_id') or data.get('inventory_id')
         self.ref_no = data.get('ref_no')
         self.product_name = data.get('product_name')
         self.old_batch_no = data.get('old_batch_no')
@@ -41,11 +42,13 @@ class VendorReturn:
         db = cls.get_db()
         return_id = data.get('return_id') or f"RET-{str(db.execute_query('SELECT IFNULL(MAX(CAST(SUBSTRING(return_id, 5) AS UNSIGNED)), 0) + 1 FROM vendor_returns')[0]['IFNULL(MAX(CAST(SUBSTRING(return_id, 5) AS UNSIGNED)), 0) + 1']).zfill(3)}"
         
+        target_unit_id = data.get('unit_id') or data.get('inventory_id')
+
         # Populate old_batch_no if missing
         old_batch = data.get('old_batch_no')
         inventory = None
-        if data.get('inventory_id'):
-            inventory = Inventory.find_by_id(data['inventory_id'])
+        if target_unit_id:
+            inventory = Inventory.find_by_id(target_unit_id)
         if not inventory and data.get('ref_no'):
             inventory = Inventory.find_by_ref_no(data['ref_no'])
             
@@ -53,12 +56,12 @@ class VendorReturn:
             old_batch = inventory.lot_no
 
         db.execute_query("""
-            INSERT INTO vendor_returns (return_id, type, inventory_id, ref_no, product_name, old_batch_no, new_batch_no, quantity, reason, return_date, credit_note, created_by)
+            INSERT INTO vendor_returns (return_id, type, unit_id, ref_no, product_name, old_batch_no, new_batch_no, quantity, reason, return_date, credit_note, created_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             return_id,
             data['type'],
-            data.get('inventory_id'),
+            target_unit_id,
             data.get('ref_no') or (inventory.ref_no if inventory else None),
             data.get('product_name') or (inventory.product_name if inventory else None),
             old_batch,
@@ -88,7 +91,8 @@ class VendorReturn:
         
         # If completed and exchange type, add new batch to inventory
         if status == 'completed' and self.type == 'exchange' and self.new_batch_no:
-            inventory = Inventory.find_by_id(self.inventory_id) if self.inventory_id else None
+            target_id = self.unit_id or self.inventory_id
+            inventory = Inventory.find_by_id(target_id) if target_id else None
             if not inventory and self.ref_no:
                 inventory = Inventory.find_by_ref_no(self.ref_no)
 
@@ -116,21 +120,29 @@ class VendorReturn:
         return VendorReturn.find_by_id(self.return_id)
 
     def to_dict(self):
+        def fmt_date(val):
+            if not val:
+                return None
+            if hasattr(val, 'isoformat'):
+                return val.isoformat()
+            return str(val)
+
         return {
             'returnId': self.return_id,
             'type': self.type,
-            'inventoryId': self.inventory_id,
+            'unitId': self.unit_id or self.inventory_id,
+            'inventoryId': self.inventory_id or self.unit_id,
             'refNo': self.ref_no,
             'productName': self.product_name,
             'oldBatchNo': self.old_batch_no,
             'newBatchNo': self.new_batch_no,
             'quantity': self.quantity,
             'reason': self.reason,
-            'returnDate': self.return_date.isoformat() if self.return_date else None,
+            'returnDate': fmt_date(self.return_date),
             'creditNote': self.credit_note,
             'creditNoteUsed': self.credit_note_used,
             'status': self.status,
             'createdBy': self.created_by,
-            'createdAt': self.created_at.isoformat() if self.created_at else None,
-            'updatedAt': self.updated_at.isoformat() if self.updated_at else None
+            'createdAt': fmt_date(self.created_at),
+            'updatedAt': fmt_date(self.updated_at)
         }

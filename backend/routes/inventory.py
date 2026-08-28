@@ -46,7 +46,7 @@ def get_public_product_history(ref_no):
         # Get issued history - include all units with this ref_no
         sql = """
             SELECT * FROM issued_items 
-            WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(inventory_id) = LOWER(%s)
+            WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(unit_id) = LOWER(%s)
             ORDER BY created_at ASC
         """
         results = db.execute_query(sql, (ref_no, str(inv_id)))
@@ -68,8 +68,8 @@ def get_public_product_history(ref_no):
             else:
                 status_label = '🔄 Current'
 
-            # ⭐ CRITICAL: Get the inventory_id (unit ID)
-            inventory_id = iss.get('inventoryId') or iss.get('inventory_id') or '—'
+            # ⭐ CRITICAL: Get the unit_id
+            inventory_id = iss.get('unitId') or iss.get('unit_id') or iss.get('inventoryId') or iss.get('inventory_id') or '—'
 
             cycles.append({
                 'cycle': idx,
@@ -105,7 +105,7 @@ def get_public_product_history(ref_no):
 # ⭐⭐⭐ NEW: Endpoint for individual unit history ⭐⭐⭐
 @inventory_bp.route('/unit-history/<unit_id>', methods=['GET'])
 def get_unit_history(unit_id):
-    """Public endpoint to get history for a SPECIFIC UNIT (by inventory_id)"""
+    """Public endpoint to get history for a SPECIFIC UNIT (by unit_id)"""
     try:
         print(f"🔍 UNIT HISTORY: Looking for unit_id: {unit_id}")
         
@@ -123,7 +123,7 @@ def get_unit_history(unit_id):
         # Get history for THIS SPECIFIC UNIT only
         sql = """
             SELECT * FROM issued_items 
-            WHERE inventory_id = %s
+            WHERE unit_id = %s
             ORDER BY created_at ASC
         """
         results = db.execute_query(sql, (unit_id,))

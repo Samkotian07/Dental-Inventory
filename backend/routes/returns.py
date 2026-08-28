@@ -53,9 +53,13 @@ def create_return():
             }
         }), 400
     
-    required = ['type', 'inventory_id']
-    missing = [f for f in required if not data.get(f)]
-    if missing:
+    return_type = data.get('type')
+    inventory_id = data.get('inventory_id') or data.get('unit_id') or data.get('refNo') or data.get('ref_no')
+    
+    if not return_type or not inventory_id:
+        missing = []
+        if not return_type: missing.append('type')
+        if not inventory_id: missing.append('inventory_id')
         return jsonify({
             'success': False,
             'error': {
@@ -64,7 +68,7 @@ def create_return():
             }
         }), 400
     
-    if data['type'] not in ['exchange', 'creditNote']:
+    if return_type not in ['exchange', 'creditNote']:
         return jsonify({
             'success': False,
             'error': {
@@ -73,8 +77,32 @@ def create_return():
             }
         }), 400
     
-    # Check if inventory item exists
-    inventory_item = Inventory.find_by_id(data['inventory_id'])
+    # Check if inventory item or unit exists
+    inventory_item = Inventory.find_by_id(inventory_id)
+    if not inventory_item:
+        try:
+            from models.inventory_unit import InventoryUnit
+            unit = InventoryUnit.find_by_id(inventory_id)
+            if unit:
+                from models.product import Product
+                product = Product.find_by_ref_no(unit.ref_no)
+                inventory_item = Inventory({
+                    'id': unit.id,
+                    'ref_no': unit.ref_no,
+                    'product_name': product.product_name if product else unit.ref_no,
+                    'category': product.category if product else 'General',
+                    'company_name': product.company_name if product else '',
+                    'size': product.size if product else '',
+                    'lot_no': product.lot_no if product else '',
+                    'quantity': unit.quantity,
+                    'is_returnable': product.is_returnable if product else True,
+                })
+        except Exception:
+            pass
+
+    if not inventory_item:
+        inventory_item = Inventory.find_by_ref_no(inventory_id)
+
     if not inventory_item:
         return jsonify({
             'success': False,
@@ -87,8 +115,9 @@ def create_return():
     current_user = request.current_user
     
     return_data = {
-        'type': data['type'],
-        'inventory_id': data['inventory_id'],
+        'type': return_type,
+        'unit_id': inventory_id,
+        'inventory_id': inventory_id,
         'ref_no': inventory_item.ref_no,
         'product_name': inventory_item.product_name,
         'old_batch_no': inventory_item.lot_no,
@@ -107,7 +136,7 @@ def create_return():
         action='CREATE_RETURN',
         entity_type='VENDOR_RETURN',
         entity_id=vendor_return.return_id,
-        details=f"Created {data['type']} return for {inventory_item.product_name} ({inventory_item.ref_no})",
+        details=f"Created {return_type} return for {inventory_item.product_name} ({inventory_item.ref_no})",
         user_id=current_user.id if current_user else None,
         user_name=current_user.name if current_user else 'Admin'
     )

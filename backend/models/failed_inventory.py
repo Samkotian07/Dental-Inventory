@@ -14,7 +14,8 @@ class FailedInventory:
         self.expiry_date = data.get('expiry_date')
         self.failure_reason = data.get('failure_reason')
         self.status = data.get('status', 'pending')
-        self.original_inventory_id = data.get('original_inventory_id')
+        self.unit_id = data.get('unit_id') or data.get('original_inventory_id')
+        self.original_inventory_id = data.get('original_inventory_id') or data.get('unit_id')
         self.replacement_inventory_id = data.get('replacement_inventory_id')
         self.moved_by = data.get('moved_by')
         self.created_at = data.get('created_at')
@@ -41,9 +42,11 @@ class FailedInventory:
         db = cls.get_db()
         failed_id = data.get('id') or f"FAIL-{str(db.execute_query('SELECT IFNULL(MAX(CAST(SUBSTRING(id, 6) AS UNSIGNED)), 0) + 1 FROM failed_inventory')[0]['IFNULL(MAX(CAST(SUBSTRING(id, 6) AS UNSIGNED)), 0) + 1']).zfill(3)}"
         
+        target_unit_id = data.get('unit_id') or data.get('original_inventory_id')
+
         db.execute_query("""
-            INSERT INTO failed_inventory (id, ref_no, product_name, category, company_name, size, lot_no, quantity, expiry_date, failure_reason, original_inventory_id, moved_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO failed_inventory (id, ref_no, product_name, category, company_name, size, lot_no, quantity, expiry_date, failure_reason, original_inventory_id, unit_id, moved_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             failed_id,
             data.get('ref_no'),
@@ -55,15 +58,26 @@ class FailedInventory:
             data.get('quantity'),
             data.get('expiry_date'),
             data.get('failure_reason'),
-            data.get('original_inventory_id'),
+            target_unit_id,
+            target_unit_id,
             data.get('moved_by')
         ))
         
-        # Update original inventory status to inactive
-        if data.get('original_inventory_id'):
-            inventory = Inventory.find_by_id(data['original_inventory_id'])
-            if inventory:
-                inventory.update({'status': 'inactive'})
+        # Update original inventory/unit status to inactive
+        if target_unit_id:
+            try:
+                from models.inventory_unit import InventoryUnit
+                unit = InventoryUnit.find_by_id(target_unit_id)
+                if unit:
+                    unit.update({'status': 'inactive'})
+                else:
+                    inventory = Inventory.find_by_id(target_unit_id)
+                    if inventory:
+                        inventory.update({'status': 'inactive'})
+            except Exception:
+                inventory = Inventory.find_by_id(target_unit_id)
+                if inventory:
+                    inventory.update({'status': 'inactive'})
         
         return cls.find_by_id(failed_id)
 
@@ -91,6 +105,13 @@ class FailedInventory:
         return self
 
     def to_dict(self):
+        def fmt_date(val):
+            if not val:
+                return None
+            if hasattr(val, 'isoformat'):
+                return val.isoformat()
+            return str(val)
+
         return {
             'id': self.id,
             'refNo': self.ref_no,
@@ -100,12 +121,13 @@ class FailedInventory:
             'size': self.size,
             'lotNo': self.lot_no,
             'quantity': self.quantity,
-            'expiryDate': self.expiry_date.isoformat() if self.expiry_date else None,
+            'expiryDate': fmt_date(self.expiry_date),
             'failureReason': self.failure_reason,
             'status': self.status,
-            'originalInventoryId': self.original_inventory_id,
+            'unitId': self.unit_id or self.original_inventory_id,
+            'originalInventoryId': self.original_inventory_id or self.unit_id,
             'replacementInventoryId': self.replacement_inventory_id,
             'movedBy': self.moved_by,
-            'createdAt': self.created_at.isoformat() if self.created_at else None,
-            'updatedAt': self.updated_at.isoformat() if self.updated_at else None
+            'createdAt': fmt_date(self.created_at),
+            'updatedAt': fmt_date(self.updated_at)
         }

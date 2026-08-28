@@ -158,15 +158,17 @@ export default function IssuedItems() {
     }
   };
 
-  const handleIssueNew = async ({ studentId, itemId, lotId, lotNo, stockType, qty }) => {
+  const handleIssueNew = async ({ studentId, itemId, inventoryId, unitId, unitIds, refNo, lotId, lotNo, stockType, qty }) => {
     const student = students.find((s) => s.id === studentId);
-    const stockMatch = stock.find((s) => s.refNo === itemId || s.id === itemId);
-    const invId = stockMatch?.id || getInventoryId(itemId);
+    const stockMatch = stock.find((s) => s.refNo === (refNo || itemId) || s.id === (inventoryId || unitId || itemId));
+    const targetUnitId = inventoryId || unitId || (Array.isArray(unitIds) && unitIds.length > 0 ? unitIds[0] : null) || stockMatch?.id || getInventoryId(refNo || itemId);
 
     const result = await issueItem({
       studentId,
-      inventoryId: invId,
-      refNo: stockMatch?.refNo || itemId,
+      inventoryId: targetUnitId,
+      unitId: targetUnitId,
+      unitIds,
+      refNo: refNo || stockMatch?.refNo || itemId,
       lotNo,
       stockType,
       qty: Number(qty),

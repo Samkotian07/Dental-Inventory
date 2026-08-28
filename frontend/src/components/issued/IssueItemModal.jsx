@@ -91,6 +91,9 @@ export default function IssueItemModal({ onClose, onConfirm }) {
     // Issue each unit one by one (or batch)
     onConfirm({
       studentId,
+      itemId: selectedItem.refNo,
+      inventoryId: unitsToIssue[0]?.id || selectedItem.refNo,
+      unitId: unitsToIssue[0]?.id || selectedItem.refNo,
       refNo: selectedItem.refNo,
       qty: Number(qty),
       unitIds: unitsToIssue.map(u => u.id),

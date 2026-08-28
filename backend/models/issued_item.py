@@ -96,15 +96,25 @@ class IssuedItem:
             WHERE issue_id = %s
         """, (return_date, condition, returned_by, self.issue_id))
         
-        # Restore quantity to inventory regardless of condition (or for Good/Damaged return)
-        inventory = None
-        if self.inventory_id:
-            inventory = Inventory.find_by_id(self.inventory_id) or Inventory.find_by_ref_no(self.inventory_id)
-        if not inventory and self.ref_no:
+        # Restore quantity to unit or inventory regardless of condition
+        target_id = self.unit_id or self.inventory_id
+        if target_id:
+            try:
+                unit = InventoryUnit.find_by_id(target_id)
+                if unit:
+                    unit.update({'quantity': unit.quantity + self.quantity})
+                else:
+                    inventory = Inventory.find_by_id(target_id) or Inventory.find_by_ref_no(target_id)
+                    if inventory:
+                        inventory.update_quantity(self.quantity, returned_by)
+            except Exception:
+                inventory = Inventory.find_by_id(target_id) or Inventory.find_by_ref_no(target_id)
+                if inventory:
+                    inventory.update_quantity(self.quantity, returned_by)
+        elif self.ref_no:
             inventory = Inventory.find_by_ref_no(self.ref_no)
-
-        if inventory:
-            inventory.update_quantity(self.quantity, returned_by)
+            if inventory:
+                inventory.update_quantity(self.quantity, returned_by)
         
         return IssuedItem.find_by_id(self.issue_id)
 

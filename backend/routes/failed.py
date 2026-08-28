@@ -52,9 +52,13 @@ def create_failed_item():
             }
         }), 400
     
-    required = ['inventory_id', 'failure_reason']
-    missing = [f for f in required if not data.get(f)]
-    if missing:
+    inventory_id = data.get('inventory_id') or data.get('unit_id') or data.get('refNo') or data.get('ref_no')
+    failure_reason = data.get('failure_reason') or data.get('reason')
+    
+    if not inventory_id or not failure_reason:
+        missing = []
+        if not inventory_id: missing.append('inventory_id')
+        if not failure_reason: missing.append('failure_reason')
         return jsonify({
             'success': False,
             'error': {
@@ -63,8 +67,32 @@ def create_failed_item():
             }
         }), 400
     
-    # Check if inventory item exists
-    inventory_item = Inventory.find_by_id(data['inventory_id'])
+    # Check if inventory item or unit exists
+    inventory_item = Inventory.find_by_id(inventory_id)
+    if not inventory_item:
+        try:
+            from models.inventory_unit import InventoryUnit
+            unit = InventoryUnit.find_by_id(inventory_id)
+            if unit:
+                from models.product import Product
+                product = Product.find_by_ref_no(unit.ref_no)
+                inventory_item = Inventory({
+                    'id': unit.id,
+                    'ref_no': unit.ref_no,
+                    'product_name': product.product_name if product else unit.ref_no,
+                    'category': product.category if product else 'General',
+                    'company_name': product.company_name if product else '',
+                    'size': product.size if product else '',
+                    'lot_no': product.lot_no if product else '',
+                    'quantity': unit.quantity,
+                    'is_returnable': product.is_returnable if product else True,
+                })
+        except Exception:
+            pass
+
+    if not inventory_item:
+        inventory_item = Inventory.find_by_ref_no(inventory_id)
+
     if not inventory_item:
         return jsonify({
             'success': False,
@@ -97,8 +125,9 @@ def create_failed_item():
         'lot_no': inventory_item.lot_no,
         'quantity': data.get('quantity', inventory_item.quantity),
         'expiry_date': inventory_item.expiry_date,
-        'failure_reason': data['failure_reason'],
-        'original_inventory_id': inventory_item.id,
+        'failure_reason': failure_reason,
+        'unit_id': inventory_id,
+        'original_inventory_id': inventory_item.id or inventory_id,
         'moved_by': current_user.name if current_user else 'Admin'
     }
     

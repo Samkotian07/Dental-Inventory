@@ -63,9 +63,13 @@ def issue_item():
             }
         }), 400
     
-    required = ['student_id', 'inventory_id']
-    missing = [f for f in required if not data.get(f)]
-    if missing:
+    student_id = data.get('student_id')
+    inventory_id = data.get('inventory_id') or data.get('unit_id')
+    
+    if not student_id or not inventory_id:
+        missing = []
+        if not student_id: missing.append('student_id')
+        if not inventory_id: missing.append('inventory_id')
         return jsonify({
             'success': False,
             'error': {
@@ -75,7 +79,7 @@ def issue_item():
         }), 400
     
     # Check if student exists
-    student = Student.find_by_id(data['student_id'])
+    student = Student.find_by_id(student_id)
     if not student:
         return jsonify({
             'success': False,
@@ -85,8 +89,32 @@ def issue_item():
             }
         }), 404
     
-    # Check if inventory item exists and has sufficient quantity
-    inventory_item = Inventory.find_by_id(data['inventory_id'])
+    # Check if inventory item or unit exists
+    inventory_item = Inventory.find_by_id(inventory_id)
+    if not inventory_item:
+        try:
+            from models.inventory_unit import InventoryUnit
+            unit = InventoryUnit.find_by_id(inventory_id)
+            if unit:
+                from models.product import Product
+                product = Product.find_by_ref_no(unit.ref_no)
+                inventory_item = Inventory({
+                    'id': unit.id,
+                    'ref_no': unit.ref_no,
+                    'product_name': product.product_name if product else unit.ref_no,
+                    'category': product.category if product else 'General',
+                    'company_name': product.company_name if product else '',
+                    'size': product.size if product else '',
+                    'lot_no': product.lot_no if product else '',
+                    'quantity': unit.quantity,
+                    'is_returnable': product.is_returnable if product else True,
+                })
+        except Exception as ex:
+            print(f"Unit lookup exception in issue_item: {ex}")
+
+    if not inventory_item:
+        inventory_item = Inventory.find_by_ref_no(inventory_id)
+
     if not inventory_item:
         return jsonify({
             'success': False,
@@ -123,9 +151,10 @@ def issue_item():
     lot_number = custom_lot if custom_lot else inventory_item.lot_no
 
     issued_data = {
-        'student_id': data['student_id'],
+        'student_id': student_id,
         'student_name': student.name,
-        'inventory_id': data['inventory_id'],
+        'inventory_id': inventory_id,
+        'unit_id': inventory_id,
         'product_name': inventory_item.product_name,
         'lot_no': lot_number,
         'ref_no': inventory_item.ref_no,

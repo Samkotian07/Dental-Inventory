@@ -40,12 +40,14 @@ function normalizeStock(item) {
   };
 }
 
-// ⭐ NORMALIZE ISSUED - Track by inventory_id (unit)
+// ⭐ NORMALIZE ISSUED - Track by unit_id / inventory_id
 function normalizeIssued(item) {
+  const resolvedUnitId = item.unit_id || item.unitId || item.inventory_id || item.inventoryId || "";
   return {
     id: item.id || item.issue_id || item.issueId,
     issueId: item.id || item.issue_id || item.issueId,
-    inventoryId: item.inventory_id || item.inventoryId || item.inventory_id, // ⭐ CRITICAL
+    unitId: resolvedUnitId,
+    inventoryId: resolvedUnitId,
     student: item.student_name || item.student || item.studentName || "Student",
     studentName: item.student_name || item.student || item.studentName || "Student",
     studentId: item.student_id || item.studentId || "",
@@ -59,14 +61,19 @@ function normalizeIssued(item) {
     issuedDate: item.issued_date || item.date || item.issuedDate || new Date().toISOString().slice(0, 10),
     returnDate: item.return_date || item.returnDate || null,
     status: item.status === "returned" ? "Returned" : item.status === "condemned" ? "Condemned" : "Active",
+    created: item.created_at || item.createdAt || "",
+    createdAt: item.created_at || item.createdAt || "",
   };
 }
 
 function normalizeReturn(item) {
+  const resolvedUnitId = item.unit_id || item.unitId || item.inventory_id || item.inventoryId || "";
   return {
     id: item.id || item.return_id || item.returnId,
     returnId: item.id || item.return_id || item.returnId,
     type: item.type === "exchange" ? "exchange" : "return",
+    unitId: resolvedUnitId,
+    inventoryId: resolvedUnitId,
     refNo: item.ref_no || item.refNo || "",
     productName: item.product_name || item.productName || item.product || "Product",
     quantity: Number(item.quantity ?? item.qty ?? 1),
@@ -76,13 +83,18 @@ function normalizeReturn(item) {
     returnDate: item.return_date || item.returnDate || new Date().toISOString().slice(0, 10),
     status: item.status || "Pending",
     batchNo: item.old_batch_no || item.batchNo || item.lot_no || item.lotNo || "",
+    created: item.created_at || item.createdAt || "",
+    createdAt: item.created_at || item.createdAt || "",
   };
 }
 
 function normalizeFailed(item) {
+  const resolvedUnitId = item.unit_id || item.unitId || item.original_inventory_id || item.originalInventoryId || item.id;
   return {
     id: item.id || item.ref_no || item.refNo,
     refNo: item.ref_no || item.refNo || item.id,
+    unitId: resolvedUnitId,
+    originalInventoryId: resolvedUnitId,
     product: item.product_name || item.product || item.productName || "Product",
     productName: item.product_name || item.product || item.productName || "Product",
     category: item.category || "General",
@@ -93,6 +105,8 @@ function normalizeFailed(item) {
     failedDate: item.failed_date || item.failedDate || new Date().toISOString().slice(0, 10),
     reason: item.failure_reason || item.failureReason || item.reason || "Failed",
     status: item.status || "failed",
+    created: item.created_at || item.createdAt || "",
+    createdAt: item.created_at || item.createdAt || "",
   };
 }
 
@@ -185,12 +199,14 @@ export function InventoryProvider({ children }) {
     loadAllData();
   }, []);
 
-  // ⭐ ISSUE ITEM - Track by individual inventory_id
-  const issueItem = async ({ studentId, inventoryId, refNo, qty, issueDate, stockType = "fresh" }) => {
+  // ⭐ ISSUE ITEM - Track by individual inventory_id / unit_id
+  const issueItem = async ({ studentId, inventoryId, unitId, unitIds, refNo, qty, issueDate, stockType = "fresh" }) => {
     try {
+      const targetId = inventoryId || unitId || (Array.isArray(unitIds) && unitIds.length > 0 ? unitIds[0] : null) || refNo;
       const payload = {
         student_id: studentId,
-        inventory_id: inventoryId,  // ⭐ Individual unit ID
+        inventory_id: targetId,
+        unit_id: targetId,
         ref_no: refNo,
         quantity: Number(qty),
         issue_date: issueDate,
@@ -207,12 +223,12 @@ export function InventoryProvider({ children }) {
       if (data.success) {
         // Update stock - decrease quantity for the specific unit
         setStock(prev => prev.map(s => 
-          s.id === inventoryId ? { ...s, quantity: s.quantity - Number(qty) } : s
+          (s.id === targetId || s.refNo === targetId) ? { ...s, quantity: Math.max(0, s.quantity - Number(qty)) } : s
         ));
         await fetchIssued();
         return { success: true, data: data.data };
       }
-      return { success: false, message: data.error?.message };
+      return { success: false, message: data.error?.message || data.message || "Failed to issue item" };
     } catch (error) {
       console.error("Issue error:", error);
       return { success: false, message: "Network error" };
