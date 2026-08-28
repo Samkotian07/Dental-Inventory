@@ -443,6 +443,90 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  // ⭐ ADD RETURN / EXCHANGE / CREDIT NOTE
+  const addReturn = async (returnData) => {
+    try {
+      const payload = {
+        type: returnData.type || "exchange",
+        inventory_id: returnData.inventoryId || returnData.inventory_id || returnData.unitId || returnData.unit_id || returnData.refNo || returnData.ref_no,
+        unit_id: returnData.unitId || returnData.unit_id || returnData.inventoryId || returnData.inventory_id,
+        ref_no: returnData.refNo || returnData.ref_no,
+        product_name: returnData.productName || returnData.product,
+        new_batch_no: returnData.newBatchNo || returnData.new_batch_no,
+        quantity: Number(returnData.quantity || returnData.qty || 1),
+        reason: returnData.reason || "",
+        return_date: returnData.returnDate || returnData.return_date || new Date().toISOString().slice(0, 10),
+        credit_note: returnData.creditNote || returnData.credit_note || "",
+      };
+
+      const res = await fetch(`${API_URL}/returns/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        await fetchReturns();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || data.message || "Failed to create return record" };
+    } catch (error) {
+      console.error("Add return error:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // ⭐ UPDATE RETURN / EXCHANGE STATUS
+  const updateReturnStatus = async (returnId, status, extraData = {}) => {
+    try {
+      const payload = {
+        status: status,
+        credit_note: typeof extraData === "string" ? extraData : extraData.creditNote || extraData.credit_note,
+        new_batch_no: typeof extraData === "object" ? extraData.newBatchNo || extraData.new_batch_no : undefined,
+      };
+
+      const res = await fetch(`${API_URL}/returns/${returnId}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        await fetchReturns();
+        await fetchStock();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || data.message || "Failed to update return status" };
+    } catch (error) {
+      console.error("Update return status error:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // ⭐ DISCARD / DELETE RETURN OR CREDIT NOTE
+  const discardReturn = async (returnId) => {
+    try {
+      const res = await fetch(`${API_URL}/returns/${returnId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        await fetchReturns();
+        return { success: true };
+      }
+      return { success: false, message: data.error?.message || data.message || "Failed to remove return record" };
+    } catch (error) {
+      console.error("Delete return error:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const deleteReturn = discardReturn;
+
   // ⭐ GET INVENTORY ID BY REF_NO (for compatibility)
   const getInventoryId = useCallback((refNo) => {
     const item = stock.find(s => s.refNo === refNo || s.id === refNo);
@@ -470,6 +554,10 @@ export function InventoryProvider({ children }) {
     moveStockToFailed,
     restoreFailedToStock,
     markFailedDisposed,
+    addReturn,
+    updateReturnStatus,
+    discardReturn,
+    deleteReturn,
     getInventoryId,
   };
 
