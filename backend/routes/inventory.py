@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify
 from middleware.auth import token_required, admin_required
-from middleware.rate_limiter import rate_limit
 from models.inventory import Inventory
 from models.issued_item import IssuedItem
 from models.audit_log import AuditLog
@@ -10,9 +9,7 @@ inventory_bp = Blueprint('inventory', __name__, url_prefix='/api/inventory')
 
 
 # ⭐⭐⭐ PUBLIC ENDPOINT - NO AUTH REQUIRED ⭐⭐⭐
-# This must be at the TOP to avoid route conflicts with /<item_id>
 @inventory_bp.route('/public-history/<ref_no>', methods=['GET'])
-@rate_limit(limit=30, period=60)
 def get_public_product_history(ref_no):
     """Public endpoint to get product details and full cycle history by ref_no (No auth required for QR scans)"""
     try:
@@ -44,7 +41,7 @@ def get_public_product_history(ref_no):
         db = Inventory.get_db()
         inv_id = item.id if item else ref_no
         
-        # Get issued history
+        # Get issued history - include all units with this ref_no
         sql = """
             SELECT * FROM issued_items 
             WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(inventory_id) = LOWER(%s)
@@ -58,7 +55,7 @@ def get_public_product_history(ref_no):
         # Build product dict
         product_dict = item.to_dict()
 
-        # Build cycle history
+        # ⭐ Build cycle history with unit tracking
         cycles = []
         for idx, iss in enumerate(issued_list, 1):
             status_str = str(iss.get('status') or '').lower()
@@ -69,10 +66,14 @@ def get_public_product_history(ref_no):
             else:
                 status_label = '🔄 Current'
 
+            # ⭐ CRITICAL: Get the inventory_id (unit ID)
+            inventory_id = iss.get('inventoryId') or iss.get('inventory_id') or '—'
+
             cycles.append({
                 'cycle': idx,
                 'student': iss.get('studentName') or iss.get('student') or 'Student',
                 'studentId': iss.get('studentId') or '',
+                'unitId': inventory_id,  # ⭐ ADDED: Individual unit ID
                 'issued': iss.get('issueDate') or iss.get('createdAt') or '—',
                 'returned': iss.get('returnDate') if status_str in ['returned', 'condemned'] else 'NULL',
                 'status': status_label,
@@ -96,6 +97,86 @@ def get_public_product_history(ref_no):
             'success': False,
             'error': str(e),
             'message': f"Error loading history for {ref_no}"
+        }), 500
+
+
+# ⭐⭐⭐ NEW: Endpoint for individual unit history ⭐⭐⭐
+@inventory_bp.route('/unit-history/<unit_id>', methods=['GET'])
+def get_unit_history(unit_id):
+    """Public endpoint to get history for a SPECIFIC UNIT (by inventory_id)"""
+    try:
+        print(f"🔍 UNIT HISTORY: Looking for unit_id: {unit_id}")
+        
+        # Find the specific unit
+        item = Inventory.find_by_id(unit_id)
+        if not item:
+            print(f"❌ Unit NOT FOUND for: {unit_id}")
+            return jsonify({
+                'success': False,
+                'message': f'Unit with ID {unit_id} not found'
+            }), 404
+
+        db = Inventory.get_db()
+        
+        # Get history for THIS SPECIFIC UNIT only
+        sql = """
+            SELECT * FROM issued_items 
+            WHERE inventory_id = %s
+            ORDER BY created_at ASC
+        """
+        results = db.execute_query(sql, (unit_id,))
+        issued_list = [IssuedItem(row).to_dict() for row in results]
+        
+        print(f"   ✅ Found {len(issued_list)} records for unit {unit_id}")
+
+        # Build product dict
+        product_dict = item.to_dict()
+        product_dict['unitId'] = unit_id
+
+        # Build cycle history
+        cycles = []
+        for idx, iss in enumerate(issued_list, 1):
+            status_str = str(iss.get('status') or '').lower()
+            if status_str == 'returned':
+                status_label = '✅ Complete'
+            elif status_str == 'condemned':
+                status_label = '❌ Condemned'
+            else:
+                status_label = '🔄 Current'
+
+            cycles.append({
+                'cycle': idx,
+                'student': iss.get('studentName') or iss.get('student') or 'Student',
+                'studentId': iss.get('studentId') or '',
+                'issued': iss.get('issueDate') or iss.get('createdAt') or '—',
+                'returned': iss.get('returnDate') if status_str in ['returned', 'condemned'] else 'NULL',
+                'status': status_label,
+                'rawStatus': status_str
+            })
+
+        # Build summary
+        total = len(cycles)
+        returned = sum(1 for c in cycles if c['rawStatus'] == 'returned')
+        condemned = sum(1 for c in cycles if c['rawStatus'] == 'condemned')
+        current = sum(1 for c in cycles if c['rawStatus'] not in ['returned', 'condemned'])
+
+        summary = f"Summary: {total} cycles → {returned} returned → {condemned} condemned → {current} current"
+
+        return jsonify({
+            'success': True,
+            'product': product_dict,
+            'history': cycles,
+            'summary': summary
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error in get_unit_history: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': f"Error loading history for unit {unit_id}"
         }), 500
 
 

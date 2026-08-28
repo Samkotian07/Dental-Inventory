@@ -109,7 +109,10 @@ class Inventory:
             'companyName': 'company_name',
             'expiryDate': 'expiry_date',
             'lotNo': 'lot_no',
-            'isReturnable': 'is_returnable'
+            'isReturnable': 'is_returnable',
+            'documentType': 'document_type',
+            'documentNumber': 'document_number',
+            'invoiceNo': 'document_number'
         }
         
         normalized_data = dict(data)
@@ -117,7 +120,11 @@ class Inventory:
             if camel in normalized_data and snake not in normalized_data:
                 normalized_data[snake] = normalized_data[camel]
 
-        allowed_fields = ['product_name', 'category', 'company_name', 'size', 'lot_no', 'quantity', 'expiry_date', 'low_stock_threshold', 'status', 'is_returnable']
+        allowed_fields = [
+            'product_name', 'category', 'company_name', 'size', 'lot_no',
+            'quantity', 'expiry_date', 'low_stock_threshold', 'status',
+            'is_returnable', 'document_type', 'document_number'
+        ]
         for field in allowed_fields:
             if field in normalized_data:
                 updates.append(f"{field} = %s")
@@ -145,6 +152,13 @@ class Inventory:
         return True
 
     def to_dict(self):
+        def fmt_date(val):
+            if not val:
+                return None
+            if hasattr(val, 'isoformat'):
+                return val.isoformat()
+            return str(val)
+
         return {
             'id': self.id,
             'refNo': self.ref_no,
@@ -154,13 +168,13 @@ class Inventory:
             'size': self.size,
             'lotNo': self.lot_no,
             'quantity': self.quantity,
-            'expiryDate': self.expiry_date.isoformat() if self.expiry_date else None,
+            'expiryDate': fmt_date(self.expiry_date),
             'lowStockThreshold': self.low_stock_threshold,
             'status': self.status,
             'isReturnable': self.is_returnable,
             'documentType': self.document_type,
             'documentNumber': self.document_number,
             'createdBy': self.created_by,
-            'createdAt': self.created_at.isoformat() if self.created_at else None,
-            'updatedAt': self.updated_at.isoformat() if self.updated_at else None
+            'createdAt': fmt_date(self.created_at),
+            'updatedAt': fmt_date(self.updated_at)
         }

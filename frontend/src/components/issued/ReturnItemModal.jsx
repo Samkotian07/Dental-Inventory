@@ -10,8 +10,8 @@ function todayISO() {
 export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, onExchange }) {
   const { stock = [], issuedItems = [] } = useInventory();
   const [returnDate, setReturnDate] = useState(todayISO());
-  const [step, setStep] = useState("confirm"); // 'confirm' | 'qr' | 'done' | 'condemn-done' | 'exchange-done'
-  const [actionType, setActionType] = useState("return"); // 'return' | 'condemn' | 'exchange'
+  const [step, setStep] = useState("confirm");
+  const [actionType, setActionType] = useState("return");
   const [condemnReason, setCondemnReason] = useState("");
   const [exchangeReason, setExchangeReason] = useState("Damaged");
   const [showCondemnFields, setShowCondemnFields] = useState(false);
@@ -20,23 +20,23 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
   // Match item in stock to get expiry date
   const stockMatch = useMemo(() => {
     if (!item) return null;
-    return stock.find((s) => s.refNo === item.refNo || s.id === item.refNo || s.id === item.inventoryId);
+    // ⭐ Match by inventoryId (individual unit)
+    return stock.find((s) => s.id === item.inventoryId);
   }, [stock, item]);
 
   const expiryDate = useMemo(() => {
     return item?.expiry || item?.expiryDate || stockMatch?.expiry || stockMatch?.expiryDate || "—";
   }, [item, stockMatch]);
 
-  // Compute product lifecycle history for the item
+  // ⭐ FIXED: History for THIS SPECIFIC UNIT (by inventoryId)
   const productHistory = useMemo(() => {
     if (!item) return [];
-    const itemRef = (item.refNo || item.id || "").toLowerCase();
-    const itemProd = (item.product || item.productName || "").toLowerCase();
-
+    
+    // ⭐ Track by INVENTORY ID (unique per unit)
+    const inventoryId = item.inventoryId || item.id;
+    
     const matches = (issuedItems || []).filter((iss) => {
-      const matchRef = (iss.refNo || "").toLowerCase() === itemRef;
-      const matchProd = (iss.product || iss.productName || "").toLowerCase() === itemProd;
-      return matchRef || matchProd;
+      return iss.inventoryId === inventoryId;  // ⭐ Only this specific unit
     });
 
     matches.sort((a, b) => new Date(a.date || a.issuedDate || 0) - new Date(b.date || b.issuedDate || 0));
@@ -78,9 +78,6 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
   }, [productHistory]);
 
   const handleConfirm = () => {
-    console.log("🔄 ReturnItemModal: handleConfirm called");
-    console.log("📦 Action Type:", actionType);
-
     if (actionType === "return") {
       onConfirm(item.issueId, returnDate);
       setStep("qr");
@@ -97,8 +94,8 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
 
   const handlePrint = () => {
     const batchVal = item.lotNo || item.batchNo || "4510315832";
+    const unitId = item.inventoryId || item.id || item.refNo;
 
-    // Extract rendered vector SVG of QR Code directly from DOM
     let qrSvgHtml = "";
     const qrContainerEl = document.getElementById("modal-qr-container");
     if (qrContainerEl) {
@@ -108,7 +105,6 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
       }
     }
 
-    // Open print sticker in a new page/window
     const printWindow = window.open("", "_blank", "width=520,height=680");
     if (!printWindow) {
       alert("Pop-up blocked! Please allow pop-ups for this site to print.");
@@ -211,7 +207,7 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
             <div class="qr-box">${qrSvgHtml}</div>
             <br/>
             <div class="badge">✅ RETURNED</div>
-            <div class="product-name">Product: ${item.product} (${item.refNo})</div>
+            <div class="product-name">Product: ${item.product} (Unit: ${unitId})</div>
             <div class="batch-info">
               <strong>Batch:</strong> ${batchVal} | <strong>Expiry Date:</strong> ${expiryDate}
             </div>
@@ -219,7 +215,7 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
               Last Student: ${item.student} | Returned: ${returnDate}
             </div>
             <div class="scan-note">
-              📱 Scan QR code to view complete product history
+              📱 Scan QR code to view complete unit history
             </div>
           </div>
           <script>
@@ -235,15 +231,14 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
     printWindow.focus();
   };
 
-  // QR Code URL payload for camera scanning
-  const scanUrl = `${window.location.origin}/product-history/${encodeURIComponent(item?.refNo || item?.id || "")}`;
+  const scanUrl = `${window.location.origin}/unit-history/${encodeURIComponent(item?.inventoryId || item?.id || item?.refNo || "")}`;
 
   // Step: Confirm Return
   if (step === "confirm") {
     return (
       <Modal title="Return / Condemn Item" onClose={onClose} width={480}>
         <p className="modal__lead">
-          Processing <strong>{item.product}</strong> ({item.refNo}) from{" "}
+          Processing <strong>{item.product}</strong> (Unit: {item.inventoryId || item.id}) from{" "}
           <strong>{item.student}</strong>.
         </p>
 
@@ -477,13 +472,14 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
     );
   }
 
-  // Step: QR Display (Only for Return)
+  // Step: QR Display
   if (step === "qr") {
     const batchVal = item.lotNo || item.batchNo || "4510315832";
+    const unitId = item.inventoryId || item.id || item.refNo;
+    
     return (
-      <Modal title="QR Code & Product History" onClose={onClose} width={640}>
+      <Modal title="QR Code & Unit History" onClose={onClose} width={640}>
         <div style={{ padding: "10px 0" }}>
-          {/* Beautified Top QR Card */}
           <div
             style={{
               display: "flex",
@@ -526,7 +522,7 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
                 ✅ RETURNED
               </div>
               <h4 style={{ margin: "4px 0", fontSize: "16px", color: "#0F172A", fontWeight: "700" }}>
-                Product: {item.product} ({item.refNo})
+                Product: {item.product} (Unit: {unitId})
               </h4>
               <p style={{ margin: "4px 0", fontSize: "13.5px", color: "#475569" }}>
                 <strong>Batch:</strong> {batchVal} | <strong>Expiry Date:</strong> {expiryDate}
@@ -537,10 +533,10 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
             </div>
           </div>
 
-          {/* Product Lifecycle History Table */}
+          {/* Unit Lifecycle History Table */}
           <div>
             <h4 style={{ margin: "0 0 10px", fontSize: "14px", color: "#1E293B", fontWeight: "700" }}>
-              📋 Product History
+              📋 Unit History
             </h4>
 
             <div style={{ overflowX: "auto", border: "1px solid #E2E8F0", borderRadius: "8px" }}>
@@ -629,142 +625,81 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
     );
   }
 
-  // Step: Condemn Done (No QR, Just Confirmation)
+  // Step: Condemn Done
   if (step === "condemn-done") {
     return (
       <Modal title="Item Condemned" onClose={onClose} width={440}>
         <div style={{ textAlign: "center", padding: "30px 0" }}>
-          <div
-            style={{
-              fontSize: "64px",
-              marginBottom: "16px",
-            }}
-          >
-            🗑️
-          </div>
-
-          <div
-            style={{
-              display: "inline-block",
-              padding: "6px 20px",
-              borderRadius: "20px",
-              fontSize: "16px",
-              fontWeight: "bold",
-              marginBottom: "16px",
-              background: "#FEE2E2",
-              color: "#DC2626",
-            }}
-          >
-            CONDEMNED
-          </div>
-
-          <p style={{ fontSize: "18px", fontWeight: "600", margin: "8px 0" }}>
-            {item.product}
-          </p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
-            Ref: {item.refNo}
-          </p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
-            Student: {item.student}
-          </p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
-            Condemned on: {returnDate}
-          </p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
-            Qty: {item.qty}
-          </p>
-
-          <div
-            style={{
-              marginTop: "16px",
-              padding: "12px",
-              background: "#FEF3C7",
-              borderRadius: "8px",
-              border: "1px solid #F59E0B",
-            }}
-          >
-            <p style={{ margin: 0, color: "#92400E", fontSize: "14px", fontWeight: "500" }}>
-              ⚠️ Reason: {condemnReason}
-            </p>
-            <p style={{ margin: "4px 0 0", color: "#92400E", fontSize: "12px" }}>
-              This item has been removed from inventory
-            </p>
+          <div style={{ fontSize: "64px", marginBottom: "16px" }}>🗑️</div>
+          <div style={{
+            display: "inline-block",
+            padding: "6px 20px",
+            borderRadius: "20px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            marginBottom: "16px",
+            background: "#FEE2E2",
+            color: "#DC2626",
+          }}>CONDEMNED</div>
+          <p style={{ fontSize: "18px", fontWeight: "600", margin: "8px 0" }}>{item.product}</p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Unit: {item.inventoryId || item.id}</p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Student: {item.student}</p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Condemned on: {returnDate}</p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Qty: {item.qty}</p>
+          <div style={{
+            marginTop: "16px",
+            padding: "12px",
+            background: "#FEF3C7",
+            borderRadius: "8px",
+            border: "1px solid #F59E0B",
+          }}>
+            <p style={{ margin: 0, color: "#92400E", fontSize: "14px", fontWeight: "500" }}>⚠️ Reason: {condemnReason}</p>
+            <p style={{ margin: "4px 0 0", color: "#92400E", fontSize: "12px" }}>This unit has been removed from inventory</p>
           </div>
         </div>
         <div className="modal__actions">
-          <button className="modal__btn" onClick={() => setStep("confirm")}>
-            Back
-          </button>
-          <button className="modal__btn modal__btn--primary" onClick={onClose}>
-            Done
-          </button>
+          <button className="modal__btn" onClick={() => setStep("confirm")}>Back</button>
+          <button className="modal__btn modal__btn--primary" onClick={onClose}>Done</button>
         </div>
       </Modal>
     );
   }
 
-  // Step: Exchange Done (Sent for Exchange)
+  // Step: Exchange Done
   if (step === "exchange-done") {
     return (
       <Modal title="Sent for Exchange" onClose={onClose} width={440}>
         <div style={{ textAlign: "center", padding: "30px 0" }}>
           <div style={{ fontSize: "64px", marginBottom: "16px" }}>🔄</div>
-
-          <div
-            style={{
-              display: "inline-block",
-              padding: "6px 20px",
-              borderRadius: "20px",
-              fontSize: "16px",
-              fontWeight: "bold",
-              marginBottom: "16px",
-              background: "#FEF3C7",
-              color: "#D97706",
-            }}
-          >
-            FAILED - SENT FOR EXCHANGE
-          </div>
-
-          <p style={{ fontSize: "18px", fontWeight: "600", margin: "8px 0" }}>
-            {item.product}
-          </p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
-            Ref: {item.refNo}
-          </p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
-            Student: {item.student}
-          </p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
-            Exchange Date: {returnDate}
-          </p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
-            Qty: {item.qty}
-          </p>
-
-          <div
-            style={{
-              marginTop: "16px",
-              padding: "12px",
-              background: "#FFFBEB",
-              borderRadius: "8px",
-              border: "1px solid #F59E0B",
-            }}
-          >
-            <p style={{ margin: 0, color: "#92400E", fontSize: "14px", fontWeight: "500" }}>
-              ⚠️ Reason: {exchangeReason}
-            </p>
-            <p style={{ margin: "4px 0 0", color: "#92400E", fontSize: "12px" }}>
-              Created exchange request in Track Returns
-            </p>
+          <div style={{
+            display: "inline-block",
+            padding: "6px 20px",
+            borderRadius: "20px",
+            fontSize: "16px",
+            fontWeight: "bold",
+            marginBottom: "16px",
+            background: "#FEF3C7",
+            color: "#D97706",
+          }}>FAILED - SENT FOR EXCHANGE</div>
+          <p style={{ fontSize: "18px", fontWeight: "600", margin: "8px 0" }}>{item.product}</p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Unit: {item.inventoryId || item.id}</p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Student: {item.student}</p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Exchange Date: {returnDate}</p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Qty: {item.qty}</p>
+          <div style={{
+            marginTop: "16px",
+            padding: "12px",
+            background: "#FFFBEB",
+            borderRadius: "8px",
+            border: "1px solid #F59E0B",
+          }}>
+            <p style={{ margin: 0, color: "#92400E", fontSize: "14px", fontWeight: "500" }}>⚠️ Reason: {exchangeReason}</p>
+            <p style={{ margin: "4px 0 0", color: "#92400E", fontSize: "12px" }}>Created exchange request in Track Returns</p>
           </div>
         </div>
         <div className="modal__actions">
-          <button className="modal__btn" onClick={() => setStep("confirm")}>
-            Back
-          </button>
-          <button className="modal__btn modal__btn--primary" onClick={onClose}>
-            Done
-          </button>
+          <button className="modal__btn" onClick={() => setStep("confirm")}>Back</button>
+          <button className="modal__btn modal__btn--primary" onClick={onClose}>Done</button>
         </div>
       </Modal>
     );

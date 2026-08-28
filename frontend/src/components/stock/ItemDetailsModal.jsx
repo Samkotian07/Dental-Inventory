@@ -12,6 +12,16 @@ function formatDisplayDate(iso) {
 export default function ItemDetailsModal({ item, onClose }) {
   if (!item) return null;
 
+  const invoice =
+    item.invoiceNo ||
+    item.invoiceNumber ||
+    item.documentNumber ||
+    item.document_number ||
+    item.creditNoteNo ||
+    "—";
+
+  const createdDate = item.created || item.createdAt || item.created_at;
+
   return (
     <Modal title="Item Details" onClose={onClose} width={480}>
       <div className="item-details">
@@ -40,11 +50,11 @@ export default function ItemDetailsModal({ item, onClose }) {
           </div>
           <div>
             <span>Lot No</span>
-            <p>{item.lotNo || "—"}</p>
+            <p>{item.lotNo || item.lot_no || "—"}</p>
           </div>
           <div>
             <span>Invoice No</span>
-            <p>{item.invoiceNo || item.invoiceNumber || item.documentNumber || "—"}</p>
+            <p>{invoice}</p>
           </div>
           <div>
             <span>Quantity</span>
@@ -52,11 +62,11 @@ export default function ItemDetailsModal({ item, onClose }) {
           </div>
           <div>
             <span>Expiry Date</span>
-            <p>{formatDisplayDate(item.expiry || item.expiryDate)}</p>
+            <p>{formatDisplayDate(item.expiry || item.expiryDate || item.expiry_date)}</p>
           </div>
           <div>
             <span>Created</span>
-            <p>{formatDisplayDate(item.created || item.createdAt)}</p>
+            <p>{formatDisplayDate(createdDate)}</p>
           </div>
         </div>
       </div>

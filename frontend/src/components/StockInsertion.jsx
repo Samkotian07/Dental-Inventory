@@ -34,7 +34,7 @@ export default function StockInsertion() {
   const { addStockItem, returns } = useInventory();
   const [csvPreview, setCsvPreview] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [documentType, setDocumentType] = useState("invoice"); // 'invoice' or 'creditNote'
+  const [documentType, setDocumentType] = useState("invoice");
   const fileInputRef = useRef(null);
 
   const completedCreditNotes = (returns || [])
@@ -52,6 +52,7 @@ export default function StockInsertion() {
     expiryDate: "",
   });
 
+  // ⭐ FIXED: Create individual units for each quantity
   const handleNewSubmit = async () => {
     if (
       !form.documentNumber ||
@@ -64,22 +65,41 @@ export default function StockInsertion() {
       toast.error("Please fill all required fields");
       return;
     }
-    const itemData = {
-      ...form,
-      refNo: generateId("INV"),
-      documentType: documentType,
-      invoiceNo: documentType === "invoice" ? form.documentNumber : "",
-      creditNoteNo: documentType === "creditNote" ? form.documentNumber : "",
-      qty: Number(form.quantity),
-      quantity: Number(form.quantity),
-      product: form.productName,
-      company: form.companyName,
-      expiry: form.expiryDate,
-      status: "active",
-    };
-    const result = await addStockItem(itemData);
-    if (result.success) {
-      toast.success(`New inventory item added successfully with ${documentType === 'invoice' ? 'Invoice' : 'Credit Note'} number`);
+
+    const totalQty = Number(form.quantity);
+    let successCount = 0;
+
+    // ⭐ Create INDIVIDUAL units (1 unit per record)
+    for (let i = 0; i < totalQty; i++) {
+      const itemData = {
+        documentNumber: form.documentNumber,
+        category: form.category,
+        companyName: form.companyName,
+        productName: form.productName,
+        size: form.size,
+        lotNo: form.lotNo,
+        expiryDate: form.expiryDate,
+        refNo: generateId("INV"),
+        documentType: documentType,
+        invoiceNo: documentType === "invoice" ? form.documentNumber : "",
+        creditNoteNo: documentType === "creditNote" ? form.documentNumber : "",
+        qty: 1,  // ⭐ Always 1
+        quantity: 1,  // ⭐ Always 1
+        product: form.productName,
+        company: form.companyName,
+        expiry: form.expiryDate,
+        status: "active",
+        lot_no: form.lotNo,
+      };
+      
+      const result = await addStockItem(itemData);
+      if (result.success) {
+        successCount++;
+      }
+    }
+
+    if (successCount === totalQty) {
+      toast.success(`Added ${successCount} individual units successfully with ${documentType === 'invoice' ? 'Invoice' : 'Credit Note'} number`);
       setForm({
         documentNumber: "",
         category: CATEGORIES[0],
@@ -91,7 +111,7 @@ export default function StockInsertion() {
         expiryDate: "",
       });
     } else {
-      toast.error(result.message || "Failed to add inventory item");
+      toast.warning(`Added ${successCount} of ${totalQty} units. Some failed.`);
     }
   };
 
@@ -126,30 +146,40 @@ export default function StockInsertion() {
     handleFile(e.dataTransfer.files[0]);
   };
 
+  // ⭐ FIXED: Bulk import - create individual units
   const handleBulkImport = () => {
+    let totalImported = 0;
+    
     csvPreview.forEach((row) => {
-      const itemData = {
-        ...row,
-        refNo: row.refNo || generateId("INV"),
-        documentType: documentType,
-        category: row.category || "General",
-        qty: Number(row.quantity) || 1,
-        quantity: Number(row.quantity) || 1,
-        product: row.productName || row.product || "Dental Item",
-        company: row.companyName || row.company || "Vendor",
-        expiry: row.expiryDate || row.expiry || "",
-        size: row.size || "",
-        status: "active",
-      };
-      addStockItem(itemData);
+      const qty = Number(row.quantity) || 1;
+      
+      // Create INDIVIDUAL units
+      for (let i = 0; i < qty; i++) {
+        const itemData = {
+          ...row,
+          refNo: generateId("INV"),
+          documentType: documentType,
+          category: row.category || "General",
+          qty: 1,
+          quantity: 1,
+          product: row.productName || row.product || "Dental Item",
+          company: row.companyName || row.company || "Vendor",
+          expiry: row.expiryDate || row.expiry || "",
+          size: row.size || "",
+          status: "active",
+          lot_no: row.lotNo,
+        };
+        addStockItem(itemData);
+        totalImported++;
+      }
     });
-    toast.success(`Imported ${csvPreview.length} items successfully`);
+    
+    toast.success(`Imported ${totalImported} individual units successfully`);
     setCsvPreview(null);
   };
 
-  // Download Excel Template (headers only - no sample data)
+  // Download Excel Template
   const downloadTemplate = () => {
-    // Create workbook with headers only (empty row)
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet([
       {
@@ -164,22 +194,20 @@ export default function StockInsertion() {
       }
     ]);
 
-    // Auto-size columns
     const colWidths = [
-      { wch: 18 }, // documentNumber
-      { wch: 15 }, // category
-      { wch: 25 }, // companyName
-      { wch: 25 }, // productName
-      { wch: 12 }, // size
-      { wch: 15 }, // lotNo
-      { wch: 10 }, // quantity
-      { wch: 15 }, // expiryDate
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 15 },
     ];
     ws['!cols'] = colWidths;
 
     XLSX.utils.book_append_sheet(wb, ws, "Inventory");
 
-    // Generate Excel file
     const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([wbout], { type: 'application/octet-stream' });
     const url = window.URL.createObjectURL(blob);
@@ -308,12 +336,12 @@ export default function StockInsertion() {
             </div>
             <div className="si-new-actions">
               <Button onClick={handleNewSubmit} className="si-add-btn">
-                <PlusCircle size={16} /> Add Item
+                <PlusCircle size={16} /> Add {form.quantity ? `${form.quantity} Unit(s)` : 'Item'}
               </Button>
             </div>
           </div>
 
-          {/* Bulk Import Section with Download Excel */}
+          {/* Bulk Import Section */}
           <div className="si-bulk-section-wrapper">
             <div className="si-bulk-header">
               <h3 className="si-section-title">Bulk Import Inventory</h3>
@@ -381,7 +409,7 @@ export default function StockInsertion() {
                   Cancel
                 </Button>
                 <Button onClick={handleBulkImport} className="si-modal-import">
-                  <Check size={16} /> Import {csvPreview?.length} Items
+                  <Check size={16} /> Import Units
                 </Button>
               </>
             }

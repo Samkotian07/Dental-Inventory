@@ -32,6 +32,7 @@ export default function PublicProductHistory() {
 
       for (const baseUrl of API_URLS) {
         try {
+          // ⭐ Fetch by ref_no (product) - shows ALL units with same ref_no
           const url = `${baseUrl}/inventory/public-history/${encodeURIComponent(refNo)}`;
           console.log(`🔍 Trying: ${url}`);
           
@@ -103,7 +104,6 @@ export default function PublicProductHistory() {
   return (
     <div className="public-history">
       <div className="public-history__container">
-        {/* Brand Header */}
         <div className="public-history__header">
           <div className="public-history__logo-badge">Y</div>
           <div className="public-history__header-titles">
@@ -112,7 +112,6 @@ export default function PublicProductHistory() {
           </div>
         </div>
 
-        {/* Product Summary Card */}
         <div className="public-history__card">
           <h3 className="public-history__product-title">
             <Package size={20} style={{ verticalAlign: "middle", marginRight: "8px", color: "#2563EB" }} />
@@ -138,10 +137,12 @@ export default function PublicProductHistory() {
           </div>
         </div>
 
-        {/* Complete Lifecycle History Table */}
         <div className="public-history__table-wrapper">
           <div className="public-history__table-head">
-            <h3>📋 Product History</h3>
+            <h3>📋 Product History (All Units)</h3>
+            <small style={{ color: "#94A3B8", fontSize: "13px" }}>
+              ⚠️ Showing history for ALL units with this ref_no
+            </small>
           </div>
           <div className="public-history__scroll">
             <table className="public-history__table">
@@ -149,6 +150,7 @@ export default function PublicProductHistory() {
                 <tr>
                   <th style={{ textAlign: "center", width: "50px" }}>Cycle</th>
                   <th>Student</th>
+                  <th>Unit ID</th>
                   <th>Issued Date</th>
                   <th>Returned Date</th>
                   <th style={{ textAlign: "center" }}>Status</th>
@@ -157,7 +159,7 @@ export default function PublicProductHistory() {
               <tbody>
                 {history.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: "center", padding: "30px", color: "#94A3B8" }}>
+                    <td colSpan={6} style={{ textAlign: "center", padding: "30px", color: "#94A3B8" }}>
                       No issue cycles recorded for this item yet.
                     </td>
                   </tr>
@@ -171,6 +173,7 @@ export default function PublicProductHistory() {
                           {row.cycle}
                         </td>
                         <td style={{ fontWeight: "600" }}>{row.student}</td>
+                        <td style={{ color: "#475569", fontFamily: "monospace" }}>{row.unitId || row.inventoryId || '—'}</td>
                         <td style={{ color: "#475569" }}>{formatDate(row.issued)}</td>
                         <td style={{ color: "#475569" }}>{formatDate(row.returned)}</td>
                         <td style={{ textAlign: "center" }}>

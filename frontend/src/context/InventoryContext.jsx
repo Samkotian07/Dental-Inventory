@@ -12,6 +12,7 @@ const getAuthHeaders = () => {
   return headers;
 };
 
+// ⭐ NORMALIZE STOCK - Each unit is separate
 function normalizeStock(item) {
   return {
     id: item.id || item.ref_no || item.refNo,
@@ -29,15 +30,22 @@ function normalizeStock(item) {
     expiryDate: item.expiry_date || item.expiry || item.expiryDate || "",
     status: item.status || "active",
     lowStockThreshold: item.low_stock_threshold || item.lowStockThreshold || 5,
-    createdAt: item.created_at || item.createdAt || "",
+    isReturnable: item.is_returnable !== undefined ? item.is_returnable : true,
+    documentType: item.document_type || item.documentType || "invoice",
+    documentNumber: item.document_number || item.documentNumber || item.invoice_no || item.invoiceNo || "",
+    invoiceNo: item.invoice_no || item.invoiceNo || item.document_number || item.documentNumber || "",
+    created: item.created_at || item.createdAt || item.created || "",
+    createdAt: item.created_at || item.createdAt || item.created || "",
+    createdBy: item.created_by || item.createdBy || "",
   };
 }
 
+// ⭐ NORMALIZE ISSUED - Track by inventory_id (unit)
 function normalizeIssued(item) {
-  const s = String(item.status || "").toLowerCase();
   return {
     id: item.id || item.issue_id || item.issueId,
     issueId: item.id || item.issue_id || item.issueId,
+    inventoryId: item.inventory_id || item.inventoryId || item.inventory_id, // ⭐ CRITICAL
     student: item.student_name || item.student || item.studentName || "Student",
     studentName: item.student_name || item.student || item.studentName || "Student",
     studentId: item.student_id || item.studentId || "",
@@ -49,14 +57,12 @@ function normalizeIssued(item) {
     qty: Number(item.quantity ?? item.qty ?? 1),
     date: item.issued_date || item.date || item.issuedDate || new Date().toISOString().slice(0, 10),
     issuedDate: item.issued_date || item.date || item.issuedDate || new Date().toISOString().slice(0, 10),
-    returnDate: item.return_date || item.returnDate || item.returned_date || item.returnedDate || null,
-    status: s === "returned" ? "Returned" : s === "condemned" ? "Condemned" : "Active",
+    returnDate: item.return_date || item.returnDate || null,
+    status: item.status === "returned" ? "Returned" : item.status === "condemned" ? "Condemned" : "Active",
   };
 }
 
 function normalizeReturn(item) {
-  const oldB = item.old_batch_no || item.oldBatchNo || item.batchNo || item.lot_no || item.lotNo || "";
-  const newB = item.new_batch_no || item.newBatchNo || "";
   return {
     id: item.id || item.return_id || item.returnId,
     returnId: item.id || item.return_id || item.returnId,
@@ -69,9 +75,7 @@ function normalizeReturn(item) {
     creditNote: item.credit_note || item.creditNote || "",
     returnDate: item.return_date || item.returnDate || new Date().toISOString().slice(0, 10),
     status: item.status || "Pending",
-    batchNo: oldB,
-    oldBatchNo: oldB,
-    newBatchNo: newB,
+    batchNo: item.old_batch_no || item.batchNo || item.lot_no || item.lotNo || "",
   };
 }
 
@@ -89,7 +93,6 @@ function normalizeFailed(item) {
     failedDate: item.failed_date || item.failedDate || new Date().toISOString().slice(0, 10),
     reason: item.failure_reason || item.failureReason || item.reason || "Failed",
     status: item.status || "failed",
-    createdAt: item.created_at || item.createdAt || "",
   };
 }
 
@@ -160,7 +163,7 @@ export function InventoryProvider({ children }) {
     return [];
   }, []);
 
-  // ⭐ SIMPLIFIED: Fetch data on mount AND when token changes
+  // ⭐ FETCH ALL DATA
   const loadAllData = useCallback(async () => {
     const token = localStorage.getItem("dental_token");
     if (!token || token === "null" || token === "undefined") {
@@ -178,110 +181,73 @@ export function InventoryProvider({ children }) {
     }
   }, [fetchStock, fetchFailed, fetchIssued, fetchReturns]);
 
-  // Load on mount
   useEffect(() => {
     loadAllData();
   }, []);
 
-  // ⭐ CRITICAL: Check for token changes every 2 seconds (works in same tab!)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const token = localStorage.getItem("dental_token");
-      const hasData = stock.length > 0 || failed.length > 0 || issuedItems.length > 0 || returns.length > 0;
-      if (token && token !== "null" && token !== "undefined" && !hasData) {
-        console.log("🔄 Token found, reloading data...");
-        loadAllData();
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [stock, failed, issuedItems, returns, loadAllData]);
-
-  const getInventoryId = (refNoOrId) => {
-    const match = stock.find((s) => s.refNo === refNoOrId || s.id === refNoOrId);
-    return match?.id || refNoOrId;
-  };
-
-  const addStockItem = async (itemData) => {
+  // ⭐ ISSUE ITEM - Track by individual inventory_id
+  const issueItem = async ({ studentId, inventoryId, refNo, qty, issueDate, stockType = "fresh" }) => {
     try {
-      const res = await fetch(`${API_URL}/inventory/`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          ref_no: itemData.refNo || itemData.ref_no,
-          product_name: itemData.productName || itemData.product_name || itemData.product,
-          category: itemData.category,
-          company_name: itemData.companyName || itemData.company_name || itemData.company,
-          size: itemData.size || null,
-          lot_no: itemData.lotNo || itemData.lot_no,
-          quantity: Number(itemData.quantity ?? itemData.qty ?? 0),
-          expiry_date: itemData.expiryDate || itemData.expiry_date || itemData.expiry || null,
-          low_stock_threshold: Number(itemData.lowStockThreshold ?? itemData.low_stock_threshold ?? 10),
-          is_returnable: itemData.isReturnable ?? itemData.is_returnable ?? true,
-          document_type: itemData.documentType || itemData.document_type || null,
-          document_number: itemData.documentNumber || itemData.document_number || null,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        await fetchStock();
-        return { success: true, data: data.data };
-      }
-      return { success: false, message: data.error?.message || "Failed to add inventory item" };
-    } catch (err) {
-      console.error("addStockItem error:", err);
-      return { success: false, message: "Network error" };
-    }
-  };
+      const payload = {
+        student_id: studentId,
+        inventory_id: inventoryId,  // ⭐ Individual unit ID
+        ref_no: refNo,
+        quantity: Number(qty),
+        issue_date: issueDate,
+        stock_type: stockType,
+      };
 
-  const issueItem = async ({ studentId, inventoryId, refNo, lotNo, stockType, qty, issueDate }) => {
-    try {
-      const invId = inventoryId || getInventoryId(refNo);
       const res = await fetch(`${API_URL}/issued/`, {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          student_id: studentId,
-          inventory_id: invId,
-          quantity: Number(qty || 1),
-          lot_no: lotNo,
-          stock_type: stockType || "fresh",
-          issue_date: issueDate || new Date().toISOString().slice(0, 10),
-        }),
+        body: JSON.stringify(payload),
       });
+
       const data = await res.json();
       if (data.success) {
-        await Promise.all([fetchIssued(), fetchStock()]);
+        // Update stock - decrease quantity for the specific unit
+        setStock(prev => prev.map(s => 
+          s.id === inventoryId ? { ...s, quantity: s.quantity - Number(qty) } : s
+        ));
+        await fetchIssued();
         return { success: true, data: data.data };
       }
-      return { success: false, message: data.error?.message || "Failed to issue item" };
-    } catch (err) {
-      console.error("issueItem error:", err);
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Issue error:", error);
       return { success: false, message: "Network error" };
     }
   };
 
+  // ⭐ RETURN ITEM
   const returnIssuedItem = async (issueId, returnDate, condition = "Good") => {
     try {
       const res = await fetch(`${API_URL}/issued/${issueId}/return`, {
         method: "PUT",
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          return_date: returnDate || new Date().toISOString().slice(0, 10),
-          return_condition: condition,
-        }),
+        body: JSON.stringify({ return_date: returnDate, return_condition: condition }),
       });
       const data = await res.json();
       if (data.success) {
-        await Promise.all([fetchIssued(), fetchStock()]);
+        // Find the issued item to know which inventory_id to update
+        const issuedItem = issuedItems.find(i => i.issueId === issueId);
+        if (issuedItem) {
+          // Increase stock for the specific unit
+          setStock(prev => prev.map(s => 
+            s.id === issuedItem.inventoryId ? { ...s, quantity: s.quantity + issuedItem.quantity } : s
+          ));
+        }
+        await fetchIssued();
         return { success: true, data: data.data };
       }
-      return { success: false, message: data.error?.message || "Failed to return item" };
-    } catch (err) {
-      console.error("returnIssuedItem error:", err);
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Return error:", error);
       return { success: false, message: "Network error" };
     }
   };
 
+  // ⭐ CONDEMN ITEM
   const condemnIssuedItem = async (issueId) => {
     try {
       const res = await fetch(`${API_URL}/issued/${issueId}/condemn`, {
@@ -292,19 +258,19 @@ export function InventoryProvider({ children }) {
       if (data.success) {
         await fetchIssued();
         await fetchStock();
-        return { success: true };
+        return { success: true, data: data.data };
       }
-      return { success: false, message: data.error?.message || "Failed to condemn item" };
-    } catch (err) {
-      console.error("condemnIssuedItem error:", err);
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Condemn error:", error);
       return { success: false, message: "Network error" };
     }
   };
 
+  // ⭐ UPDATE STOCK ITEM
   const updateStockItem = async (itemId, patch) => {
     try {
-      const realId = getInventoryId(itemId);
-      const res = await fetch(`${API_URL}/inventory/${realId}`, {
+      const res = await fetch(`${API_URL}/inventory/${itemId}`, {
         method: "PUT",
         headers: getAuthHeaders(),
         body: JSON.stringify(patch),
@@ -314,17 +280,17 @@ export function InventoryProvider({ children }) {
         await fetchStock();
         return { success: true, data: data.data };
       }
-      return { success: false, message: data.error?.message || "Failed to update item" };
-    } catch (err) {
-      console.error("updateStockItem error:", err);
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Update error:", error);
       return { success: false, message: "Network error" };
     }
   };
 
+  // ⭐ TOGGLE STATUS
   const toggleStockStatus = async (itemId) => {
     try {
-      const realId = getInventoryId(itemId);
-      const res = await fetch(`${API_URL}/inventory/${realId}/status`, {
+      const res = await fetch(`${API_URL}/inventory/${itemId}/status`, {
         method: "PUT",
         headers: getAuthHeaders(),
       });
@@ -333,164 +299,70 @@ export function InventoryProvider({ children }) {
         await fetchStock();
         return { success: true, data: data.data };
       }
-      return { success: false, message: data.error?.message || "Failed to toggle status" };
-    } catch (err) {
-      console.error("toggleStockStatus error:", err);
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Toggle status error:", error);
       return { success: false, message: "Network error" };
     }
   };
 
+  // ⭐ DELETE STOCK ITEM
   const deleteStockItem = async (itemId) => {
     try {
-      const realId = getInventoryId(itemId);
-      const res = await fetch(`${API_URL}/inventory/${realId}`, {
+      const res = await fetch(`${API_URL}/inventory/${itemId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.ok) {
         await fetchStock();
         return { success: true };
       }
-      return { success: false, message: data.error?.message || "Failed to delete item" };
-    } catch (err) {
-      console.error("deleteStockItem error:", err);
+      return { success: false, message: "Delete failed" };
+    } catch (error) {
+      console.error("Delete error:", error);
       return { success: false, message: "Network error" };
     }
   };
 
-  const moveStockToFailed = async (itemId, failureReason, quantity) => {
+  // ⭐ ADD STOCK ITEM
+  const addStockItem = async (itemData) => {
     try {
-      const res = await fetch(`${API_URL}/failed-inventory/`, {
+      const payload = {
+        ref_no: itemData.refNo || itemData.ref_no,
+        product_name: itemData.productName || itemData.product || itemData.product_name,
+        category: itemData.category,
+        company_name: itemData.companyName || itemData.company || itemData.company_name,
+        size: itemData.size,
+        lot_no: itemData.lotNo || itemData.lot_no,
+        quantity: Number(itemData.quantity ?? itemData.qty ?? 1),
+        expiry_date: itemData.expiryDate || itemData.expiry || itemData.expiry_date,
+        document_type: itemData.documentType || itemData.document_type || "invoice",
+        document_number: itemData.documentNumber || itemData.document_number || itemData.invoiceNo || itemData.invoice_no || itemData.creditNoteNo || itemData.credit_note_no || "",
+      };
+
+      const res = await fetch(`${API_URL}/inventory/`, {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          inventory_id: getInventoryId(itemId),
-          failure_reason: failureReason,
-          ...(quantity ? { quantity: Number(quantity) } : {}),
-        }),
+        body: JSON.stringify(payload),
       });
+
       const data = await res.json();
       if (data.success) {
-        await Promise.all([fetchStock(), fetchFailed()]);
+        await fetchStock();
         return { success: true, data: data.data };
       }
-      return { success: false, message: data.error?.message || "Failed to move item to failed inventory" };
-    } catch (err) {
-      console.error("moveStockToFailed error:", err);
+      return { success: false, message: data.error?.message || data.message || "Failed to add stock item" };
+    } catch (error) {
+      console.error("Add stock error:", error);
       return { success: false, message: "Network error" };
     }
   };
 
-  const restoreFailedToStock = async (failedId, inventoryData) => {
-    try {
-      const res = await fetch(`${API_URL}/failed-inventory/${failedId}/restore`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ inventory_data: inventoryData || {} }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        await Promise.all([fetchFailed(), fetchStock()]);
-        return { success: true, data: data.data };
-      }
-      return { success: false, message: data.error?.message || "Failed to restore item" };
-    } catch (err) {
-      console.error("restoreFailedToStock error:", err);
-      return { success: false, message: "Network error" };
-    }
-  };
-
-  const markFailedDisposed = async (failedId) => {
-    try {
-      const res = await fetch(`${API_URL}/failed-inventory/${failedId}/dispose`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-      });
-      const data = await res.json();
-      if (data.success) {
-        await fetchFailed();
-        return { success: true, data: data.data };
-      }
-      return { success: false, message: data.error?.message || "Failed to dispose item" };
-    } catch (err) {
-      console.error("markFailedDisposed error:", err);
-      return { success: false, message: "Network error" };
-    }
-  };
-
-  const addReturn = async (returnData) => {
-    try {
-      const invId = getInventoryId(returnData.inventoryId || returnData.refNo);
-      const res = await fetch(`${API_URL}/returns/`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          type: returnData.type || "exchange",
-          inventory_id: invId,
-          quantity: Number(returnData.qty || returnData.quantity || 1),
-          reason: returnData.reason || "",
-          new_batch_no: returnData.newBatchNo || returnData.batchNo,
-          credit_note: returnData.creditNote,
-          return_date: returnData.returnDate || new Date().toISOString().slice(0, 10),
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        await Promise.all([fetchReturns(), fetchStock()]);
-        return { success: true, data: data.data };
-      }
-      return { success: false, message: data.error?.message || "Failed to add return" };
-    } catch (err) {
-      console.error("addReturn error:", err);
-      return { success: false, message: "Network error" };
-    }
-  };
-
-  const updateReturnStatus = async (returnId, newStatus, extraData = {}) => {
-    try {
-      const res = await fetch(`${API_URL}/returns/${returnId}/status`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          status: newStatus.toLowerCase(),
-          credit_note: extraData.creditNote,
-          new_batch_no: extraData.newBatchNo || extraData.batchNo,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        await Promise.all([fetchReturns(), fetchStock()]);
-        return { success: true, data: data.data };
-      }
-      return { success: false, message: data.error?.message || "Failed to update return status" };
-    } catch (err) {
-      console.error("updateReturnStatus error:", err);
-      return { success: false, message: "Network error" };
-    }
-  };
-
-  const discardReturn = async (returnId) => {
-    return updateReturnStatus(returnId, "rejected");
-  };
-
-  const deleteReturn = async (returnId) => {
-    try {
-      const res = await fetch(`${API_URL}/returns/${returnId}`, {
-        method: "DELETE",
-        headers: getAuthHeaders(),
-      });
-      const data = await res.json();
-      if (data.success) {
-        await fetchReturns();
-        return { success: true };
-      }
-      return { success: false, message: data.error?.message || "Failed to remove return record" };
-    } catch (err) {
-      console.error("deleteReturn error:", err);
-      return { success: false, message: "Network error" };
-    }
-  };
+  // ⭐ GET INVENTORY ID BY REF_NO (for compatibility)
+  const getInventoryId = useCallback((refNo) => {
+    const item = stock.find(s => s.refNo === refNo || s.id === refNo);
+    return item?.id || refNo;
+  }, [stock]);
 
   const value = {
     stock,
@@ -503,7 +375,6 @@ export function InventoryProvider({ children }) {
     fetchIssued,
     fetchReturns,
     loadAllData,
-    getInventoryId,
     addStockItem,
     issueItem,
     returnIssuedItem,
@@ -511,13 +382,7 @@ export function InventoryProvider({ children }) {
     updateStockItem,
     toggleStockStatus,
     deleteStockItem,
-    moveStockToFailed,
-    restoreFailedToStock,
-    markFailedDisposed,
-    addReturn,
-    updateReturnStatus,
-    discardReturn,
-    deleteReturn,
+    getInventoryId,
   };
 
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;
