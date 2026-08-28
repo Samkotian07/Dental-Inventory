@@ -55,9 +55,12 @@ export default function Stock() {
   const [editItem, setEditItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
 
+  // ⭐ FIXED: Group by ref_no to show one row per product
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = (rows || []).filter((r) => {
+    
+    // 1. Filter items
+    let filteredItems = (rows || []).filter((r) => {
       const matchesCategory = category === "All Categories" || r.category === category;
       const matchesQuery =
         !q ||
@@ -68,6 +71,26 @@ export default function Stock() {
       return matchesCategory && matchesQuery;
     });
 
+    // 2. Group by ref_no
+    const groupedMap = {};
+    filteredItems.forEach((r) => {
+      const key = r.refNo || r.id;
+      if (!groupedMap[key]) {
+        groupedMap[key] = {
+          ...r,
+          quantity: 0,
+          qty: 0,
+          units: []
+        };
+      }
+      groupedMap[key].quantity += r.quantity || 0;
+      groupedMap[key].qty += r.qty || 0;
+      groupedMap[key].units.push(r.id);
+    });
+
+    let list = Object.values(groupedMap);
+
+    // 3. Sort
     if (sort.key) {
       list = [...list].sort((a, b) => {
         const va = a[sort.key] ?? "";
@@ -93,7 +116,13 @@ export default function Stock() {
   };
 
   const handleSaveEdit = async (refNo, patch) => {
-    const realId = getInventoryId(refNo);
+    // Find the first unit of this product to get its real ID
+    const productUnits = rows.filter(r => r.refNo === refNo);
+    if (productUnits.length === 0) {
+      toast.error("Product not found");
+      return;
+    }
+    const realId = productUnits[0].id;
     const result = await updateStockItem(realId, {
       product_name: patch.product,
       category: patch.category,
@@ -112,25 +141,53 @@ export default function Stock() {
   };
 
   const handleConfirmDelete = async (refNo, options) => {
-    const realId = getInventoryId(refNo);
-    const result = options?.moveToFailed
-      ? await moveStockToFailed(realId, options.reason)
-      : await deleteStockItem(realId);
-    if (result.success) {
-      toast.success(options?.moveToFailed ? "Stock item moved to Failed Inventory" : "Stock item deleted");
+    // Find all units of this product
+    const productUnits = rows.filter(r => r.refNo === refNo);
+    if (productUnits.length === 0) {
+      toast.error("Product not found");
+      return;
+    }
+    
+    if (options?.moveToFailed) {
+      // Move all units to failed
+      let successCount = 0;
+      for (const unit of productUnits) {
+        const result = await moveStockToFailed(unit.id, options.reason);
+        if (result.success) successCount++;
+      }
+      if (successCount === productUnits.length) {
+        toast.success(`All ${successCount} units moved to Failed Inventory`);
+      } else {
+        toast.warning(`Moved ${successCount} of ${productUnits.length} units to Failed`);
+      }
     } else {
-      toast.error(result.message || "Failed to delete item");
+      // Delete all units
+      let successCount = 0;
+      for (const unit of productUnits) {
+        const result = await deleteStockItem(unit.id);
+        if (result.success) successCount++;
+      }
+      if (successCount === productUnits.length) {
+        toast.success(`All ${successCount} units deleted`);
+      } else {
+        toast.warning(`Deleted ${successCount} of ${productUnits.length} units`);
+      }
     }
     setDeleteItem(null);
   };
 
   const handleToggleStatus = async (row) => {
-    const realId = getInventoryId(row.refNo || row.id);
-    const result = await toggleStockStatus(realId);
-    if (result.success) {
-      toast.success(`Status updated for ${row.product}`);
+    // Toggle status for ALL units of this product
+    const productUnits = rows.filter(r => r.refNo === row.refNo);
+    let successCount = 0;
+    for (const unit of productUnits) {
+      const result = await toggleStockStatus(unit.id);
+      if (result.success) successCount++;
+    }
+    if (successCount === productUnits.length) {
+      toast.success(`Status updated for ${row.product} (${successCount} units)`);
     } else {
-      toast.error(result.message || "Failed to toggle status");
+      toast.warning(`Updated ${successCount} of ${productUnits.length} units`);
     }
   };
 
