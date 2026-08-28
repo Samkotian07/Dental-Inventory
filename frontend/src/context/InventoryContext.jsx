@@ -374,6 +374,75 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  // ⭐ MOVE STOCK TO FAILED INVENTORY
+  const moveStockToFailed = async (itemId, reason = "Damaged") => {
+    try {
+      const payload = {
+        inventory_id: itemId,
+        unit_id: itemId,
+        failure_reason: reason,
+        reason: reason,
+      };
+
+      const res = await fetch(`${API_URL}/failed-inventory/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        await fetchFailed();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || data.message || "Failed to move item to failed inventory" };
+    } catch (error) {
+      console.error("Move to failed error:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // ⭐ RESTORE FAILED ITEM TO STOCK
+  const restoreFailedToStock = async (failedId, inventoryData) => {
+    try {
+      const res = await fetch(`${API_URL}/failed-inventory/${failedId}/restore`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ inventory_data: inventoryData }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        await fetchFailed();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || data.message || "Failed to restore item" };
+    } catch (error) {
+      console.error("Restore failed item error:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // ⭐ MARK FAILED ITEM DISPOSED
+  const markFailedDisposed = async (failedId) => {
+    try {
+      const res = await fetch(`${API_URL}/failed-inventory/${failedId}/dispose`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchFailed();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || data.message || "Failed to dispose item" };
+    } catch (error) {
+      console.error("Dispose error:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
   // ⭐ GET INVENTORY ID BY REF_NO (for compatibility)
   const getInventoryId = useCallback((refNo) => {
     const item = stock.find(s => s.refNo === refNo || s.id === refNo);
@@ -398,6 +467,9 @@ export function InventoryProvider({ children }) {
     updateStockItem,
     toggleStockStatus,
     deleteStockItem,
+    moveStockToFailed,
+    restoreFailedToStock,
+    markFailedDisposed,
     getInventoryId,
   };
 
