@@ -1,12 +1,14 @@
 from database.db import Database
 from models.inventory import Inventory
+from models.inventory_unit import InventoryUnit
 
 class IssuedItem:
     def __init__(self, data):
         self.issue_id = data.get('issue_id')
         self.student_id = data.get('student_id')
         self.student_name = data.get('student_name')
-        self.inventory_id = data.get('inventory_id')
+        self.unit_id = data.get('unit_id') or data.get('inventory_id')
+        self.inventory_id = data.get('unit_id') or data.get('inventory_id')
         self.product_name = data.get('product_name')
         self.lot_no = data.get('lot_no')
         self.ref_no = data.get('ref_no')
@@ -47,14 +49,16 @@ class IssuedItem:
         db = cls.get_db()
         issue_id = data.get('issue_id') or f"ISS-{str(db.execute_query('SELECT IFNULL(MAX(CAST(SUBSTRING(issue_id, 5) AS UNSIGNED)), 0) + 1 FROM issued_items')[0]['IFNULL(MAX(CAST(SUBSTRING(issue_id, 5) AS UNSIGNED)), 0) + 1']).zfill(3)}"
         
+        unit_id = data.get('unit_id') or data.get('inventory_id')
+
         db.execute_query("""
-            INSERT INTO issued_items (issue_id, student_id, student_name, inventory_id, product_name, lot_no, ref_no, quantity, issue_date, status, issued_by)
+            INSERT INTO issued_items (issue_id, student_id, student_name, unit_id, product_name, lot_no, ref_no, quantity, issue_date, status, issued_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             issue_id,
             data['student_id'],
             data.get('student_name'),
-            data['inventory_id'],
+            unit_id,
             data.get('product_name'),
             data.get('lot_no'),
             data.get('ref_no'),
@@ -64,10 +68,20 @@ class IssuedItem:
             data.get('issued_by')
         ))
         
-        # Update inventory quantity
-        inventory = Inventory.find_by_id(data['inventory_id'])
-        if inventory:
-            inventory.update_quantity(-data.get('quantity', 1), data.get('issued_by'))
+        # Update inventory_units quantity
+        try:
+            unit = InventoryUnit.find_by_id(unit_id)
+            if unit:
+                unit.update({'quantity': unit.quantity - data.get('quantity', 1)})
+            else:
+                inventory = Inventory.find_by_id(unit_id)
+                if inventory:
+                    inventory.update_quantity(-data.get('quantity', 1), data.get('issued_by'))
+        except Exception as e:
+            print(f"Unit update in IssuedItem.create fallback: {e}")
+            inventory = Inventory.find_by_id(unit_id)
+            if inventory:
+                inventory.update_quantity(-data.get('quantity', 1), data.get('issued_by'))
         
         return cls.find_by_id(issue_id)
 
@@ -106,21 +120,29 @@ class IssuedItem:
         return IssuedItem.find_by_id(self.issue_id)
 
     def to_dict(self):
+        def fmt_date(val):
+            if not val:
+                return None
+            if hasattr(val, 'isoformat'):
+                return val.isoformat()
+            return str(val)
+
         return {
             'issueId': self.issue_id,
             'studentId': self.student_id,
             'studentName': self.student_name,
-            'inventoryId': self.inventory_id,
+            'unitId': self.unit_id or self.inventory_id,
+            'inventoryId': self.inventory_id or self.unit_id,
             'productName': self.product_name,
             'lotNo': self.lot_no,
             'refNo': self.ref_no,
             'quantity': self.quantity,
-            'issueDate': self.issue_date.isoformat() if self.issue_date else None,
-            'returnDate': self.return_date.isoformat() if self.return_date else None,
+            'issueDate': fmt_date(self.issue_date),
+            'returnDate': fmt_date(self.return_date),
             'returnCondition': self.return_condition,
             'status': self.status,
             'issuedBy': self.issued_by,
             'returnedBy': self.returned_by,
-            'createdAt': self.created_at.isoformat() if self.created_at else None,
-            'updatedAt': self.updated_at.isoformat() if self.updated_at else None
+            'createdAt': fmt_date(self.created_at),
+            'updatedAt': fmt_date(self.updated_at)
         }
