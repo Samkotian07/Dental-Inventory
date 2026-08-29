@@ -63,7 +63,7 @@
   min-width: 0;
 }
 
-.si-new-grid > div > label,
+.si-new-grid>div>label,
 .si-new-label {
   display: block;
   margin-bottom: 6px;
@@ -349,7 +349,7 @@
   .si-new-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .si-bulk-header {
     flex-direction: column;
     align-items: flex-start;
@@ -378,6 +378,7 @@
     align-items: stretch;
   }
 }
+
 /* Document Type Toggle */
 .si-header-row {
   display: flex;
@@ -446,4 +447,134 @@
 .si-bulk-hint-label {
   font-weight: 600;
   color: var(--ink);
+}
+
+
+/* Stock Type Badges */
+.stock-type-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.stock-type-badge.fresh {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.stock-type-badge.returned {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+/* Returned Count Badge */
+.returned-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.fresh-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #D1FAE5;
+  color: #059669;
+}
+
+/* Returned count in found item */
+.returned-count-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+/* Expand button */
+.sd-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6B7280;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.sd-expand-btn:hover {
+  background: #F3F4F6;
+  color: #1F2937;
+}
+
+/* Expanded row */
+.sd-expanded-row {
+  background: #F9FAFB;
+}
+
+.sd-expanded-row td {
+  padding: 12px 16px !important;
+}
+
+.sd-expanded-content {
+  padding: 8px 0;
+}
+
+.sd-expanded-content h4 {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  color: #4B5563;
+  font-weight: 600;
+}
+
+/* Units table inside expanded row */
+.sd-units-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sd-units-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-weight: 600;
+  color: #6B7280;
+  border-bottom: 1px solid #E5E7EB;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sd-units-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.sd-units-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Units list in found item */
+.sd-units-list {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #E5E7EB;
+}
+
+.sd-units-list h4 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 600;
 }

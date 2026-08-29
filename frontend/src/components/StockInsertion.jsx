@@ -259,7 +259,22 @@ export default function StockInsertion() {
                   <select
                     className="si-new-select"
                     value={form.documentNumber}
-                    onChange={(e) => setForm({ ...form, documentNumber: e.target.value })}
+                    onChange={(e) => {
+                      const cnVal = e.target.value;
+                      const matching = (returns || []).find((r) => r.creditNote === cnVal);
+                      if (matching) {
+                        setForm((prev) => ({
+                          ...prev,
+                          documentNumber: cnVal,
+                          productName: matching.productName || matching.product || prev.productName,
+                          companyName: matching.companyName || matching.company || prev.companyName,
+                          category: matching.category || prev.category,
+                          lotNo: matching.oldBatchNo || matching.batchNo || prev.lotNo,
+                        }));
+                      } else {
+                        setForm((prev) => ({ ...prev, documentNumber: cnVal }));
+                      }
+                    }}
                   >
                     <option value="">Select available Credit Note...</option>
                     {completedCreditNotes.map((cn) => (

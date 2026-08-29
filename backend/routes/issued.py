@@ -6,7 +6,6 @@ from models.student import Student
 from models.audit_log import AuditLog
 import datetime
 
-
 issued_bp = Blueprint('issued', __name__, url_prefix='/api/issued')
 
 @issued_bp.route('/', methods=['GET'])
@@ -89,88 +88,96 @@ def issue_item():
             }
         }), 404
     
-    # Check if inventory item or unit exists
-    inventory_item = Inventory.find_by_id(inventory_id)
-    if not inventory_item:
-        try:
-            from models.inventory_unit import InventoryUnit
-            unit = InventoryUnit.find_by_id(inventory_id)
-            if unit:
-                from models.product import Product
-                product = Product.find_by_ref_no(unit.ref_no)
-                inventory_item = Inventory({
-                    'id': unit.id,
-                    'ref_no': unit.ref_no,
-                    'product_name': product.product_name if product else unit.ref_no,
-                    'category': product.category if product else 'General',
-                    'company_name': product.company_name if product else '',
-                    'size': product.size if product else '',
-                    'lot_no': product.lot_no if product else '',
-                    'quantity': unit.quantity,
-                    'is_returnable': product.is_returnable if product else True,
-                })
-        except Exception as ex:
-            print(f"Unit lookup exception in issue_item: {ex}")
+    # Check if inventory unit exists
+    from models.inventory_unit import InventoryUnit
+    from models.product import Product
 
-    if not inventory_item:
-        inventory_item = Inventory.find_by_ref_no(inventory_id)
-
-    if not inventory_item:
+    unit = InventoryUnit.find_by_id(inventory_id)
+    if not unit:
         return jsonify({
             'success': False,
             'error': {
-                'code': 'INVENTORY_NOT_FOUND',
-                'message': 'Inventory item not found'
+                'code': 'UNIT_NOT_FOUND',
+                'message': f'Unit {inventory_id} not found'
             }
         }), 404
     
+    # Check if unit has quantity > 0
+    if unit.quantity <= 0:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'UNIT_UNAVAILABLE',
+                'message': f'Unit {inventory_id} has no available stock (quantity: {unit.quantity})'
+            }
+        }), 400
+    
+    # Check if unit is already active
+    active_issue = IssuedItem.find_active_by_unit(inventory_id)
+    if active_issue:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'UNIT_ALREADY_ISSUED',
+                'message': f'Unit {inventory_id} is already issued to {active_issue.student_name}'
+            }
+        }), 400
+    
+    # Get product details
+    product = Product.find_by_ref_no(unit.ref_no)
+    
     quantity = data.get('quantity', 1)
-    if inventory_item.quantity < quantity:
+    if quantity > unit.quantity:
         return jsonify({
             'success': False,
             'error': {
                 'code': 'INSUFFICIENT_STOCK',
-                'message': f'Insufficient stock. Available: {inventory_item.quantity}'
-            }
-        }), 400
-    
-    # Check if item is returnable (skip for consumables)
-    if not inventory_item.is_returnable:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'NOT_RETURNABLE',
-                'message': 'This item is not returnable (consumable)'
+                'message': f'Insufficient stock. Available: {unit.quantity}'
             }
         }), 400
     
     # Create issued item
     current_user = request.current_user
     stock_type = data.get('stock_type', 'fresh')
-    custom_lot = data.get('lot_no')
-    lot_number = custom_lot if custom_lot else inventory_item.lot_no
-
+    
     issued_data = {
         'student_id': student_id,
         'student_name': student.name,
         'inventory_id': inventory_id,
         'unit_id': inventory_id,
-        'product_name': inventory_item.product_name,
-        'lot_no': lot_number,
-        'ref_no': inventory_item.ref_no,
+        'product_name': product.product_name if product else unit.ref_no,
+        'lot_no': product.lot_no if product else '',
+        'ref_no': unit.ref_no,
         'quantity': quantity,
         'issue_date': data.get('issue_date', datetime.date.today().isoformat()),
         'issued_by': current_user.name if current_user else 'Admin'
     }
     
-    issued_item = IssuedItem.create(issued_data)
+    try:
+        issued_item = IssuedItem.create(issued_data)
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'UNIT_ALREADY_ISSUED',
+                'message': str(e)
+            }
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'INTERNAL_ERROR',
+                'message': f'Failed to issue item: {str(e)}'
+            }
+        }), 500
     
     # Log the action
     AuditLog.create(
         action='ISSUE',
         entity_type='ISSUED',
         entity_id=issued_item.issue_id,
-        details=f"Issued {quantity} x {inventory_item.product_name} (Lot: {lot_number}, Source: {stock_type.title()}) to {student.name}",
+        details=f"Issued {quantity} x {product.product_name if product else unit.ref_no} (Unit: {inventory_id}, Source: {stock_type.title()}) to {student.name}",
         user_id=current_user.id if current_user else None,
         user_name=current_user.name if current_user else 'Admin'
     )
@@ -178,7 +185,7 @@ def issue_item():
     return jsonify({
         'success': True,
         'data': issued_item.to_dict(),
-        'message': 'Item issued successfully'
+        'message': f'Unit {inventory_id} issued successfully to {student.name}'
     }), 201
 
 @issued_bp.route('/<issue_id>/return', methods=['PUT'])
@@ -237,30 +244,27 @@ def return_item(issue_id):
     
     current_user = request.current_user
     
-    # Check if item is returnable
-    inventory_item = Inventory.find_by_id(issued_item.inventory_id)
-    if inventory_item and not inventory_item.is_returnable:
+    try:
+        returned_item = issued_item.return_item(
+            return_date,
+            condition,
+            current_user.name if current_user else 'Admin'
+        )
+    except Exception as e:
         return jsonify({
             'success': False,
             'error': {
-                'code': 'NOT_RETURNABLE',
-                'message': 'This item is not returnable'
+                'code': 'RETURN_FAILED',
+                'message': f'Failed to return item: {str(e)}'
             }
-        }), 400
-    
-    # Return the item
-    returned_item = issued_item.return_item(
-        return_date,
-        condition,
-        current_user.name if current_user else 'Admin'
-    )
+        }), 500
     
     # Log the action
     AuditLog.create(
         action='RETURN',
         entity_type='ISSUED',
         entity_id=issue_id,
-        details=f"Returned item: {issued_item.product_name} from {issued_item.student_name}, Condition: {condition}",
+        details=f"Returned unit {issued_item.unit_id} ({issued_item.product_name}) from {issued_item.student_name}, Condition: {condition}",
         user_id=current_user.id if current_user else None,
         user_name=current_user.name if current_user else 'Admin'
     )
@@ -268,7 +272,7 @@ def return_item(issue_id):
     return jsonify({
         'success': True,
         'data': returned_item.to_dict(),
-        'message': f'Item returned successfully with condition: {condition}'
+        'message': f'Unit returned successfully with condition: {condition}'
     }), 200
 
 @issued_bp.route('/<issue_id>/condemn', methods=['PUT'])
@@ -296,14 +300,24 @@ def condemn_item(issue_id):
         }), 400
     
     current_user = request.current_user
-    condemned_item = issued_item.condemn(current_user.name if current_user else 'Admin')
+    
+    try:
+        condemned_item = issued_item.condemn(current_user.name if current_user else 'Admin')
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'CONDEMN_FAILED',
+                'message': f'Failed to condemn item: {str(e)}'
+            }
+        }), 500
     
     # Log the action
     AuditLog.create(
         action='CONDEMN',
         entity_type='ISSUED',
         entity_id=issue_id,
-        details=f"Condemned item: {issued_item.product_name} from {issued_item.student_name}",
+        details=f"Condemned unit {issued_item.unit_id} ({issued_item.product_name}) from {issued_item.student_name}",
         user_id=current_user.id if current_user else None,
         user_name=current_user.name if current_user else 'Admin'
     )
@@ -311,5 +325,155 @@ def condemn_item(issue_id):
     return jsonify({
         'success': True,
         'data': condemned_item.to_dict(),
-        'message': 'Item condemned successfully'
+        'message': 'Unit condemned successfully'
     }), 200
+
+
+# =====================================================
+# ⭐ BATCH ISSUE ENDPOINT
+# =====================================================
+@issued_bp.route('/batch', methods=['POST'])
+@token_required
+def batch_issue_items():
+    """
+    Issue multiple units in a single request for better performance.
+    Expects: { "items": [ { "student_id": "...", "unit_id": "...", "ref_no": "..." } ] }
+    """
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'INVALID_REQUEST',
+                'message': 'Request body is required'
+            }
+        }), 400
+    
+    if not data.get('items') or not isinstance(data['items'], list):
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'VALIDATION_ERROR',
+                'message': 'items array is required'
+            }
+        }), 400
+    
+    # Get current user
+    current_user = request.current_user
+    user_name = current_user.name if current_user else 'Admin'
+    user_id = current_user.id if current_user else None
+    
+    results = []
+    errors = []
+    
+    for idx, item_data in enumerate(data['items']):
+        try:
+            # Validate each item
+            student_id = item_data.get('student_id')
+            unit_id = item_data.get('unit_id')
+            
+            if not student_id or not unit_id:
+                errors.append({
+                    'index': idx,
+                    'error': 'Missing student_id or unit_id',
+                    'unit_id': unit_id
+                })
+                continue
+            
+            # Check if student exists
+            student = Student.find_by_id(student_id)
+            if not student:
+                errors.append({
+                    'index': idx,
+                    'error': f'Student {student_id} not found',
+                    'unit_id': unit_id
+                })
+                continue
+            
+            # Check if unit exists and is available
+            from models.inventory_unit import InventoryUnit
+            from models.product import Product
+            
+            unit = InventoryUnit.find_by_id(unit_id)
+            if not unit:
+                errors.append({
+                    'index': idx,
+                    'error': f'Unit {unit_id} not found',
+                    'unit_id': unit_id
+                })
+                continue
+            
+            if unit.quantity <= 0:
+                errors.append({
+                    'index': idx,
+                    'error': f'Unit {unit_id} has no stock (quantity: {unit.quantity})',
+                    'unit_id': unit_id
+                })
+                continue
+            
+            # Check if unit is already active
+            active_issue = IssuedItem.find_active_by_unit(unit_id)
+            if active_issue:
+                errors.append({
+                    'index': idx,
+                    'error': f'Unit {unit_id} is already issued to {active_issue.student_name}',
+                    'unit_id': unit_id
+                })
+                continue
+            
+            # Get product details
+            product = Product.find_by_ref_no(unit.ref_no)
+            
+            # Create issued data
+            issued_data = {
+                'student_id': student_id,
+                'student_name': student.name,
+                'inventory_id': unit_id,
+                'unit_id': unit_id,
+                'product_name': product.product_name if product else unit.ref_no,
+                'lot_no': product.lot_no if product else '',
+                'ref_no': unit.ref_no,
+                'quantity': 1,
+                'issue_date': item_data.get('issue_date', datetime.date.today().isoformat()),
+                'issued_by': user_name
+            }
+            
+            # Create the issued item
+            issued_item = IssuedItem.create(issued_data)
+            
+            # Log the action
+            AuditLog.create(
+                action='ISSUE',
+                entity_type='ISSUED',
+                entity_id=issued_item.issue_id,
+                details=f"Issued 1 x {product.product_name if product else unit.ref_no} (Unit: {unit_id}) to {student.name}",
+                user_id=user_id,
+                user_name=user_name
+            )
+            
+            results.append(issued_item.to_dict())
+            
+        except ValueError as e:
+            errors.append({
+                'index': idx,
+                'error': str(e),
+                'unit_id': item_data.get('unit_id')
+            })
+        except Exception as e:
+            errors.append({
+                'index': idx,
+                'error': f'Internal error: {str(e)}',
+                'unit_id': item_data.get('unit_id')
+            })
+    
+    return jsonify({
+        'success': True,
+        'data': {
+            'results': results,
+            'errors': errors,
+            'total': len(results),
+            'failed': len(errors)
+        },
+        'message': f'Successfully issued {len(results)} unit(s)' + (f', {len(errors)} failed' if errors else '')
+    }), 201

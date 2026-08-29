@@ -68,69 +68,67 @@ export default function Pagination({
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="pagination__controls">
-          <button
-            className="pagination__nav"
-            onClick={() => onPageChange(1)}
-            disabled={page === 1}
-            aria-label="First page"
-            title="First page"
-          >
-            <ChevronsLeft size={15} />
-          </button>
+      <div className="pagination__controls">
+        <button
+          className="pagination__nav"
+          onClick={() => onPageChange(1)}
+          disabled={page === 1}
+          aria-label="First page"
+          title="First page"
+        >
+          <ChevronsLeft size={15} />
+        </button>
 
-          <button
-            className="pagination__nav"
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 1}
-            aria-label="Previous page"
-            title="Previous page"
-          >
-            <ChevronLeft size={15} />
-          </button>
+        <button
+          className="pagination__nav"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page === 1}
+          aria-label="Previous page"
+          title="Previous page"
+        >
+          <ChevronLeft size={15} />
+        </button>
 
-          {pages.map((p, idx) => {
-            if (p === "...") {
-              return (
-                <span key={`dots-${idx}`} className="pagination__ellipsis">
-                  •••
-                </span>
-              );
-            }
+        {pages.map((p, idx) => {
+          if (p === "...") {
             return (
-              <button
-                key={p}
-                className={`pagination__page ${p === page ? "is-active" : ""}`}
-                onClick={() => onPageChange(p)}
-                aria-current={p === page ? "page" : undefined}
-              >
-                {p}
-              </button>
+              <span key={`dots-${idx}`} className="pagination__ellipsis">
+                •••
+              </span>
             );
-          })}
+          }
+          return (
+            <button
+              key={p}
+              className={`pagination__page ${p === page ? "is-active" : ""}`}
+              onClick={() => onPageChange(p)}
+              aria-current={p === page ? "page" : undefined}
+            >
+              {p}
+            </button>
+          );
+        })}
 
-          <button
-            className="pagination__nav"
-            onClick={() => onPageChange(page + 1)}
-            disabled={page === totalPages}
-            aria-label="Next page"
-            title="Next page"
-          >
-            <ChevronRight size={15} />
-          </button>
+        <button
+          className="pagination__nav"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          aria-label="Next page"
+          title="Next page"
+        >
+          <ChevronRight size={15} />
+        </button>
 
-          <button
-            className="pagination__nav"
-            onClick={() => onPageChange(totalPages)}
-            disabled={page === totalPages}
-            aria-label="Last page"
-            title="Last page"
-          >
-            <ChevronsRight size={15} />
-          </button>
-        </div>
-      )}
+        <button
+          className="pagination__nav"
+          onClick={() => onPageChange(totalPages)}
+          disabled={page >= totalPages}
+          aria-label="Last page"
+          title="Last page"
+        >
+          <ChevronsRight size={15} />
+        </button>
+      </div>
     </div>
   );
 }

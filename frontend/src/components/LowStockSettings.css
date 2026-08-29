@@ -132,7 +132,7 @@
   width: 100%;
 }
 
-.lss-default-controls > div > label {
+.lss-default-controls>div>label {
   display: block;
   margin-bottom: 6px;
   color: var(--ink);
@@ -140,7 +140,7 @@
   font-weight: 600;
 }
 
-.lss-default-controls > div {
+.lss-default-controls>div {
   flex: 1 1 260px;
   max-width: 320px;
 }
@@ -439,7 +439,7 @@
     max-width: none;
   }
 
-  .lss-default-controls > div {
+  .lss-default-controls>div {
     flex: 1 1 240px;
     max-width: none;
   }
@@ -530,7 +530,7 @@
     align-items: stretch;
   }
 
-  .lss-default-controls > div {
+  .lss-default-controls>div {
     flex: 0 0 auto;
     width: 100%;
   }

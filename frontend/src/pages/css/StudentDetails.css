@@ -245,7 +245,7 @@
   box-shadow: 0 2px 5px rgba(220, 38, 38, 0.15);
 }
 
-.students__card > .pagination {
+.students__card>.pagination {
   padding: 14px 16px 16px;
 }
 

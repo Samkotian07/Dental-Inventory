@@ -69,6 +69,13 @@ class Product:
         return Product.find_by_ref_no(self.ref_no)
 
     def to_dict(self):
+        def fmt_date(val):
+            if not val:
+                return None
+            if hasattr(val, 'isoformat'):
+                return val.isoformat()
+            return str(val)
+
         return {
             'refNo': self.ref_no,
             'productName': self.product_name,
@@ -76,9 +83,9 @@ class Product:
             'companyName': self.company_name,
             'size': self.size,
             'lotNo': self.lot_no,
-            'expiryDate': self.expiry_date.isoformat() if self.expiry_date else None,
+            'expiryDate': fmt_date(self.expiry_date),
             'lowStockThreshold': self.low_stock_threshold,
             'isReturnable': self.is_returnable,
-            'createdAt': self.created_at.isoformat() if self.created_at else None,
-            'updatedAt': self.updated_at.isoformat() if self.updated_at else None
+            'createdAt': fmt_date(self.created_at),
+            'updatedAt': fmt_date(self.updated_at)
         }

@@ -20,6 +20,9 @@ import StockHandle from "./components/StockHandle.jsx";
 
 import PublicProductHistory from "./pages/PublicProductHistory.jsx";
 
+// ⭐ ADD THIS IMPORT
+import UnitHistory from "./pages/UnitHistory.jsx";
+
 // Protected Route Component
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { isAuthenticated, user, loading } = useAuth();
@@ -71,6 +74,9 @@ export default function App() {
         <Route path="/stock-insertion" element={<StockInsertion />} />
         <Route path="/stock-handle" element={<StockHandle />} />
         <Route path="/settings" element={<Settings />} />
+
+        {/* ⭐ ADD UNIT HISTORY ROUTE */}
+        <Route path="/unit-history/:unitId" element={<UnitHistory />} />
 
         {/* Admin Only Routes */}
         <Route

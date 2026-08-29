@@ -58,7 +58,7 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
     (currentFullViewPage - 1) * FULL_VIEW_PAGE_SIZE,
     currentFullViewPage * FULL_VIEW_PAGE_SIZE
   );
-  const visible = filtered.slice(0, 7);
+  const visible = filtered.slice(0, 9);
 
   const controls = (
     <div className="inv-table__controls">
@@ -125,7 +125,7 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
 
         <div className="inv-table__scroll">{renderTable(visible)}</div>
 
-        {filtered.length > visible.length && (
+        {filtered.length > 0 && (
           <button className="inv-table__more" onClick={() => navigate("/stock")}>
             View all {filtered.length} items
           </button>

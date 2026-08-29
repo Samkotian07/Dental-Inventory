@@ -4,6 +4,7 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .ret-type-badge--exchange {

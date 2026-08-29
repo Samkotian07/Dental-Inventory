@@ -17,7 +17,7 @@ import { useMenuClick } from "../components/Layout.jsx";
 import { useSearchParams } from "react-router-dom";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { useData } from "../context/DataContext.jsx";
-import { toast } from "sonner";  // ⭐ ADD THIS
+import { toast } from "sonner";
 import "./css/IssuedItems.css";
 
 const PAGE_SIZE = 6;
@@ -29,6 +29,8 @@ const CSV_COLUMNS = [
   { key: "product", label: "Product" },
   { key: "lotNo", label: "Lot No" },
   { key: "refNo", label: "Ref No" },
+  { key: "unitId", label: "Unit ID" },
+  { key: "stockType", label: "Stock Type" },
   { key: "qty", label: "Qty" },
   { key: "date", label: "Issue Date" },
   { key: "returnDate", label: "Return Date" },
@@ -47,7 +49,7 @@ function formatDate(isoOrDate) {
 
 export default function IssuedItems() {
   const onMenuClick = useMenuClick();
-  const { issuedItems, issueItem, returnIssuedItem, condemnIssuedItem, addReturn, stock, getInventoryId } = useInventory();
+  const { issuedItems, issueItem, returnIssuedItem, condemnIssuedItem, stock, batchIssueItems } = useInventory();
   const { students } = useData();
 
   const [query, setQuery] = useState("");
@@ -55,12 +57,12 @@ export default function IssuedItems() {
   const [status, setStatus] = useState("Active");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
 
   const [detailItem, setDetailItem] = useState(null);
   const [returnItem, setReturnItem] = useState(null);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
 
+  // ⭐ FIXED: Keep both features - searchParams and inventoryOptions
   useEffect(() => {
     setQuery(searchParams.get("search") || "");
     setPage(1);
@@ -87,7 +89,8 @@ export default function IssuedItems() {
         (r.studentId || "").toLowerCase().includes(q) ||
         (r.product || r.productName || "").toLowerCase().includes(q) ||
         (r.issueId || "").toLowerCase().includes(q) ||
-        (r.refNo || "").toLowerCase().includes(q);
+        (r.refNo || "").toLowerCase().includes(q) ||
+        (r.unitId || "").toLowerCase().includes(q);
       return matchesStatus && matchesQuery;
     });
 
@@ -104,11 +107,11 @@ export default function IssuedItems() {
     return list;
   }, [issuedItems, query, status, sort]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageRows = filtered.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
   );
 
   const toggleSort = (key) => {
@@ -135,7 +138,6 @@ export default function IssuedItems() {
   };
 
   const handleCondemn = async (issueId, returnDate, reason) => {
-    console.log("🗑️ Condemning item:", issueId, "Reason:", reason);
     const result = await condemnIssuedItem(issueId);
     if (result.success) {
       toast.success(`Item condemned: ${reason || "Discarded"}`);
@@ -144,47 +146,42 @@ export default function IssuedItems() {
     }
   };
 
-  const handleExchange = async (issueId, returnDate, reason) => {
-    const item = (issuedItems || []).find((i) => (i.issueId || i.id) === issueId);
-    console.log("🔄 Processing Exchange for issue:", issueId, "Reason:", reason);
-    const condemnRes = await condemnIssuedItem(issueId);
-    const refNoVal = item?.refNo || "";
-    const returnRes = await addReturn({
-      type: "exchange",
-      refNo: refNoVal,
-      inventoryId: refNoVal,
-      quantity: item?.qty ?? item?.quantity ?? 1,
-      reason: reason ? `Failed: ${reason}` : "Failed item returned by student - Send for exchange",
-      returnDate: returnDate || new Date().toISOString().slice(0, 10),
-    });
-
-    if (condemnRes.success || returnRes.success) {
-      toast.success("Item marked as failed & exchange request added to Track Returns");
-    } else {
-      toast.error("Failed to process exchange request");
-    }
-  };
-
-  const handleIssueNew = async ({ studentId, itemId, inventoryId, unitId, unitIds, refNo, lotId, lotNo, stockType, qty }) => {
+  const handleIssueNew = async ({ studentId, refNo, qty, unitIds, lotNo, stockType }) => {
     const student = students.find((s) => s.id === studentId);
-    const stockMatch = stock.find((s) => s.refNo === (refNo || itemId) || s.id === (inventoryId || unitId || itemId));
-    const targetUnitId = inventoryId || unitId || (Array.isArray(unitIds) && unitIds.length > 0 ? unitIds[0] : null) || stockMatch?.id || getInventoryId(refNo || itemId);
-
+    
+    // Use batch API for multiple units
+    if (unitIds && unitIds.length > 1) {
+      const items = unitIds.map(unitId => ({
+        student_id: studentId,
+        unit_id: unitId,
+        ref_no: refNo,
+        issue_date: new Date().toISOString().slice(0, 10),
+      }));
+      
+      const result = await batchIssueItems({ items });
+      if (result.success) {
+        toast.success(result.data?.message || `Issued ${result.data?.total || qty} unit(s) to ${student?.name || studentId}`);
+        setIssueModalOpen(false);
+        setPage(1);
+        return;
+      } else {
+        toast.error(result.message || "Failed to issue items");
+        return;
+      }
+    }
+    
+    // Single unit issue
     const result = await issueItem({
       studentId,
-      inventoryId: targetUnitId,
-      unitId: targetUnitId,
-      unitIds,
-      refNo: refNo || stockMatch?.refNo || itemId,
-      lotNo,
-      stockType,
+      inventoryId: unitIds?.[0],
+      refNo,
       qty: Number(qty),
       issueDate: new Date().toISOString().slice(0, 10),
+      stockType: stockType || "fresh",
     });
 
     if (result.success) {
-      const sourceLabel = stockType === "returned" ? " (from Returned Stock)" : "";
-      toast.success(`Issued ${qty} item(s) to ${student?.name || studentId}${sourceLabel}`);
+      toast.success(result.message || `Issued ${qty} unit(s) to ${student?.name || studentId}`);
       setIssueModalOpen(false);
       setPage(1);
     } else {
@@ -197,6 +194,7 @@ export default function IssuedItems() {
     { key: "student", label: "Student" },
     { key: "studentId", label: "Student ID" },
     { key: "product", label: "Product" },
+    { key: "unitId", label: "Unit ID" },
     { key: "lotNo", label: "Lot No" },
     { key: "refNo", label: "Ref No" },
     { key: "qty", label: "Qty" },
@@ -287,6 +285,7 @@ export default function IssuedItems() {
                     <td className="issued__strong">{row.student || row.studentName}</td>
                     <td className="issued__mono">{row.studentId}</td>
                     <td>{row.product || row.productName}</td>
+                    <td className="issued__mono">{row.unitId || row.inventoryId || "—"}</td>
                     <td className="issued__mono">{row.lotNo}</td>
                     <td className="issued__mono">{row.refNo}</td>
                     <td>{row.qty ?? row.quantity}</td>
@@ -330,12 +329,8 @@ export default function IssuedItems() {
             page={currentPage}
             totalPages={totalPages}
             totalItems={filtered.length}
-            pageSize={pageSize}
+            pageSize={PAGE_SIZE}
             onPageChange={setPage}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize);
-              setPage(1);
-            }}
           />
         </section>
       </main>
@@ -353,7 +348,6 @@ export default function IssuedItems() {
           onClose={() => setReturnItem(null)}
           onConfirm={handleConfirmReturn}
           onCondemn={handleCondemn}
-          onExchange={handleExchange}
         />
       )}
 

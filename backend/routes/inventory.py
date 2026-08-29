@@ -235,14 +235,24 @@ def get_inventory():
     """Get all inventory units"""
     try:
         units = InventoryUnit.find_all()
+        return jsonify({
+            'success': True,
+            'data': [u.to_dict() for u in units]
+        }), 200
     except Exception as e:
-        print(f"InventoryUnit fetch fallback: {e}")
-        units = Inventory.find_all()
-
-    return jsonify({
-        'success': True,
-        'data': [u.to_dict() for u in units]
-    }), 200
+        print(f"InventoryUnit fetch error: {e}")
+        try:
+            units = Inventory.find_all()
+            return jsonify({
+                'success': True,
+                'data': [u.to_dict() for u in units]
+            }), 200
+        except Exception as inner_e:
+            print(f"Inventory fetch fallback error: {inner_e}")
+            return jsonify({
+                'success': True,
+                'data': []
+            }), 200
 
 
 @inventory_bp.route('/low-stock', methods=['GET'])

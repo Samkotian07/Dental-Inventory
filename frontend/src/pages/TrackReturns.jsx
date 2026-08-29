@@ -43,6 +43,7 @@ export default function TrackReturns() {
       stock.map((s) => ({
         id: s.refNo || s.id,
         product: s.product || s.productName,
+        lotNo: s.lotNo,
       })),
     [stock]
   );
@@ -87,8 +88,8 @@ export default function TrackReturns() {
         !q ||
         (r.returnId || "").toLowerCase().includes(q) ||
         (r.refNo || "").toLowerCase().includes(q) ||
-        (r.product || "").toLowerCase().includes(q) ||
-        (r.company || "").toLowerCase().includes(q);
+        (r.productName || "").toLowerCase().includes(q) ||
+        (r.reason || "").toLowerCase().includes(q);
       return matchesStatus && matchesType && matchesQuery;
     });
 
@@ -143,6 +144,7 @@ export default function TrackReturns() {
       refNo: data.itemId,
       productName: item ? (item.product || item.productName) : data.itemId,
       batchNo: data.batchNo || item?.lotNo,
+      newBatchNo: data.newBatchNo || "",  // ⭐ PASS newBatchNo
       quantity: data.quantity,
       reason: data.reason,
       returnDate: data.returnDate ? new Date(data.returnDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -165,6 +167,7 @@ export default function TrackReturns() {
       batchNo: data.batchNo || item?.lotNo,
       quantity: data.quantity,
       reason: data.reason,
+      creditNote: data.creditNote || "",  // ⭐ PASS creditNote
       returnDate: data.returnDate ? new Date(data.returnDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
     });
     if (result.success) {
@@ -183,7 +186,7 @@ export default function TrackReturns() {
     { key: "productName", label: "Product" },
     { key: "quantity", label: "Qty" },
     { key: "batchNo", label: "Batch No" },
-    { key: "creditNote", label: "Credit Note / Repl" },
+    { key: "creditNoteOrRepl", label: "Credit Note / Repl" },
     { key: "returnDate", label: "Return Date" },
     { key: "status", label: "Status" },
   ];
@@ -231,7 +234,7 @@ export default function TrackReturns() {
             >
               <option>All Types</option>
               <option value="exchange">Exchange</option>
-              <option value="return">Return</option>
+              <option value="creditNote">Credit Note</option>
             </select>
           </div>
 
@@ -240,13 +243,25 @@ export default function TrackReturns() {
               <Download size={15} strokeWidth={2.2} />
               Export
             </button>
-            <button
-              className="returns__btn returns__btn--primary"
-              onClick={() => setCreditModalOpen(true)}
-            >
-              <Plus size={15} strokeWidth={2.4} />
-              Create Return
-            </button>
+            <div className="returns__dropdown" ref={dropdownRef}>
+              <button
+                className="returns__btn returns__btn--primary"
+                onClick={() => setShowCreateMenu(!showCreateMenu)}
+              >
+                <Plus size={15} strokeWidth={2.4} />
+                Create Return
+              </button>
+              {showCreateMenu && (
+                <div className="returns__dropdown-menu">
+                  <button onClick={() => { setExchangeModalOpen(true); setShowCreateMenu(false); }}>
+                    🔄 Exchange (Damaged)
+                  </button>
+                  <button onClick={() => { setCreditModalOpen(true); setShowCreateMenu(false); }}>
+                    📄 Credit Note
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -280,7 +295,7 @@ export default function TrackReturns() {
                     <td className="returns__mono">{row.returnId}</td>
                     <td>
                       <span className={`ret-type-badge ret-type-badge--${row.type}`}>
-                        {row.type === "exchange" ? "🔄 Exchange" : "📄 Return"}
+                        {row.type === "exchange" ? "🔄 Exchange" : "📄 Credit Note"}
                       </span>
                     </td>
                     <td className="returns__mono">{row.refNo}</td>
@@ -289,10 +304,10 @@ export default function TrackReturns() {
                     <td className="returns__mono">{row.batchNo || row.oldBatchNo || "—"}</td>
                     <td className="returns__mono">
                       {row.type === "exchange"
-                        ? row.newBatchNo
-                          ? `LOT: ${row.newBatchNo}`
-                          : "—"
-                        : (row.status?.toLowerCase() === "completed" ? (row.creditNote || "—") : "—")}
+                        ? (row.newBatchNo || row.new_batch_no
+                          ? `🔄 New LOT: ${row.newBatchNo || row.new_batch_no}`
+                          : "—")
+                        : (row.creditNote || "—")}
                     </td>
                     <td>{row.returnDate}</td>
                     <td>

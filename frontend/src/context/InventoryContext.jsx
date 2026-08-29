@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useAuth } from "./AuthContext";
 
 const InventoryContext = createContext(null);
 const API_URL = "http://127.0.0.1:5000/api";
@@ -29,6 +30,7 @@ function normalizeStock(item) {
     expiry: item.expiry_date || item.expiry || item.expiryDate || "",
     expiryDate: item.expiry_date || item.expiry || item.expiryDate || "",
     status: item.status || "active",
+    isReturned: Boolean(item.is_returned || item.isReturned),
     lowStockThreshold: item.low_stock_threshold || item.lowStockThreshold || 5,
     isReturnable: item.is_returnable !== undefined ? item.is_returnable : true,
     documentType: item.document_type || item.documentType || "invoice",
@@ -40,7 +42,7 @@ function normalizeStock(item) {
   };
 }
 
-// ⭐ NORMALIZE ISSUED - Track by unit_id / inventory_id
+// ⭐ NORMALIZE ISSUED - Track by unit_id
 function normalizeIssued(item) {
   const resolvedUnitId = item.unit_id || item.unitId || item.inventory_id || item.inventoryId || "";
   return {
@@ -83,6 +85,8 @@ function normalizeReturn(item) {
     returnDate: item.return_date || item.returnDate || new Date().toISOString().slice(0, 10),
     status: item.status || "Pending",
     batchNo: item.old_batch_no || item.batchNo || item.lot_no || item.lotNo || "",
+    newBatchNo: item.new_batch_no || item.newBatchNo || "",
+    new_batch_no: item.new_batch_no || item.newBatchNo || "",
     created: item.created_at || item.createdAt || "",
     createdAt: item.created_at || item.createdAt || "",
   };
@@ -111,6 +115,7 @@ function normalizeFailed(item) {
 }
 
 export function InventoryProvider({ children }) {
+  const { isAuthenticated } = useAuth();
   const [stock, setStock] = useState([]);
   const [failed, setFailed] = useState([]);
   const [issuedItems, setIssuedItems] = useState([]);
@@ -196,19 +201,66 @@ export function InventoryProvider({ children }) {
   }, [fetchStock, fetchFailed, fetchIssued, fetchReturns]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setStock([]);
+      setFailed([]);
+      setIssuedItems([]);
+      setReturns([]);
+      setLoading(false);
+      return;
+    }
     loadAllData();
-  }, []);
+  }, [isAuthenticated, loadAllData]);
 
-  // ⭐ ISSUE ITEM - Track by individual inventory_id / unit_id
-  const issueItem = async ({ studentId, inventoryId, unitId, unitIds, refNo, qty, issueDate, stockType = "fresh" }) => {
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const token = localStorage.getItem("dental_token");
+      if (token && token !== "null" && token !== "undefined" && stock.length === 0 && isAuthenticated) {
+        console.log("🔄 Token active, reloading inventory data...");
+        loadAllData();
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [stock.length, isAuthenticated, loadAllData]);
+
+  // ⭐ GET UNIT HISTORY
+  const getUnitHistory = useCallback((unitId) => {
+    return (issuedItems || [])
+      .filter(i => i.unitId === unitId)
+      .sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
+  }, [issuedItems]);
+
+  // ⭐ BATCH ISSUE ITEMS
+  const batchIssueItems = async ({ items }) => {
     try {
-      const targetId = inventoryId || unitId || (Array.isArray(unitIds) && unitIds.length > 0 ? unitIds[0] : null) || refNo;
+      const payload = { items };
+      const res = await fetch(`${API_URL}/issued/batch`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchStock(), fetchIssued()]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message || "Batch issue failed" };
+    } catch (error) {
+      console.error("Batch issue error:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  // ⭐ ISSUE ITEM - Single unit
+  const issueItem = async ({ studentId, inventoryId, unitId, refNo, qty, issueDate, stockType = "fresh" }) => {
+    try {
+      const targetId = inventoryId || unitId || refNo;
       const payload = {
         student_id: studentId,
         inventory_id: targetId,
         unit_id: targetId,
         ref_no: refNo,
-        quantity: Number(qty),
+        quantity: Number(qty || 1),
         issue_date: issueDate,
         stock_type: stockType,
       };
@@ -221,11 +273,7 @@ export function InventoryProvider({ children }) {
 
       const data = await res.json();
       if (data.success) {
-        // Update stock - decrease quantity for the specific unit
-        setStock(prev => prev.map(s => 
-          (s.id === targetId || s.refNo === targetId) ? { ...s, quantity: Math.max(0, s.quantity - Number(qty)) } : s
-        ));
-        await fetchIssued();
+        await Promise.all([fetchStock(), fetchIssued()]);
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message || data.message || "Failed to issue item" };
@@ -245,15 +293,8 @@ export function InventoryProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        // Find the issued item to know which inventory_id to update
-        const issuedItem = issuedItems.find(i => i.issueId === issueId);
-        if (issuedItem) {
-          // Increase stock for the specific unit
-          setStock(prev => prev.map(s => 
-            s.id === issuedItem.inventoryId ? { ...s, quantity: s.quantity + issuedItem.quantity } : s
-          ));
-        }
-        await fetchIssued();
+        await Promise.all([fetchStock(), fetchIssued()]);
+        console.log("✅ Return completed, data refreshed");
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message };
@@ -272,8 +313,7 @@ export function InventoryProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        await fetchIssued();
-        await fetchStock();
+        await Promise.all([fetchIssued(), fetchStock()]);
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message };
@@ -392,8 +432,7 @@ export function InventoryProvider({ children }) {
 
       const data = await res.json();
       if (data.success) {
-        await fetchStock();
-        await fetchFailed();
+        await Promise.all([fetchStock(), fetchFailed()]);
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message || data.message || "Failed to move item to failed inventory" };
@@ -413,8 +452,7 @@ export function InventoryProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        await fetchStock();
-        await fetchFailed();
+        await Promise.all([fetchStock(), fetchFailed()]);
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message || data.message || "Failed to restore item" };
@@ -452,6 +490,7 @@ export function InventoryProvider({ children }) {
         unit_id: returnData.unitId || returnData.unit_id || returnData.inventoryId || returnData.inventory_id,
         ref_no: returnData.refNo || returnData.ref_no,
         product_name: returnData.productName || returnData.product,
+        old_batch_no: returnData.oldBatchNo || returnData.batchNo || returnData.old_batch_no,
         new_batch_no: returnData.newBatchNo || returnData.new_batch_no,
         quantity: Number(returnData.quantity || returnData.qty || 1),
         reason: returnData.reason || "",
@@ -480,10 +519,11 @@ export function InventoryProvider({ children }) {
   // ⭐ UPDATE RETURN / EXCHANGE STATUS
   const updateReturnStatus = async (returnId, status, extraData = {}) => {
     try {
+      const normalizedStatus = String(status || "").toLowerCase().replace(/\s+/g, "_");
       const payload = {
-        status: status,
-        credit_note: typeof extraData === "string" ? extraData : extraData.creditNote || extraData.credit_note,
-        new_batch_no: typeof extraData === "object" ? extraData.newBatchNo || extraData.new_batch_no : undefined,
+        status: normalizedStatus,
+        credit_note: typeof extraData === "string" ? extraData : extraData?.creditNote || extraData?.credit_note,
+        new_batch_no: typeof extraData === "object" ? extraData?.newBatchNo || extraData?.new_batch_no : undefined,
       };
 
       const res = await fetch(`${API_URL}/returns/${returnId}/status`, {
@@ -494,8 +534,7 @@ export function InventoryProvider({ children }) {
 
       const data = await res.json();
       if (data.success) {
-        await fetchReturns();
-        await fetchStock();
+        await Promise.all([fetchReturns(), fetchStock()]);
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message || data.message || "Failed to update return status" };
@@ -546,6 +585,7 @@ export function InventoryProvider({ children }) {
     loadAllData,
     addStockItem,
     issueItem,
+    batchIssueItems,
     returnIssuedItem,
     condemnIssuedItem,
     updateStockItem,
@@ -559,6 +599,7 @@ export function InventoryProvider({ children }) {
     discardReturn,
     deleteReturn,
     getInventoryId,
+    getUnitHistory,
   };
 
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;

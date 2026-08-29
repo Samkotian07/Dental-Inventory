@@ -7,6 +7,7 @@ class InventoryUnit:
         self.ref_no = data.get('ref_no')
         self.quantity = data.get('quantity', 1)
         self.status = data.get('status', 'active')
+        self.is_returned = data.get('is_returned', False)
         self.created_by = data.get('created_by')
         self.created_at = data.get('created_at')
 
@@ -36,17 +37,17 @@ class InventoryUnit:
     def create(cls, data):
         db = cls.get_db()
         
-        # Generate unique ID if not provided
         unit_id = data.get('id') or f"{data['ref_no']}-{data.get('suffix', 'A')}"
         
         db.execute_query("""
-            INSERT INTO inventory_units (id, ref_no, quantity, status, created_by)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO inventory_units (id, ref_no, quantity, status, is_returned, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (
             unit_id,
             data['ref_no'],
             data.get('quantity', 1),
             data.get('status', 'active'),
+            data.get('is_returned', False),
             data.get('created_by')
         ))
         return cls.find_by_id(unit_id)
@@ -56,7 +57,7 @@ class InventoryUnit:
         updates = []
         params = []
         
-        allowed_fields = ['quantity', 'status']
+        allowed_fields = ['quantity', 'status', 'is_returned']
         for field in allowed_fields:
             if field in data:
                 updates.append(f"{field} = %s")
@@ -75,7 +76,17 @@ class InventoryUnit:
         db.execute_query("DELETE FROM inventory_units WHERE id = %s", (self.id,))
         return True
 
+    def mark_returned(self):
+        return self.update({'is_returned': True})
+
     def to_dict(self):
+        def fmt_date(val):
+            if not val:
+                return None
+            if hasattr(val, 'isoformat'):
+                return val.isoformat()
+            return str(val)
+
         # Get product details
         product = Product.find_by_ref_no(self.ref_no)
         product_dict = product.to_dict() if product else {}
@@ -85,7 +96,8 @@ class InventoryUnit:
             'refNo': self.ref_no,
             'quantity': self.quantity,
             'status': self.status,
+            'isReturned': bool(self.is_returned),  # ⭐ CRITICAL - MUST BE HERE
             'createdBy': self.created_by,
-            'createdAt': self.created_at.isoformat() if self.created_at else None,
+            'createdAt': fmt_date(self.created_at),
             **product_dict
         }

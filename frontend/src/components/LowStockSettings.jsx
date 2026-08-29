@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Sliders, Search, TrendingDown, Receipt, Trash2 } from "lucide-react";
 import DashboardHeader from "./dashboard/DashboardHeader.jsx";
 import { useMenuClick } from "./Layout.jsx";
@@ -12,14 +12,19 @@ import "./LowStockSettings.css";
 export default function LowStockSettings() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { stock = [], updateStockItem, returns = [], deleteReturn } = useInventory();
+  const { stock = [], fetchStock, updateStockItem, returns = [], deleteReturn } = useInventory();
   const { settings = { lowQuantityThreshold: 10 } } = useData();
 
-  const inventory = stock;
   const defaultThreshold = settings?.lowQuantityThreshold ?? 10;
 
   const [thresholdSearch, setThresholdSearch] = useState("");
   const [thresholdEdits, setThresholdEdits] = useState({});
+
+  useEffect(() => {
+    if (fetchStock) {
+      fetchStock();
+    }
+  }, [fetchStock]);
 
   const creditNotes = useMemo(() => {
     return (returns || []).filter(
@@ -38,7 +43,7 @@ export default function LowStockSettings() {
     }
   };
 
-  const handleSaveThresholds = () => {
+  const handleSaveThresholds = async () => {
     const changed = Object.entries(thresholdEdits).filter(
       ([id, val]) => val !== "" && val !== null,
     );
@@ -46,25 +51,58 @@ export default function LowStockSettings() {
       toast.error("No thresholds changed");
       return;
     }
-    changed.forEach(([id, val]) => {
-      updateStockItem(id, { lowStockThreshold: Number(val) });
-    });
+
+    let successCount = 0;
+    for (const [key, val] of changed) {
+      const matchingUnits = stock.filter(s => s.refNo === key || s.id === key);
+      if (matchingUnits.length > 0) {
+        for (const u of matchingUnits) {
+          const res = await updateStockItem(u.id, { lowStockThreshold: Number(val) });
+          if (res?.success) successCount++;
+        }
+      } else {
+        const res = await updateStockItem(key, { lowStockThreshold: Number(val) });
+        if (res?.success) successCount++;
+      }
+    }
+
     setThresholdEdits({});
-    toast.success(
-      `Updated ${changed.length} product threshold(s)`,
-    );
+    toast.success(`Updated threshold(s) successfully`);
   };
 
-  const filteredInventory = useMemo(() => {
+  const groupedInventory = useMemo(() => {
     const q = thresholdSearch.toLowerCase().trim();
-    if (!q) return inventory;
-    return inventory.filter(
+    const map = {};
+    (stock || []).forEach((item) => {
+      const key = item.refNo || item.productName || item.product || item.id;
+      if (!map[key]) {
+        map[key] = {
+          ...item,
+          refNo: item.refNo || item.id,
+          productName: item.productName || item.product || "Product",
+          category: item.category || "General",
+          quantity: 0,
+          qty: 0,
+          units: [],
+        };
+      }
+      if (item.status === "active" || !item.status) {
+        map[key].quantity += item.quantity || item.qty || 1;
+        map[key].qty += item.quantity || item.qty || 1;
+        map[key].units.push(item.id);
+      }
+    });
+
+    let list = Object.values(map);
+    if (!q) return list;
+
+    return list.filter(
       (item) =>
         (item.productName || item.product || "").toLowerCase().includes(q) ||
         (item.refNo || item.id || "").toLowerCase().includes(q) ||
         (item.category || "").toLowerCase().includes(q),
     );
-  }, [inventory, thresholdSearch]);
+  }, [stock, thresholdSearch]);
 
   const getThresholdValue = (item) => {
     const itemId = item.refNo || item.id;
@@ -81,7 +119,7 @@ export default function LowStockSettings() {
     (k) => thresholdEdits[k] !== "" && thresholdEdits[k] !== null,
   ).length;
 
-  const lowStockCount = inventory.filter(
+  const lowStockCount = groupedInventory.filter(
     (i) => (i.quantity ?? i.qty ?? 0) <= (i.lowStockThreshold ?? defaultThreshold),
   ).length;
 
@@ -108,7 +146,7 @@ export default function LowStockSettings() {
               <Sliders size={18} />
             </div>
             <div>
-              <p className="lss-stat-number">{inventory.length}</p>
+              <p className="lss-stat-number">{groupedInventory.length}</p>
               <p className="lss-stat-label">Total tracked products</p>
             </div>
           </div>
@@ -230,14 +268,14 @@ export default function LowStockSettings() {
                 </tr>
               </thead>
               <tbody>
-                {filteredInventory.length === 0 ? (
+                {groupedInventory.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="lss-empty">
                       No products found
                     </td>
                   </tr>
                 ) : (
-                  filteredInventory.map((item) => {
+                  groupedInventory.map((item) => {
                     const itemId = item.refNo || item.id;
                     const itemQty = item.quantity ?? item.qty ?? 0;
                     const currentThreshold =

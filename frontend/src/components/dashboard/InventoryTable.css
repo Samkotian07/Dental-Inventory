@@ -5,6 +5,12 @@
   padding: 20px;
 }
 
+.inv-table {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .card__head {
   display: flex;
   align-items: center;
@@ -169,7 +175,7 @@
 
 .inv-table__more {
   width: 100%;
-  margin-top: 12px;
+  margin-top: auto;
   border: 1px dashed var(--line);
   background: transparent;
   color: var(--accent-deep);
@@ -177,6 +183,8 @@
   font-weight: 600;
   padding: 9px;
   border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .inv-table__more:hover {

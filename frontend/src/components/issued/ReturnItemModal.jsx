@@ -20,7 +20,6 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
   // Match item in stock to get expiry date
   const stockMatch = useMemo(() => {
     if (!item) return null;
-    // ⭐ Match by inventoryId (individual unit)
     return stock.find((s) => s.id === item.inventoryId);
   }, [stock, item]);
 
@@ -32,11 +31,10 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
   const productHistory = useMemo(() => {
     if (!item) return [];
     
-    // ⭐ Track by INVENTORY ID (unique per unit)
     const inventoryId = item.inventoryId || item.id;
     
     const matches = (issuedItems || []).filter((iss) => {
-      return iss.inventoryId === inventoryId;  // ⭐ Only this specific unit
+      return iss.inventoryId === inventoryId;
     });
 
     matches.sort((a, b) => new Date(a.date || a.issuedDate || 0) - new Date(b.date || b.issuedDate || 0));

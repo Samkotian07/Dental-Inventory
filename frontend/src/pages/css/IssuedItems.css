@@ -3,6 +3,9 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 1380px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .issued__toolbar {
@@ -102,7 +105,7 @@
 
 .issued__table th {
   text-align: left;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
@@ -127,7 +130,7 @@
 
 .issued__actions-head {
   text-align: right;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   font-size: 11px;
   font-weight: 700;
@@ -137,15 +140,27 @@
 }
 
 .issued__table td {
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--line);
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--ink);
   white-space: nowrap;
 }
 
 .issued__table tr:last-child td {
   border-bottom: none;
+}
+
+/* Qty (col 8) & Date (col 9) gap reduction */
+.issued__table th:nth-child(8),
+.issued__table td:nth-child(8) {
+  padding-right: 4px;
+  width: 1%;
+}
+
+.issued__table th:nth-child(9),
+.issued__table td:nth-child(9) {
+  padding-left: 4px;
 }
 
 .issued__strong {
@@ -188,7 +203,7 @@
   color: var(--ink);
 }
 
-.issued__card > .pagination {
+.issued__card>.pagination {
   padding: 14px 16px 16px;
 }
 
@@ -226,7 +241,7 @@
 
   .issued__table th,
   .issued__table td {
-    padding: 16px 14px;
+    padding: 10px 12px;
   }
 }
 

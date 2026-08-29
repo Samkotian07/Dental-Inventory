@@ -194,7 +194,7 @@
   color: var(--danger);
 }
 
-.failed__card > .pagination {
+.failed__card>.pagination {
   padding: 14px 16px 16px;
 }
 

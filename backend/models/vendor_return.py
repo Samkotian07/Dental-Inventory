@@ -40,20 +40,46 @@ class VendorReturn:
     @classmethod
     def create(cls, data):
         db = cls.get_db()
-        return_id = data.get('return_id') or f"RET-{str(db.execute_query('SELECT IFNULL(MAX(CAST(SUBSTRING(return_id, 5) AS UNSIGNED)), 0) + 1 FROM vendor_returns')[0]['IFNULL(MAX(CAST(SUBSTRING(return_id, 5) AS UNSIGNED)), 0) + 1']).zfill(3)}"
+        return_id = data.get('return_id')
+        if not return_id:
+            res = db.execute_query("SELECT IFNULL(MAX(CAST(SUBSTRING(return_id, 5) AS UNSIGNED)), 0) + 1 AS next_id FROM vendor_returns")
+            next_num = res[0]['next_id'] if res and res[0] and 'next_id' in res[0] else 1
+            return_id = f"RET-{str(next_num).zfill(3)}"
         
-        target_unit_id = data.get('unit_id') or data.get('inventory_id')
+        raw_unit_id = data.get('unit_id') or data.get('inventory_id')
+        ref_no = data.get('ref_no')
 
-        # Populate old_batch_no if missing
-        old_batch = data.get('old_batch_no')
-        inventory = None
-        if target_unit_id:
-            inventory = Inventory.find_by_id(target_unit_id)
-        if not inventory and data.get('ref_no'):
-            inventory = Inventory.find_by_ref_no(data['ref_no'])
-            
-        if not old_batch and inventory:
-            old_batch = inventory.lot_no
+        # Safely validate unit_id against inventory_units foreign key constraint
+        from models.inventory_unit import InventoryUnit
+        from models.inventory import Inventory
+
+        valid_unit = None
+        if raw_unit_id:
+            valid_unit = InventoryUnit.find_by_id(raw_unit_id)
+            if not valid_unit:
+                units = InventoryUnit.find_by_ref_no(raw_unit_id)
+                if units:
+                    valid_unit = units[0]
+
+        if not valid_unit and ref_no:
+            units = InventoryUnit.find_by_ref_no(ref_no)
+            if units:
+                valid_unit = units[0]
+
+        target_unit_id = valid_unit.id if valid_unit else None
+        final_ref_no = ref_no or (valid_unit.ref_no if valid_unit else raw_unit_id)
+
+        # Populate product_name & old_batch_no if missing
+        from models.product import Product
+        product_info = Product.find_by_ref_no(final_ref_no) if final_ref_no else None
+
+        prod_name = data.get('product_name')
+        if not prod_name or prod_name == 'Product':
+            prod_name = (product_info.product_name if product_info else None) or (inventory.product_name if inventory else None) or final_ref_no
+
+        old_batch = data.get('old_batch_no') or data.get('batch_no')
+        if not old_batch:
+            old_batch = (product_info.lot_no if product_info else None) or (inventory.lot_no if inventory else None)
 
         db.execute_query("""
             INSERT INTO vendor_returns (return_id, type, unit_id, ref_no, product_name, old_batch_no, new_batch_no, quantity, reason, return_date, credit_note, created_by)
@@ -62,8 +88,8 @@ class VendorReturn:
             return_id,
             data['type'],
             target_unit_id,
-            data.get('ref_no') or (inventory.ref_no if inventory else None),
-            data.get('product_name') or (inventory.product_name if inventory else None),
+            final_ref_no,
+            prod_name,
             old_batch,
             data.get('new_batch_no'),
             data.get('quantity', 1),
@@ -80,7 +106,7 @@ class VendorReturn:
         db.execute_query("DELETE FROM vendor_returns WHERE return_id = %s", (self.return_id,))
         return True
 
-    def update_status(self, status, credit_note_number=None):
+    def update_status(self, status, credit_note_number=None, new_batch_no=None):
         db = self.get_db()
         updates = ["status = %s"]
         params = [status]
@@ -88,7 +114,18 @@ class VendorReturn:
         if credit_note_number:
             updates.append("credit_note = %s")
             params.append(credit_note_number)
+            self.credit_note = credit_note_number
+
+        if new_batch_no:
+            updates.append("new_batch_no = %s")
+            params.append(new_batch_no)
+            self.new_batch_no = new_batch_no
         
+        params.append(self.return_id)
+        query = f"UPDATE vendor_returns SET {', '.join(updates)} WHERE return_id = %s"
+        db.execute_query(query, tuple(params))
+        self.status = status
+
         # If completed and exchange type, add new batch to inventory
         if status == 'completed' and self.type == 'exchange' and self.new_batch_no:
             target_id = self.unit_id or self.inventory_id
@@ -113,10 +150,6 @@ class VendorReturn:
                 }
                 Inventory.create(new_inv_data)
         
-        params.append(self.return_id)
-        query = f"UPDATE vendor_returns SET {', '.join(updates)} WHERE return_id = %s"
-        db.execute_query(query, tuple(params))
-        self.status = status
         return VendorReturn.find_by_id(self.return_id)
 
     def to_dict(self):
@@ -127,14 +160,30 @@ class VendorReturn:
                 return val.isoformat()
             return str(val)
 
+        product_name = self.product_name
+        old_batch_no = self.old_batch_no
+
+        if not product_name or product_name == 'Product' or not old_batch_no:
+            from models.product import Product
+            ref = self.ref_no or self.unit_id
+            if ref:
+                prod = Product.find_by_ref_no(ref)
+                if prod:
+                    if not product_name or product_name == 'Product':
+                        product_name = prod.product_name
+                    if not old_batch_no:
+                        old_batch_no = prod.lot_no
+
         return {
             'returnId': self.return_id,
             'type': self.type,
             'unitId': self.unit_id or self.inventory_id,
             'inventoryId': self.inventory_id or self.unit_id,
             'refNo': self.ref_no,
-            'productName': self.product_name,
-            'oldBatchNo': self.old_batch_no,
+            'productName': product_name,
+            'product': product_name,
+            'oldBatchNo': old_batch_no,
+            'batchNo': old_batch_no,
             'newBatchNo': self.new_batch_no,
             'quantity': self.quantity,
             'reason': self.reason,

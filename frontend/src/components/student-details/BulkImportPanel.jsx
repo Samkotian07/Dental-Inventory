@@ -169,7 +169,7 @@ export default function BulkImportPanel({ onImport }) {
         </span>
 
         <div className="bulk-import__text">
-          <strong>Upload Excel or CSV</strong>
+          <strong>Bulk Upload Students</strong>
           <span>Drag &amp; drop a file or browse. Supports .xlsx</span>
         </div>
 

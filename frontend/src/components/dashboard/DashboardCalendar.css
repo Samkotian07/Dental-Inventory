@@ -8,6 +8,7 @@
   max-width: 420px;
   width: 100%;
   margin: 0 auto;
+  height: 100%;
 }
 
 .cal__head {
@@ -109,7 +110,7 @@
 }
 
 .cal__detail {
-  margin-top: 12px;
+  margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }

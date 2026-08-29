@@ -30,7 +30,7 @@ export default function ReturnDetailsModal({ item, onClose }) {
           <div>
             <span>Type</span>
             <p className="ret-details__type">
-              {isExchange ? "🔄 Exchange" : "📄 Return"}
+              {isExchange ? "🔄 Exchange" : "📄 Credit Note"}
             </p>
           </div>
           <div>

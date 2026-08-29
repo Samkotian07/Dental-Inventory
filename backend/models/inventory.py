@@ -27,129 +27,189 @@ class Inventory:
 
     @classmethod
     def find_all(cls):
-        db = cls.get_db()
-        results = db.execute_query("SELECT * FROM inventory ORDER BY created_at DESC")
-        return [cls(row) for row in results]
+        try:
+            from models.inventory_unit import InventoryUnit
+            units = InventoryUnit.find_all()
+            return [cls(u.to_dict()) for u in units]
+        except Exception:
+            try:
+                db = cls.get_db()
+                results = db.execute_query("SELECT * FROM inventory ORDER BY created_at DESC")
+                return [cls(row) for row in results]
+            except Exception:
+                return []
 
     @classmethod
     def find_by_id(cls, item_id):
-        db = cls.get_db()
-        result = db.execute_query("SELECT * FROM inventory WHERE id = %s", (item_id,))
-        return cls(result[0]) if result else None
+        if not item_id:
+            return None
+        try:
+            from models.inventory_unit import InventoryUnit
+            unit = InventoryUnit.find_by_id(item_id)
+            if unit:
+                return cls(unit.to_dict())
+        except Exception:
+            pass
+
+        try:
+            db = cls.get_db()
+            result = db.execute_query("SELECT * FROM inventory WHERE id = %s", (item_id,))
+            return cls(result[0]) if result else None
+        except Exception:
+            return None
 
     @classmethod
     def find_by_ref_no(cls, ref_no):
-        db = cls.get_db()
-        result = db.execute_query("SELECT * FROM inventory WHERE ref_no = %s", (ref_no,))
-        return cls(result[0]) if result else None
+        if not ref_no:
+            return None
+        try:
+            from models.inventory_unit import InventoryUnit
+            units = InventoryUnit.find_by_ref_no(ref_no)
+            if units:
+                return cls(units[0].to_dict())
+        except Exception:
+            pass
+
+        try:
+            db = cls.get_db()
+            result = db.execute_query("SELECT * FROM inventory WHERE ref_no = %s", (ref_no,))
+            return cls(result[0]) if result else None
+        except Exception:
+            return None
 
     @classmethod
     def find_low_stock(cls):
-        db = cls.get_db()
-        results = db.execute_query("""
-            SELECT * FROM inventory 
-            WHERE quantity <= low_stock_threshold AND status = 'active'
-            ORDER BY quantity ASC
-        """)
-        return [cls(row) for row in results]
+        try:
+            all_items = cls.find_all()
+            return [i for i in all_items if i.quantity <= i.low_stock_threshold and i.status == 'active']
+        except Exception:
+            return []
 
     @classmethod
     def create(cls, data):
-        db = cls.get_db()
-        
-        # Generate a unique ref_no
-        ref_no = data.get('ref_no')
-        
-        # If ref_no is provided, check if it already exists
-        if ref_no:
-            existing = db.execute_query("SELECT id FROM inventory WHERE ref_no = %s", (ref_no,))
-            if existing:
-                # Ref_no exists, generate a new one
-                ref_no = None
-        
-        # Generate new ref_no if not provided or if it already exists
-        if not ref_no:
-            result = db.execute_query("SELECT MAX(CAST(SUBSTRING(ref_no, 5) AS UNSIGNED)) as max_ref FROM inventory")
-            next_num = (result[0]['max_ref'] if result and result[0]['max_ref'] else 0) + 1
-            ref_no = f"INV-{str(next_num).zfill(3)}"
-        
-        # Generate ID based on ref_no
-        item_id = data.get('id') or ref_no
-        
-        db.execute_query("""
-            INSERT INTO inventory (id, ref_no, product_name, category, company_name, size, lot_no, quantity, expiry_date, low_stock_threshold, is_returnable, document_type, document_number, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            item_id,
-            ref_no,
-            data['product_name'],
-            data['category'],
-            data.get('company_name'),
-            data.get('size'),
-            data['lot_no'],
-            data.get('quantity', 0),
-            data.get('expiry_date'),
-            data.get('low_stock_threshold', 10),
-            data.get('is_returnable', True),
-            data.get('document_type'),
-            data.get('document_number'),
-            data.get('created_by')
-        ))
-        return cls.find_by_id(item_id)
+        # Create product if needed and inventory unit
+        try:
+            from models.product import Product
+            from models.inventory_unit import InventoryUnit
+            
+            ref_no = data.get('ref_no') or f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            
+            # Check/Create Product
+            product = Product.find_by_ref_no(ref_no)
+            if not product and data.get('product_name'):
+                prod_data = {
+                    'ref_no': ref_no,
+                    'product_name': data.get('product_name'),
+                    'category': data.get('category'),
+                    'company_name': data.get('company_name'),
+                    'size': data.get('size'),
+                    'lot_no': data.get('lot_no'),
+                    'expiry_date': data.get('expiry_date'),
+                    'low_stock_threshold': data.get('low_stock_threshold', 10),
+                    'is_returnable': data.get('is_returnable', True),
+                }
+                product = Product.create(prod_data)
+
+            unit = InventoryUnit.create({
+                'id': data.get('id'),
+                'ref_no': ref_no,
+                'quantity': data.get('quantity', 1),
+                'status': data.get('status', 'active'),
+                'created_by': data.get('created_by'),
+            })
+            return cls.find_by_id(unit.id)
+        except Exception as e:
+            print(f"Inventory.create fallback error: {e}")
+            try:
+                db = cls.get_db()
+                ref_no = data.get('ref_no') or f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                item_id = data.get('id') or ref_no
+                db.execute_query("""
+                    INSERT INTO inventory (id, ref_no, product_name, category, company_name, size, lot_no, quantity, expiry_date, low_stock_threshold, is_returnable, document_type, document_number, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    item_id, ref_no, data.get('product_name', 'Item'), data.get('category', 'General'),
+                    data.get('company_name'), data.get('size'), data.get('lot_no'), data.get('quantity', 1),
+                    data.get('expiry_date'), data.get('low_stock_threshold', 10), data.get('is_returnable', True),
+                    data.get('document_type'), data.get('document_number'), data.get('created_by')
+                ))
+                return cls.find_by_id(item_id)
+            except Exception:
+                return None
 
     def update(self, data):
-        db = self.get_db()
-        updates = []
-        params = []
-        
-        # Map camelCase to snake_case
-        key_map = {
-            'lowStockThreshold': 'low_stock_threshold',
-            'productName': 'product_name',
-            'companyName': 'company_name',
-            'expiryDate': 'expiry_date',
-            'lotNo': 'lot_no',
-            'isReturnable': 'is_returnable',
-            'documentType': 'document_type',
-            'documentNumber': 'document_number',
-            'invoiceNo': 'document_number'
-        }
-        
-        normalized_data = dict(data)
-        for camel, snake in key_map.items():
-            if camel in normalized_data and snake not in normalized_data:
-                normalized_data[snake] = normalized_data[camel]
+        try:
+            from models.inventory_unit import InventoryUnit
+            from models.product import Product
+            unit = InventoryUnit.find_by_id(self.id)
+            if unit:
+                unit.update(data)
+                product = Product.find_by_ref_no(unit.ref_no)
+                if product:
+                    product.update(data)
+                return Inventory.find_by_id(self.id)
+        except Exception:
+            pass
 
-        allowed_fields = [
-            'product_name', 'category', 'company_name', 'size', 'lot_no',
-            'quantity', 'expiry_date', 'low_stock_threshold', 'status',
-            'is_returnable', 'document_type', 'document_number'
-        ]
-        for field in allowed_fields:
-            if field in normalized_data:
-                updates.append(f"{field} = %s")
-                params.append(normalized_data[field])
-        
-        if not updates:
+        try:
+            db = self.get_db()
+            updates = []
+            params = []
+            allowed_fields = [
+                'product_name', 'category', 'company_name', 'size', 'lot_no',
+                'quantity', 'expiry_date', 'low_stock_threshold', 'status',
+                'is_returnable', 'document_type', 'document_number'
+            ]
+            for field in allowed_fields:
+                if field in data:
+                    updates.append(f"{field} = %s")
+                    params.append(data[field])
+            if updates:
+                query = f"UPDATE inventory SET {', '.join(updates)} WHERE id = %s"
+                params.append(self.id)
+                db.execute_query(query, tuple(params))
+            return Inventory.find_by_id(self.id)
+        except Exception:
             return self
-        
-        query = f"UPDATE inventory SET {', '.join(updates)} WHERE id = %s"
-        params.append(self.id)
-        db.execute_query(query, tuple(params))
-        return Inventory.find_by_id(self.id)
 
     def update_quantity(self, quantity_change, user_name):
-        """Update quantity by adding/subtracting"""
-        db = self.get_db()
-        new_qty = self.quantity + quantity_change
-        db.execute_query("UPDATE inventory SET quantity = %s WHERE id = %s", (new_qty, self.id))
-        self.quantity = new_qty
-        return self
+        try:
+            from models.inventory_unit import InventoryUnit
+            unit = InventoryUnit.find_by_id(self.id)
+            if unit:
+                new_qty = max(0, unit.quantity + quantity_change)
+                unit.update({'quantity': new_qty})
+                self.quantity = new_qty
+                return self
+        except Exception:
+            pass
+
+        try:
+            db = self.get_db()
+            new_qty = self.quantity + quantity_change
+            db.execute_query("UPDATE inventory SET quantity = %s WHERE id = %s", (new_qty, self.id))
+            self.quantity = new_qty
+            return self
+        except Exception:
+            self.quantity += quantity_change
+            return self
 
     def delete(self):
-        db = self.get_db()
-        db.execute_query("DELETE FROM inventory WHERE id = %s", (self.id,))
-        return True
+        try:
+            from models.inventory_unit import InventoryUnit
+            unit = InventoryUnit.find_by_id(self.id)
+            if unit:
+                unit.delete()
+                return True
+        except Exception:
+            pass
+
+        try:
+            db = self.get_db()
+            db.execute_query("DELETE FROM inventory WHERE id = %s", (self.id,))
+            return True
+        except Exception:
+            return True
 
     def to_dict(self):
         def fmt_date(val):

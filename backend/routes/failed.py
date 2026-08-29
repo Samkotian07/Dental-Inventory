@@ -67,31 +67,27 @@ def create_failed_item():
             }
         }), 400
     
-    # Check if inventory item or unit exists
-    inventory_item = Inventory.find_by_id(inventory_id)
-    if not inventory_item:
-        try:
-            from models.inventory_unit import InventoryUnit
-            unit = InventoryUnit.find_by_id(inventory_id)
-            if unit:
-                from models.product import Product
-                product = Product.find_by_ref_no(unit.ref_no)
-                inventory_item = Inventory({
-                    'id': unit.id,
-                    'ref_no': unit.ref_no,
-                    'product_name': product.product_name if product else unit.ref_no,
-                    'category': product.category if product else 'General',
-                    'company_name': product.company_name if product else '',
-                    'size': product.size if product else '',
-                    'lot_no': product.lot_no if product else '',
-                    'quantity': unit.quantity,
-                    'is_returnable': product.is_returnable if product else True,
-                })
-        except Exception:
-            pass
+    # Check if inventory unit or item exists
+    from models.inventory_unit import InventoryUnit
+    from models.product import Product
 
-    if not inventory_item:
-        inventory_item = Inventory.find_by_ref_no(inventory_id)
+    inventory_item = None
+    unit = InventoryUnit.find_by_id(inventory_id)
+    if unit:
+        product = Product.find_by_ref_no(unit.ref_no)
+        inventory_item = Inventory({
+            'id': unit.id,
+            'ref_no': unit.ref_no,
+            'product_name': product.product_name if product else unit.ref_no,
+            'category': product.category if product else 'General',
+            'company_name': product.company_name if product else '',
+            'size': product.size if product else '',
+            'lot_no': product.lot_no if product else '',
+            'quantity': unit.quantity,
+            'is_returnable': product.is_returnable if product else True,
+        })
+    else:
+        inventory_item = Inventory.find_by_id(inventory_id) or Inventory.find_by_ref_no(inventory_id)
 
     if not inventory_item:
         return jsonify({

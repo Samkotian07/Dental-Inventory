@@ -439,6 +439,6 @@
   }
 }
 
-.stock-handle > .pagination {
+.stock-handle>.pagination {
   padding: 12px 2px 0;
 }

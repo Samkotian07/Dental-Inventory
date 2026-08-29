@@ -45,12 +45,59 @@ class IssuedItem:
         return [cls(row) for row in results]
 
     @classmethod
+    def find_active_by_unit(cls, unit_id):
+        """Check if a unit is currently active (issued but not returned)"""
+        if not unit_id:
+            return None
+        db = cls.get_db()
+        result = db.execute_query(
+            "SELECT * FROM issued_items WHERE unit_id = %s AND status = 'active' LIMIT 1",
+            (unit_id,)
+        )
+        if result:
+            return cls(result[0])
+        return None
+
+    @classmethod
     def create(cls, data):
         db = cls.get_db()
-        issue_id = data.get('issue_id') or f"ISS-{str(db.execute_query('SELECT IFNULL(MAX(CAST(SUBSTRING(issue_id, 5) AS UNSIGNED)), 0) + 1 FROM issued_items')[0]['IFNULL(MAX(CAST(SUBSTRING(issue_id, 5) AS UNSIGNED)), 0) + 1']).zfill(3)}"
         
-        unit_id = data.get('unit_id') or data.get('inventory_id')
+        # ⭐ Get unit_id from data
+        raw_unit_id = data.get('unit_id') or data.get('inventory_id')
+        
+        # ⭐ CRITICAL CHECK: Is this unit already active?
+        if raw_unit_id:
+            active = cls.find_active_by_unit(raw_unit_id)
+            if active:
+                raise ValueError(f"Unit {raw_unit_id} is already issued to {active.student_name} and not returned yet")
+        
+        # Generate issue_id
+        issue_id = data.get('issue_id')
+        if not issue_id:
+            res = db.execute_query("SELECT IFNULL(MAX(CAST(SUBSTRING(issue_id, 5) AS UNSIGNED)), 0) + 1 AS next_id FROM issued_items")
+            next_num = res[0]['next_id'] if res and res[0] and 'next_id' in res[0] else 1
+            issue_id = f"ISS-{str(next_num).zfill(3)}"
+        
+        ref_no = data.get('ref_no')
 
+        # ⭐ Find valid unit
+        from models.inventory_unit import InventoryUnit
+        valid_unit = None
+        if raw_unit_id:
+            valid_unit = InventoryUnit.find_by_id(raw_unit_id)
+            if not valid_unit:
+                units = InventoryUnit.find_by_ref_no(raw_unit_id)
+                if units:
+                    valid_unit = units[0]
+
+        if not valid_unit and ref_no:
+            units = InventoryUnit.find_by_ref_no(ref_no)
+            if units:
+                valid_unit = units[0]
+
+        target_unit_id = valid_unit.id if valid_unit else None
+
+        # ⭐ Insert into issued_items
         db.execute_query("""
             INSERT INTO issued_items (issue_id, student_id, student_name, unit_id, product_name, lot_no, ref_no, quantity, issue_date, status, issued_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -58,36 +105,45 @@ class IssuedItem:
             issue_id,
             data['student_id'],
             data.get('student_name'),
-            unit_id,
+            target_unit_id,
             data.get('product_name'),
             data.get('lot_no'),
-            data.get('ref_no'),
+            ref_no or (valid_unit.ref_no if valid_unit else raw_unit_id),
             data.get('quantity', 1),
             data.get('issue_date'),
             'active',
             data.get('issued_by')
         ))
         
-        # Update inventory_units quantity
+        # ⭐ Update inventory_units quantity - DECREASE by quantity
         try:
-            unit = InventoryUnit.find_by_id(unit_id)
-            if unit:
-                unit.update({'quantity': unit.quantity - data.get('quantity', 1)})
-            else:
-                inventory = Inventory.find_by_id(unit_id)
+            if target_unit_id:
+                unit = InventoryUnit.find_by_id(target_unit_id)
+                if unit:
+                    new_qty = max(0, unit.quantity - data.get('quantity', 1))
+                    unit.update({'quantity': new_qty})
+                    print(f"✅ Unit {target_unit_id} quantity decreased to {new_qty}")
+                else:
+                    inventory = Inventory.find_by_id(target_unit_id)
+                    if inventory:
+                        inventory.update_quantity(-data.get('quantity', 1), data.get('issued_by'))
+        except Exception as e:
+            print(f"⚠️ Unit update in IssuedItem.create fallback: {e}")
+            if target_unit_id:
+                inventory = Inventory.find_by_id(target_unit_id)
                 if inventory:
                     inventory.update_quantity(-data.get('quantity', 1), data.get('issued_by'))
-        except Exception as e:
-            print(f"Unit update in IssuedItem.create fallback: {e}")
-            inventory = Inventory.find_by_id(unit_id)
-            if inventory:
-                inventory.update_quantity(-data.get('quantity', 1), data.get('issued_by'))
         
         return cls.find_by_id(issue_id)
 
+    # ⭐ FIXED INDENTATION - This was the issue!
     def return_item(self, return_date, condition, returned_by):
         """Return an item"""
         db = self.get_db()
+        
+        # ⭐ Check if already returned
+        if self.status == 'returned':
+            return self
         
         # Update issued item record
         db.execute_query("""
@@ -96,13 +152,17 @@ class IssuedItem:
             WHERE issue_id = %s
         """, (return_date, condition, returned_by, self.issue_id))
         
-        # Restore quantity to unit or inventory regardless of condition
+        # ⭐ Restore quantity to unit - INCREASE by quantity
         target_id = self.unit_id or self.inventory_id
         if target_id:
             try:
                 unit = InventoryUnit.find_by_id(target_id)
                 if unit:
-                    unit.update({'quantity': unit.quantity + self.quantity})
+                    new_qty = unit.quantity + self.quantity
+                    unit.update({'quantity': new_qty})
+                    # ⭐ MARK AS RETURNED
+                    unit.mark_returned()
+                    print(f"✅ Unit {target_id} returned, quantity: {new_qty}, is_returned: True")
                 else:
                     inventory = Inventory.find_by_id(target_id) or Inventory.find_by_ref_no(target_id)
                     if inventory:
@@ -115,6 +175,10 @@ class IssuedItem:
             inventory = Inventory.find_by_ref_no(self.ref_no)
             if inventory:
                 inventory.update_quantity(self.quantity, returned_by)
+        
+        self.status = 'returned'
+        self.return_date = return_date
+        self.return_condition = condition
         
         return IssuedItem.find_by_id(self.issue_id)
 

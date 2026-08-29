@@ -57,8 +57,32 @@ export default function FailedInventory() {
       return matchesCategory && matchesReason && matchesQuery;
     });
 
+    // ⭐ Group by base ref_no (e.g. INV-007A -> INV-007) (matching Stock.jsx logic)
+    const groupedMap = {};
+    list.forEach((r) => {
+      const rawRef = r.refNo || r.id || "";
+      const baseRef = /^[A-Z0-9]+-[0-9]+[A-Z]$/i.test(rawRef) ? rawRef.slice(0, -1) : rawRef;
+      const key = baseRef || (r.product || "").toLowerCase();
+
+      if (!groupedMap[key]) {
+        groupedMap[key] = {
+          ...r,
+          refNo: baseRef,
+          quantity: 0,
+          qty: 0,
+          units: []
+        };
+      }
+      const unitQty = Number(r.quantity ?? r.qty ?? 1);
+      groupedMap[key].quantity += unitQty;
+      groupedMap[key].qty += unitQty;
+      groupedMap[key].units.push(r.id || r.unitId || r.originalInventoryId);
+    });
+
+    let groupedList = Object.values(groupedMap);
+
     if (sort.key) {
-      list = [...list].sort((a, b) => {
+      groupedList = [...groupedList].sort((a, b) => {
         const va = a[sort.key] ?? "";
         const vb = b[sort.key] ?? "";
         if (typeof va === "number" && typeof vb === "number") return (va - vb) * sort.dir;
@@ -66,7 +90,7 @@ export default function FailedInventory() {
       });
     }
 
-    return list;
+    return groupedList;
   }, [rows, query, category, reason, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -81,30 +105,58 @@ export default function FailedInventory() {
     exportToCsv(`failed-inventory-${new Date().toISOString().slice(0, 10)}`, CSV_COLUMNS, filtered);
   };
 
+  const getFailedUnits = (refNo) => {
+    return rows.filter(r => {
+      const rawRef = r.refNo || r.id || "";
+      const baseRef = /^[A-Z0-9]+-[0-9]+[A-Z]$/i.test(rawRef) ? rawRef.slice(0, -1) : rawRef;
+      return baseRef === refNo || r.refNo === refNo || r.id === refNo;
+    });
+  };
+
   const handleConfirmDispose = async (refNo) => {
-    const item = rows.find(r => r.refNo === refNo || r.id === refNo);
-    const result = await markFailedDisposed(item?.id || refNo);
-    if (result.success) {
-      toast.success("Item marked as disposed");
+    const matchingItems = getFailedUnits(refNo);
+    if (matchingItems.length === 0) {
+      toast.error("Item not found");
+      return;
+    }
+    
+    let successCount = 0;
+    for (const item of matchingItems) {
+      const res = await markFailedDisposed(item.id || item.refNo);
+      if (res.success) successCount++;
+    }
+    
+    if (successCount > 0) {
+      toast.success(`Marked ${successCount} item(s) as disposed`);
     } else {
-      toast.error(result.message || "Failed to dispose item");
+      toast.error("Failed to dispose item(s)");
     }
     setDisposeItem(null);
   };
 
   const handleConfirmRestore = async (refNo) => {
-    const item = rows.find(r => r.refNo === refNo || r.id === refNo);
-    const result = await restoreFailedToStock(item?.id || refNo, {
-      product_name: item?.product,
-      category: item?.category,
-      company_name: item?.company,
-      lot_no: item?.lotNo,
-      quantity: item?.qty,
-    });
-    if (result.success) {
-      toast.success("Item restored to inventory stock");
+    const matchingItems = getFailedUnits(refNo);
+    if (matchingItems.length === 0) {
+      toast.error("Item not found");
+      return;
+    }
+
+    let successCount = 0;
+    for (const item of matchingItems) {
+      const res = await restoreFailedToStock(item.id || item.refNo, {
+        product_name: item.product,
+        category: item.category,
+        company_name: item.company,
+        lot_no: item.lotNo,
+        quantity: item.qty || 1,
+      });
+      if (res.success) successCount++;
+    }
+
+    if (successCount > 0) {
+      toast.success(`Restored ${successCount} item(s) to inventory stock`);
     } else {
-      toast.error(result.message || "Failed to restore item");
+      toast.error("Failed to restore item(s)");
     }
     setRestoreItem(null);
   };
@@ -208,7 +260,7 @@ export default function FailedInventory() {
                 )}
 
                 {pageRows.map((row) => (
-                  <tr key={row.refNo}>
+                  <tr key={row.refNo || row.id}>
                     <td className="failed__mono">{row.refNo}</td>
                     <td>
                       <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>

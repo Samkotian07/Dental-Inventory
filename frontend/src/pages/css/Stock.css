@@ -3,6 +3,9 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 1380px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .stock__toolbar {
@@ -102,7 +105,7 @@
 
 .stock__table th {
   text-align: left;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
@@ -127,7 +130,7 @@
 
 .stock__actions-head {
   text-align: right;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   font-size: 11px;
   font-weight: 700;
@@ -137,9 +140,9 @@
 }
 
 .stock__table td {
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--line);
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--ink);
   white-space: nowrap;
 }
@@ -194,7 +197,7 @@
   color: var(--danger);
 }
 
-.stock__card > .pagination {
+.stock__card>.pagination {
   padding: 14px 16px 16px;
 }
 
@@ -252,7 +255,7 @@
 
   .stock__table th,
   .stock__table td {
-    padding: 16px 14px;
+    padding: 10px 12px;
   }
 }
 

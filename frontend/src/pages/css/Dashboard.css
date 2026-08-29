@@ -7,9 +7,9 @@
 
 .dashboard__grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .dashboard__col {
@@ -17,6 +17,7 @@
   flex-direction: column;
   gap: 20px;
   min-width: 0;
+  height: 100%;
 }
 
 .dashboard__row {

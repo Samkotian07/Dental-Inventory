@@ -40,16 +40,37 @@ class FailedInventory:
     @classmethod
     def create(cls, data):
         db = cls.get_db()
-        failed_id = data.get('id') or f"FAIL-{str(db.execute_query('SELECT IFNULL(MAX(CAST(SUBSTRING(id, 6) AS UNSIGNED)), 0) + 1 FROM failed_inventory')[0]['IFNULL(MAX(CAST(SUBSTRING(id, 6) AS UNSIGNED)), 0) + 1']).zfill(3)}"
+        failed_id = data.get('id')
+        if not failed_id:
+            res = db.execute_query("SELECT IFNULL(MAX(CAST(SUBSTRING(id, 6) AS UNSIGNED)), 0) + 1 AS next_id FROM failed_inventory")
+            next_num = res[0]['next_id'] if res and res[0] and 'next_id' in res[0] else 1
+            failed_id = f"FAIL-{str(next_num).zfill(3)}"
         
-        target_unit_id = data.get('unit_id') or data.get('original_inventory_id')
+        raw_unit_id = data.get('unit_id') or data.get('original_inventory_id')
+        ref_no = data.get('ref_no')
+
+        from models.inventory_unit import InventoryUnit
+        valid_unit = None
+        if raw_unit_id:
+            valid_unit = InventoryUnit.find_by_id(raw_unit_id)
+            if not valid_unit:
+                units = InventoryUnit.find_by_ref_no(raw_unit_id)
+                if units:
+                    valid_unit = units[0]
+
+        if not valid_unit and ref_no:
+            units = InventoryUnit.find_by_ref_no(ref_no)
+            if units:
+                valid_unit = units[0]
+
+        target_unit_id = valid_unit.id if valid_unit else None
 
         db.execute_query("""
             INSERT INTO failed_inventory (id, ref_no, product_name, category, company_name, size, lot_no, quantity, expiry_date, failure_reason, original_inventory_id, unit_id, moved_by)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             failed_id,
-            data.get('ref_no'),
+            ref_no or (valid_unit.ref_no if valid_unit else raw_unit_id),
             data.get('product_name'),
             data.get('category'),
             data.get('company_name'),

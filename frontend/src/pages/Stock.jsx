@@ -25,6 +25,7 @@ const CSV_COLUMNS = [
   { key: "lotNo", label: "Lot No" },
   { key: "qty", label: "Qty" },
   { key: "expiry", label: "Expiry" },
+  { key: "returnedCount", label: "Returned" },
 ];
 
 function formatDisplayDate(iso) {
@@ -57,16 +58,16 @@ export default function Stock() {
   const [editItem, setEditItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
 
+  // ⭐ FIXED: Keep both - searchParams and grouping
   useEffect(() => {
     setQuery(searchParams.get("search") || "");
     setPage(1);
   }, [searchParams]);
 
-  // ⭐ FIXED: Group by ref_no to show one row per product
+  // ⭐ Group by base ref_no and count returned units
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    
-    // 1. Filter items
+
     let filteredItems = (rows || []).filter((r) => {
       const matchesCategory = category === "All Categories" || r.category === category;
       const matchesQuery =
@@ -78,26 +79,35 @@ export default function Stock() {
       return matchesCategory && matchesQuery;
     });
 
-    // 2. Group by ref_no
+    // Group by base ref_no
     const groupedMap = {};
     filteredItems.forEach((r) => {
-      const key = r.refNo || r.id;
+      const rawRef = r.refNo || r.id || "";
+      const baseRef = /^[A-Z0-9]+-[0-9]+[A-Z]$/i.test(rawRef) ? rawRef.slice(0, -1) : rawRef;
+      const key = baseRef || (r.product || "").toLowerCase();
+
       if (!groupedMap[key]) {
         groupedMap[key] = {
           ...r,
+          refNo: baseRef,
           quantity: 0,
           qty: 0,
+          returnedCount: 0,
           units: []
         };
       }
-      groupedMap[key].quantity += r.quantity || 0;
-      groupedMap[key].qty += r.qty || 0;
+      const unitQty = Number(r.quantity ?? r.qty ?? 1);
+      groupedMap[key].quantity += unitQty;
+      groupedMap[key].qty += unitQty;
+      // ⭐ Count returned units
+      if (r.isReturned === true) {
+        groupedMap[key].returnedCount += unitQty;
+      }
       groupedMap[key].units.push(r.id);
     });
 
     let list = Object.values(groupedMap);
 
-    // 3. Sort
     if (sort.key) {
       list = [...list].sort((a, b) => {
         const va = a[sort.key] ?? "";
@@ -122,79 +132,88 @@ export default function Stock() {
     exportToCsv(`stock-${new Date().toISOString().slice(0, 10)}`, CSV_COLUMNS, filtered);
   };
 
+  const getProductUnits = (refNo) => {
+    return rows.filter(r => {
+      const rawRef = r.refNo || r.id || "";
+      const baseRef = /^[A-Z0-9]+-[0-9]+[A-Z]$/i.test(rawRef) ? rawRef.slice(0, -1) : rawRef;
+      return baseRef === refNo || r.refNo === refNo || r.id === refNo;
+    });
+  };
+
   const handleSaveEdit = async (refNo, patch) => {
-    // Find the first unit of this product to get its real ID
-    const productUnits = rows.filter(r => r.refNo === refNo);
+    const productUnits = getProductUnits(refNo);
     if (productUnits.length === 0) {
       toast.error("Product not found");
       return;
     }
-    const realId = productUnits[0].id;
-    const result = await updateStockItem(realId, {
-      product_name: patch.product,
-      category: patch.category,
-      company_name: patch.company,
-      size: patch.size,
-      lot_no: patch.lotNo,
-      quantity: Number(patch.qty),
-      expiry_date: patch.expiry,
-    });
-    if (result.success) {
+
+    let successCount = 0;
+    for (const unit of productUnits) {
+      const result = await updateStockItem(unit.id, {
+        product_name: patch.product,
+        category: patch.category,
+        company_name: patch.company,
+        size: patch.size,
+        lot_no: patch.lotNo,
+        quantity: Number(patch.qty),
+        expiry_date: patch.expiry,
+      });
+      if (result.success) successCount++;
+    }
+
+    if (successCount > 0) {
       toast.success("Stock item updated successfully");
     } else {
-      toast.error(result.message || "Failed to update item");
+      toast.error("Failed to update item");
     }
     setEditItem(null);
   };
 
   const handleConfirmDelete = async (refNo, options) => {
-    // Find all units of this product
-    const productUnits = rows.filter(r => r.refNo === refNo);
+    const productUnits = getProductUnits(refNo);
     if (productUnits.length === 0) {
       toast.error("Product not found");
       return;
     }
-    
+
     if (options?.moveToFailed) {
-      // Move all units to failed
       let successCount = 0;
       for (const unit of productUnits) {
         const result = await moveStockToFailed(unit.id, options.reason);
         if (result.success) successCount++;
       }
       if (successCount === productUnits.length) {
-        toast.success(`All ${successCount} units moved to Failed Inventory`);
+        toast.success(`All ${successCount} unit(s) moved to Failed Inventory`);
       } else {
-        toast.warning(`Moved ${successCount} of ${productUnits.length} units to Failed`);
+        toast.warning(`Moved ${successCount} of ${productUnits.length} unit(s) to Failed`);
       }
     } else {
-      // Delete all units
       let successCount = 0;
       for (const unit of productUnits) {
         const result = await deleteStockItem(unit.id);
         if (result.success) successCount++;
       }
       if (successCount === productUnits.length) {
-        toast.success(`All ${successCount} units deleted`);
+        toast.success(`All ${successCount} unit(s) deleted`);
       } else {
-        toast.warning(`Deleted ${successCount} of ${productUnits.length} units`);
+        toast.warning(`Deleted ${successCount} of ${productUnits.length} unit(s)`);
       }
     }
     setDeleteItem(null);
   };
 
   const handleToggleStatus = async (row) => {
-    // Toggle status for ALL units of this product
-    const productUnits = rows.filter(r => r.refNo === row.refNo);
+    const targetKey = row.refNo || row.id;
+    const productUnits = getProductUnits(targetKey);
     let successCount = 0;
     for (const unit of productUnits) {
       const result = await toggleStockStatus(unit.id);
       if (result.success) successCount++;
     }
-    if (successCount === productUnits.length) {
-      toast.success(`Status updated for ${row.product} (${successCount} units)`);
+    if (successCount > 0) {
+      toast.success(`Status updated for ${row.product} (${successCount} unit(s))`);
     } else {
-      toast.warning(`Updated ${successCount} of ${productUnits.length} units`);
+      toast.error("Failed to update status");
     }
   };
 
@@ -207,6 +226,7 @@ export default function Stock() {
     { key: "lotNo", label: "Lot No" },
     { key: "qty", label: "QTY" },
     { key: "expiry", label: "Expiry" },
+    { key: "returnedCount", label: "Returned" },
   ];
 
   return (
@@ -276,7 +296,7 @@ export default function Stock() {
                 )}
 
                 {pageRows.map((row) => (
-                  <tr key={row.refNo}>
+                  <tr key={row.refNo || row.id}>
                     <td className="stock__mono">{row.refNo}</td>
                     <td>
                       <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>
@@ -290,6 +310,15 @@ export default function Stock() {
                     <td>{row.qty}</td>
                     <td className={isExpiringSoon(row.expiry) ? "stock__expiry-warning" : "stock__expiry"}>
                       {formatDisplayDate(row.expiry)}
+                    </td>
+                    <td>
+                      {row.returnedCount > 0 ? (
+                        <span className="returned-badge">
+                          🔄 {row.returnedCount} unit{row.returnedCount > 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span className="fresh-badge">📦 Fresh</span>
+                      )}
                     </td>
                     <td>
                       <div className="stock__row-actions">

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, Package } from "lucide-react";
+import { Search, Package, ChevronDown, ChevronUp, History } from "lucide-react";
 import { useData } from "../context/DataContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
@@ -17,14 +17,59 @@ const PAGE_SIZE = 8;
 export default function StockHandle() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { stock, updateStockItem } = useInventory();
+  const { stock, updateStockItem, toggleStockStatus, getInventoryId, issuedItems } = useInventory();
   const [searchRef, setSearchRef] = useState("");
   const [foundItem, setFoundItem] = useState(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [expandedRows, setExpandedRows] = useState({});
+
+  // ⭐ Toggle expand
+  const toggleExpand = (refNo) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [refNo]: !prev[refNo]
+    }));
+  };
+
+  // ⭐ Group stock by ref_no with individual units
+  const groupedStock = useMemo(() => {
+    const groupedMap = {};
+    (stock || []).forEach((r) => {
+      const key = r.refNo || r.id;
+      if (!groupedMap[key]) {
+        groupedMap[key] = {
+          id: key,
+          refNo: r.refNo,
+          productName: r.productName || r.product,
+          product: r.productName || r.product,
+          category: r.category,
+          company: r.company,
+          size: r.size,
+          lotNo: r.lotNo,
+          expiry: r.expiry,
+          quantity: 0,
+          qty: 0,
+          status: r.status,
+          returnedCount: 0,
+          units: [],
+          unitIds: [],
+        };
+      }
+      const unitQty = r.quantity || 1;
+      groupedMap[key].quantity += unitQty;
+      groupedMap[key].qty += unitQty;
+      if (r.isReturned === true) {
+        groupedMap[key].returnedCount += unitQty;
+      }
+      groupedMap[key].units.push(r);
+      groupedMap[key].unitIds.push(r.id);
+    });
+    return Object.values(groupedMap);
+  }, [stock]);
 
   const handleSearch = () => {
-    const item = stock.find(
+    const item = groupedStock.find(
       (i) => (i.refNo || "").toLowerCase() === searchRef.trim().toLowerCase(),
     );
     if (item) {
@@ -35,21 +80,56 @@ export default function StockHandle() {
     }
   };
 
-  // Toggle item status (Active/Inactive)
-  const handleToggleStatus = (itemId, currentStatus) => {
+  // ⭐ Toggle status for a specific unit (for returned units)
+  const handleToggleUnitStatus = async (unitId, refNo) => {
+    const result = await toggleStockStatus(unitId);
+    if (result.success) {
+      toast.success(`Unit ${unitId} status updated`);
+      // Update foundItem if needed
+      if (foundItem && foundItem.refNo === refNo) {
+        const updatedUnit = stock.find(s => s.id === unitId);
+        if (updatedUnit) {
+          const updatedUnits = foundItem.units.map(u => 
+            u.id === unitId ? { ...u, status: updatedUnit.status } : u
+          );
+          setFoundItem({ ...foundItem, units: updatedUnits });
+        }
+      }
+    } else {
+      toast.error(result.message || "Failed to update status");
+    }
+  };
+
+  // ⭐ Toggle all units (for fresh products)
+  const handleToggleAllUnits = async (refNo, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
-    updateStockItem(itemId, { status: newStatus });
-    toast.success(`Item status updated to ${newStatus}`);
+    const productUnits = stock.filter(r => r.refNo === refNo);
+    let successCount = 0;
+    
+    for (const unit of productUnits) {
+      const result = await toggleStockStatus(unit.id);
+      if (result.success) successCount++;
+    }
+    
+    if (successCount === productUnits.length) {
+      toast.success(`All ${successCount} units set to ${newStatus}`);
+    } else {
+      toast.warning(`Updated ${successCount} of ${productUnits.length} units`);
+    }
+    
+    if (foundItem && foundItem.refNo === refNo) {
+      setFoundItem({ ...foundItem, status: newStatus });
+    }
   };
 
   const filtered = useMemo(() => {
-    return stock.filter(
+    return groupedStock.filter(
       (i) =>
         !search ||
         i.refNo.toLowerCase().includes(search.toLowerCase()) ||
         (i.productName || i.product || "").toLowerCase().includes(search.toLowerCase()),
     );
-  }, [stock, search]);
+  }, [groupedStock, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -57,6 +137,13 @@ export default function StockHandle() {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
+
+  // ⭐ Get unit history
+  const getUnitHistory = (unitId) => {
+    return (issuedItems || [])
+      .filter(i => i.unitId === unitId)
+      .sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
+  };
 
   return (
     <>
@@ -93,31 +180,75 @@ export default function StockHandle() {
                     <p className="sd-found-item-name">{foundItem.productName}</p>
                     <p className="sd-found-item-details">
                       {foundItem.refNo} - Qty: {foundItem.quantity} - Expires:{" "}
-                      {formatDate(foundItem.expiryDate)}
+                      {formatDate(foundItem.expiry)}
                     </p>
                     <p className="sd-found-item-status">
                       Status:{" "}
                       <Badge variant={foundItem.status === "active" ? "success" : "neutral"}>
                         {foundItem.status || "active"}
                       </Badge>
+                      {foundItem.returnedCount > 0 && (
+                        <span className="returned-count-badge">
+                          🔄 {foundItem.returnedCount} returned
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
 
                 <div className="sd-toggle-section">
                   <div className="sd-toggle-row">
-                    <span className="sd-toggle-label">Active Status</span>
+                    <span className="sd-toggle-label">Active Status (All Units)</span>
                     <ToggleSwitch
                       isOn={foundItem.status !== "inactive"}
                       onToggle={() => {
-                        const newStatus = foundItem.status === "inactive" ? "active" : "inactive";
-                        updateStockItem(foundItem.id, { status: newStatus });
-                        setFoundItem({ ...foundItem, status: newStatus });
-                        toast.success(`Status updated to ${newStatus}`);
+                        handleToggleAllUnits(foundItem.refNo, foundItem.status);
                       }}
                     />
                   </div>
                 </div>
+
+                {/* ⭐ Show individual units for found item */}
+                {foundItem.units.length > 1 && (
+                  <div className="sd-units-list">
+                    <h4>Individual Units ({foundItem.units.length})</h4>
+                    <table className="sd-units-table">
+                      <thead>
+                        <tr>
+                          <th>Unit ID</th>
+                          <th>Type</th>
+                          <th>Status</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {foundItem.units.map((unit) => (
+                          <tr key={unit.id}>
+                            <td className="sd-mono">{unit.id}</td>
+                            <td>
+                              {unit.isReturned ? (
+                                <span className="stock-type-badge returned">🔄 Returned</span>
+                              ) : (
+                                <span className="stock-type-badge fresh">📦 Fresh</span>
+                              )}
+                            </td>
+                            <td>
+                              <Badge variant={unit.status === "active" ? "success" : "neutral"}>
+                                {unit.status || "active"}
+                              </Badge>
+                            </td>
+                            <td>
+                              <ToggleSwitch
+                                isOn={unit.status !== "inactive"}
+                                onToggle={() => handleToggleUnitStatus(unit.id, foundItem.refNo)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -128,7 +259,7 @@ export default function StockHandle() {
             <div>
               <h3 className="sd-section-title">All Items</h3>
               <p className="sd-section-subtitle">
-                Browse inventory items and toggle status.
+                Browse inventory items and toggle status. Click <strong>▶</strong> to expand units.
               </p>
             </div>
             <div className="sd-table-search-wrapper">
@@ -150,10 +281,12 @@ export default function StockHandle() {
             <table className="sd-table">
               <thead>
                 <tr>
+                  <th style={{ width: '30px' }}></th>
                   <th>Ref No</th>
                   <th>Product</th>
                   <th>Category</th>
                   <th>Quantity</th>
+                  <th>Returned</th>
                   <th>Status</th>
                   <th className="sd-actions-head">Action</th>
                 </tr>
@@ -161,47 +294,116 @@ export default function StockHandle() {
               <tbody>
                 {pagedInventory.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="sd-empty">
+                    <td colSpan="8" className="sd-empty">
                       No items match your search.
                     </td>
                   </tr>
                 ) : (
                   pagedInventory.map((item) => {
                     const isActive = item.status !== "inactive";
+                    const isExpanded = expandedRows[item.refNo] || false;
+                    const showUnits = item.units && item.units.length > 1;
+
                     return (
-                      <tr key={item.id}>
-                        <td className="sd-mono">{item.refNo}</td>
-                        <td className="sd-product">{item.productName}</td>
-                        <td>
-                          <Badge variant="primary">{item.category}</Badge>
-                        </td>
-                        <td>
-                          <span
-                            className={`sd-quantity ${
-                              item.quantity <= 10 ? "sd-quantity-low" : ""
-                            }`}
-                          >
-                            {item.quantity}
-                          </span>
-                        </td>
-                        <td>
-                          <Badge variant={isActive ? "success" : "neutral"}>
-                            {isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </td>
-                        <td>
-                          <div className="sd-action-cell">
-                            <ToggleSwitch
-                              isOn={isActive}
-                              onToggle={() => {
-                                const newStatus = isActive ? "inactive" : "active";
-                                updateStockItem(item.id, { status: newStatus });
-                                toast.success(`Status updated to ${newStatus}`);
-                              }}
-                            />
-                          </div>
-                        </td>
-                      </tr>
+                      <>
+                        {/* Main Row */}
+                        <tr key={item.refNo} className="sd-main-row">
+                          <td>
+                            {showUnits && (
+                              <button
+                                className="sd-expand-btn"
+                                onClick={() => toggleExpand(item.refNo)}
+                              >
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </button>
+                            )}
+                          </td>
+                          <td className="sd-mono">{item.refNo}</td>
+                          <td className="sd-product">{item.productName}</td>
+                          <td>
+                            <Badge variant="primary">{item.category}</Badge>
+                          </td>
+                          <td>
+                            <span className={`sd-quantity ${item.quantity <= 10 ? "sd-quantity-low" : ""}`}>
+                              {item.quantity}
+                            </span>
+                          </td>
+                          <td>
+                            {item.returnedCount > 0 ? (
+                              <span className="returned-badge">🔄 {item.returnedCount}</span>
+                            ) : (
+                              <span className="fresh-badge">📦 0</span>
+                            )}
+                          </td>
+                          <td>
+                            <Badge variant={isActive ? "success" : "neutral"}>
+                              {isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </td>
+                          <td>
+                            <div className="sd-action-cell">
+                              <ToggleSwitch
+                                isOn={isActive}
+                                onToggle={() => {
+                                  handleToggleAllUnits(item.refNo, item.status);
+                                }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* ⭐ Expanded Units Row */}
+                        {isExpanded && showUnits && (
+                          <tr className="sd-expanded-row">
+                            <td colSpan="8">
+                              <div className="sd-expanded-content">
+                                <h4>Individual Units ({item.units.length})</h4>
+                                <table className="sd-units-table">
+                                  <thead>
+                                    <tr>
+                                      <th>Unit ID</th>
+                                      <th>Type</th>
+                                      <th>Status</th>
+                                      <th>Last Student</th>
+                                      <th>Action</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {item.units.map((unit) => {
+                                      const history = getUnitHistory(unit.id);
+                                      const lastStudent = history.length > 0 ? history[0].student : '—';
+                                      return (
+                                        <tr key={unit.id}>
+                                          <td className="sd-mono">{unit.id}</td>
+                                          <td>
+                                            {unit.isReturned ? (
+                                              <span className="stock-type-badge returned">🔄 Returned</span>
+                                            ) : (
+                                              <span className="stock-type-badge fresh">📦 Fresh</span>
+                                            )}
+                                          </td>
+                                          <td>
+                                            <Badge variant={unit.status === "active" ? "success" : "neutral"}>
+                                              {unit.status || "active"}
+                                            </Badge>
+                                          </td>
+                                          <td className="sd-mono">{lastStudent}</td>
+                                          <td>
+                                            <ToggleSwitch
+                                              isOn={unit.status !== "inactive"}
+                                              onToggle={() => handleToggleUnitStatus(unit.id, item.refNo)}
+                                            />
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     );
                   })
                 )}
