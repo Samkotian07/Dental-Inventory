@@ -108,70 +108,7 @@
   margin: 4px 0 0 0;
 }
 
-.lss-default-controls {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-}
 
-.lss-default-input {
-  flex: 1;
-  min-width: 200px;
-  max-width: 280px;
-  min-height: 44px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--ink);
-  padding: 10px 13px;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  transition: all 0.2s ease;
-  width: 100%;
-}
-
-.lss-default-controls>div>label {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.lss-default-controls>div {
-  flex: 1 1 260px;
-  max-width: 320px;
-}
-
-.lss-default-input:hover {
-  border-color: var(--ink-soft);
-}
-
-.lss-default-input:focus {
-  border-color: var(--accent-deep);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
-  outline: none;
-}
-
-.lss-default-btn {
-  background: var(--accent-deep);
-  color: #ffffff;
-  padding: 11px 18px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--accent-deep);
-  font-weight: 600;
-  font-size: 13px;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.lss-default-btn:hover {
-  background: #2B2B2E;
-  border-color: #2B2B2E;
-}
 
 /* Table Section */
 .lss-table-section {
@@ -366,18 +303,28 @@
 }
 
 .lss-threshold-input {
-  width: 88px;
-  min-height: 38px;
-  padding: 8px 10px;
+  width: 80px;
+  min-height: 36px;
+  padding: 6px 10px;
   text-align: center;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   color: var(--ink);
   font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-body);
   transition: all 0.2s ease;
   margin: 0 auto;
   display: block;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+.lss-threshold-input::-webkit-outer-spin-button,
+.lss-threshold-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .lss-threshold-input:hover {

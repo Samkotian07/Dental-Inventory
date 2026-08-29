@@ -8,6 +8,8 @@ class InventoryUnit:
         self.quantity = data.get('quantity', 1)
         self.status = data.get('status', 'active')
         self.is_returned = data.get('is_returned', False)
+        # ⭐ CRITICAL FIX: Read low_stock_threshold from database
+        self.low_stock_threshold = data.get('low_stock_threshold', 10)
         self.created_by = data.get('created_by')
         self.created_at = data.get('created_at')
 
@@ -40,14 +42,15 @@ class InventoryUnit:
         unit_id = data.get('id') or f"{data['ref_no']}-{data.get('suffix', 'A')}"
         
         db.execute_query("""
-            INSERT INTO inventory_units (id, ref_no, quantity, status, is_returned, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO inventory_units (id, ref_no, quantity, status, is_returned, low_stock_threshold, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (
             unit_id,
             data['ref_no'],
             data.get('quantity', 1),
             data.get('status', 'active'),
             data.get('is_returned', False),
+            data.get('low_stock_threshold', 10),
             data.get('created_by')
         ))
         return cls.find_by_id(unit_id)
@@ -57,7 +60,8 @@ class InventoryUnit:
         updates = []
         params = []
         
-        allowed_fields = ['quantity', 'status', 'is_returned']
+        # ⭐ Include low_stock_threshold in allowed fields
+        allowed_fields = ['quantity', 'status', 'is_returned', 'low_stock_threshold']
         for field in allowed_fields:
             if field in data:
                 updates.append(f"{field} = %s")
@@ -87,7 +91,6 @@ class InventoryUnit:
                 return val.isoformat()
             return str(val)
 
-        # Get product details
         product = Product.find_by_ref_no(self.ref_no)
         product_dict = product.to_dict() if product else {}
         
@@ -96,7 +99,8 @@ class InventoryUnit:
             'refNo': self.ref_no,
             'quantity': self.quantity,
             'status': self.status,
-            'isReturned': bool(self.is_returned),  # ⭐ CRITICAL - MUST BE HERE
+            'isReturned': bool(self.is_returned),
+            'lowStockThreshold': self.low_stock_threshold,  # ⭐ CRITICAL: Return to frontend
             'createdBy': self.created_by,
             'createdAt': fmt_date(self.created_at),
             **product_dict

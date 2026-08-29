@@ -1,11 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { Sliders, Search, TrendingDown, Receipt, Trash2 } from "lucide-react";
-import DashboardHeader from "./dashboard/DashboardHeader.jsx";
-import { useMenuClick } from "./Layout.jsx";
-import { useData } from "../context/DataContext";
+import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
+import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext";
 import { useAuth } from "../context/AuthContext";
-import Button from "./common/Button"; 
+import Button from "../components/common/Button"; 
 import { toast } from "sonner";
 import "./LowStockSettings.css";
 
@@ -13,12 +12,10 @@ export default function LowStockSettings() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { stock = [], fetchStock, updateStockItem, returns = [], deleteReturn } = useInventory();
-  const { settings = { lowQuantityThreshold: 10 } } = useData();
-
-  const defaultThreshold = settings?.lowQuantityThreshold ?? 10;
 
   const [thresholdSearch, setThresholdSearch] = useState("");
   const [thresholdEdits, setThresholdEdits] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (fetchStock) {
@@ -45,83 +42,134 @@ export default function LowStockSettings() {
 
   const handleSaveThresholds = async () => {
     const changed = Object.entries(thresholdEdits).filter(
-      ([id, val]) => val !== "" && val !== null,
+      ([id, val]) => val !== "" && val !== null && val !== undefined
     );
+    
     if (changed.length === 0) {
-      toast.error("No thresholds changed");
+      toast.info("No thresholds changed");
       return;
     }
 
+    setIsSaving(true);
     let successCount = 0;
+    let errorMessages = [];
+
     for (const [key, val] of changed) {
+      const newThreshold = Number(val);
+      if (isNaN(newThreshold) || newThreshold < 0) {
+        errorMessages.push(`Invalid threshold value for ${key}`);
+        continue;
+      }
+
       const matchingUnits = stock.filter(s => s.refNo === key || s.id === key);
+      
       if (matchingUnits.length > 0) {
-        for (const u of matchingUnits) {
-          const res = await updateStockItem(u.id, { lowStockThreshold: Number(val) });
-          if (res?.success) successCount++;
+        for (const unit of matchingUnits) {
+          try {
+            const result = await updateStockItem(unit.id, { 
+              low_stock_threshold: newThreshold
+            });
+            if (result?.success) {
+              successCount++;
+            } else {
+              errorMessages.push(`Failed to update ${unit.id}: ${result?.message || 'Unknown error'}`);
+            }
+          } catch (err) {
+            errorMessages.push(`Error updating ${unit.id}: ${err.message}`);
+          }
         }
       } else {
-        const res = await updateStockItem(key, { lowStockThreshold: Number(val) });
-        if (res?.success) successCount++;
+        try {
+          const result = await updateStockItem(key, { 
+            low_stock_threshold: newThreshold
+          });
+          if (result?.success) {
+            successCount++;
+          } else {
+            errorMessages.push(`Failed to update ${key}: ${result?.message || 'Unknown error'}`);
+          }
+        } catch (err) {
+          errorMessages.push(`Error updating ${key}: ${err.message}`);
+        }
       }
     }
 
-    setThresholdEdits({});
-    toast.success(`Updated threshold(s) successfully`);
+    setIsSaving(false);
+
+    if (successCount > 0) {
+      toast.success(`Updated ${successCount} threshold(s) successfully`);
+      setThresholdEdits({});
+      await fetchStock();
+    } else {
+      toast.error(errorMessages.join(", ") || "Failed to update thresholds");
+    }
   };
 
+  // ⭐ CRITICAL FIX: Use actual threshold from item, NO fallback to default
   const groupedInventory = useMemo(() => {
     const q = thresholdSearch.toLowerCase().trim();
     const map = {};
+    
     (stock || []).forEach((item) => {
-      const key = item.refNo || item.productName || item.product || item.id;
+      const key = item.refNo || item.id;
+      
       if (!map[key]) {
         map[key] = {
-          ...item,
-          refNo: item.refNo || item.id,
+          id: key,
+          refNo: key,
           productName: item.productName || item.product || "Product",
           category: item.category || "General",
           quantity: 0,
           qty: 0,
           units: [],
+          // ⭐ CRITICAL: Use item's actual threshold, NO fallback
+          lowStockThreshold: item.lowStockThreshold ?? 10,
+          status: item.status,
         };
       }
+      
       if (item.status === "active" || !item.status) {
-        map[key].quantity += item.quantity || item.qty || 1;
-        map[key].qty += item.quantity || item.qty || 1;
+        const unitQty = item.quantity || item.qty || 1;
+        map[key].quantity += unitQty;
+        map[key].qty += unitQty;
         map[key].units.push(item.id);
       }
     });
 
     let list = Object.values(map);
-    if (!q) return list;
-
-    return list.filter(
-      (item) =>
-        (item.productName || item.product || "").toLowerCase().includes(q) ||
-        (item.refNo || item.id || "").toLowerCase().includes(q) ||
-        (item.category || "").toLowerCase().includes(q),
-    );
+    
+    if (q) {
+      list = list.filter(
+        (item) =>
+          (item.productName || "").toLowerCase().includes(q) ||
+          (item.refNo || "").toLowerCase().includes(q) ||
+          (item.category || "").toLowerCase().includes(q)
+      );
+    }
+    
+    return list;
   }, [stock, thresholdSearch]);
 
+  // ⭐ CRITICAL FIX: Use item's actual threshold, NO fallback
   const getThresholdValue = (item) => {
     const itemId = item.refNo || item.id;
-    if (
-      thresholdEdits[itemId] !== undefined &&
-      thresholdEdits[itemId] !== ""
-    ) {
+    if (thresholdEdits[itemId] !== undefined && thresholdEdits[itemId] !== "") {
       return thresholdEdits[itemId];
     }
-    return item.lowStockThreshold ?? defaultThreshold;
+    // ⭐ Use the actual threshold from the item, fallback to 10 ONLY if undefined
+    return item.lowStockThreshold ?? 10;
   };
 
   const unsavedCount = Object.keys(thresholdEdits).filter(
-    (k) => thresholdEdits[k] !== "" && thresholdEdits[k] !== null,
+    (k) => thresholdEdits[k] !== "" && thresholdEdits[k] !== null && thresholdEdits[k] !== undefined
   ).length;
 
-  const lowStockCount = groupedInventory.filter(
-    (i) => (i.quantity ?? i.qty ?? 0) <= (i.lowStockThreshold ?? defaultThreshold),
-  ).length;
+  // ⭐ CRITICAL FIX: Use actual threshold, NO fallback
+  const lowStockCount = groupedInventory.filter((i) => {
+    const qty = i.quantity ?? i.qty ?? 0;
+    const threshold = i.lowStockThreshold ?? 10;
+    return qty <= threshold;
+  }).length;
 
   return (
     <>
@@ -136,9 +184,7 @@ export default function LowStockSettings() {
             </div>
             <div>
               <p className="lss-stat-number">{lowStockCount}</p>
-              <p className="lss-stat-label">
-                Products at or below threshold
-              </p>
+              <p className="lss-stat-label">Products at or below threshold</p>
             </div>
           </div>
           <div className="lss-stat-card">
@@ -161,17 +207,15 @@ export default function LowStockSettings() {
           </div>
         </section>
 
-        {/* Credit Notes Management Section (Replaces Default Threshold) */}
-        <section className="card lss-default-section">
+        {/* Credit Notes Management Section */}
+        <section className="card lss-credit-section">
           <div className="lss-default-header">
             <div className="lss-default-icon" style={{ background: "#FEF2F2", color: "#EF4444" }}>
               <Receipt size={18} />
             </div>
             <div>
               <h3 className="lss-default-title">Credit Notes Management</h3>
-              <p className="lss-default-subtitle">
-                View and remove vendor credit note records.
-              </p>
+              <p className="lss-default-subtitle">View and remove vendor credit note records.</p>
             </div>
           </div>
 
@@ -200,9 +244,7 @@ export default function LowStockSettings() {
                         <td className="lss-ref-no">{cn.returnId}</td>
                         <td>{cn.refNo}</td>
                         <td className="lss-product-name">{cn.productName}</td>
-                        <td style={{ fontWeight: "600", color: "#2563EB" }}>
-                          {cn.creditNote || "—"}
-                        </td>
+                        <td style={{ fontWeight: "600", color: "#2563EB" }}>{cn.creditNote || "—"}</td>
                         <td className="lss-qty-cell">{cn.quantity}</td>
                         <td>{cn.returnDate ? new Date(cn.returnDate).toLocaleDateString() : "—"}</td>
                         <td className="lss-th-center">
@@ -223,8 +265,7 @@ export default function LowStockSettings() {
                               gap: "4px",
                             }}
                           >
-                            <Trash2 size={13} />
-                            Remove
+                            <Trash2 size={13} /> Remove
                           </button>
                         </td>
                       </tr>
@@ -240,8 +281,12 @@ export default function LowStockSettings() {
         <section className="card lss-table-section">
           <div className="lss-table-header">
             <h3 className="lss-table-title">Per-Product Thresholds</h3>
-            <Button onClick={handleSaveThresholds} className="lss-save-btn">
-              Save All Changes
+            <Button 
+              onClick={handleSaveThresholds} 
+              className="lss-save-btn"
+              disabled={isSaving || unsavedCount === 0}
+            >
+              {isSaving ? "Saving..." : `Save ${unsavedCount > 0 ? `(${unsavedCount})` : ""}`}
             </Button>
           </div>
 
@@ -270,47 +315,42 @@ export default function LowStockSettings() {
               <tbody>
                 {groupedInventory.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="lss-empty">
-                      No products found
-                    </td>
+                    <td colSpan={5} className="lss-empty">No products found</td>
                   </tr>
                 ) : (
                   groupedInventory.map((item) => {
                     const itemId = item.refNo || item.id;
                     const itemQty = item.quantity ?? item.qty ?? 0;
-                    const currentThreshold =
-                      item.lowStockThreshold ?? defaultThreshold;
+                    // ⭐ CRITICAL: Use actual threshold, NO fallback
+                    const currentThreshold = item.lowStockThreshold ?? 10;
                     const isLow = itemQty <= currentThreshold;
-                    const isEdited =
-                      thresholdEdits[itemId] !== undefined &&
-                      thresholdEdits[itemId] !== "";
+                    const isEdited = thresholdEdits[itemId] !== undefined && thresholdEdits[itemId] !== "";
+                    
                     return (
                       <tr key={itemId} className="lss-table-row">
                         <td className="lss-ref-no">{item.refNo || item.id}</td>
-                        <td className="lss-product-name">
-                          {item.productName || item.product}
-                        </td>
-                        <td className="lss-category">
-                          {item.category}
-                        </td>
+                        <td className="lss-product-name">{item.productName || item.product}</td>
+                        <td className="lss-category">{item.category}</td>
                         <td className="lss-qty-cell">
-                          <span
-                            className={`lss-qty-badge ${isLow ? "lss-qty-low" : "lss-qty-ok"}`}
-                          >
+                          <span className={`lss-qty-badge ${isLow ? "lss-qty-low" : "lss-qty-ok"}`}>
                             {itemQty}
                           </span>
                         </td>
                         <td className="lss-threshold-cell">
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={getThresholdValue(item)}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9]/g, "");
                               setThresholdEdits({
                                 ...thresholdEdits,
-                                [itemId]: e.target.value,
-                              })
-                            }
+                                [itemId]: val,
+                              });
+                            }}
                             className={`lss-threshold-input ${isEdited ? "lss-threshold-edited" : ""}`}
+                            placeholder="0"
                           />
                         </td>
                       </tr>
