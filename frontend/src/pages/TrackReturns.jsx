@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search, Download, Plus, Eye, RefreshCw, Trash2, ArrowUpDown } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
@@ -47,6 +48,7 @@ export default function TrackReturns() {
   );
 
   const [query, setQuery] = useState("");
+  const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("All Status");
   const [type, setType] = useState("All Types");
   const [sort, setSort] = useState({ key: null, dir: 1 });
@@ -60,6 +62,11 @@ export default function TrackReturns() {
   const [creditModalOpen, setCreditModalOpen] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    setQuery(searchParams.get("search") || "");
+    setPage(1);
+  }, [searchParams]);
 
   useEffect(() => {
     function handleClickOutside(event) {

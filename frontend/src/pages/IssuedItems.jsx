@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Download,
@@ -14,6 +14,7 @@ import ReturnItemModal from "../components/issued/ReturnItemModal.jsx";
 import IssueItemModal from "../components/issued/IssueItemModal.jsx";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
+import { useSearchParams } from "react-router-dom";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { useData } from "../context/DataContext.jsx";
 import { toast } from "sonner";  // ⭐ ADD THIS
@@ -50,6 +51,7 @@ export default function IssuedItems() {
   const { students } = useData();
 
   const [query, setQuery] = useState("");
+  const [searchParams] = useSearchParams();
   const [status, setStatus] = useState("Active");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
@@ -58,6 +60,11 @@ export default function IssuedItems() {
   const [detailItem, setDetailItem] = useState(null);
   const [returnItem, setReturnItem] = useState(null);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
+
+  useEffect(() => {
+    setQuery(searchParams.get("search") || "");
+    setPage(1);
+  }, [searchParams]);
 
   const inventoryOptions = useMemo(
     () =>

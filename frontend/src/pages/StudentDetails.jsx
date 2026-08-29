@@ -10,6 +10,7 @@ import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import "./css/StudentDetails.css";
 
@@ -53,6 +54,7 @@ export default function StudentDetails() {
   const { students, loading, addStudent, updateStudent, deleteStudent, bulkImportStudents } = useData();
 
   const [query, setQuery] = useState("");
+  const [searchParams] = useSearchParams();
   const [selectedSemester, setSelectedSemester] = useState("All Semesters");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
@@ -60,6 +62,11 @@ export default function StudentDetails() {
   const [formStudent, setFormStudent] = useState(undefined);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [historyStudent, setHistoryStudent] = useState(null);
+
+  useEffect(() => {
+    setQuery(searchParams.get("search") || "");
+    setPage(1);
+  }, [searchParams]);
 
   const availableSemesters = useMemo(() => {
     const set = new Set();

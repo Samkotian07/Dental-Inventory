@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Download, Eye, Pencil, Trash2, ArrowUpDown, Power } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
@@ -8,6 +8,7 @@ import DeleteItemModal from "../components/stock/DeleteItemModal.jsx";
 import { CATEGORIES as categories } from "../components/utils/constants.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
+import { useSearchParams } from "react-router-dom";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { toast } from "sonner";
 import "./css/Stock.css";
@@ -46,6 +47,7 @@ export default function Stock() {
   const { stock: rows, updateStockItem, deleteStockItem, moveStockToFailed, toggleStockStatus, getInventoryId } = useInventory();
 
   const [query, setQuery] = useState("");
+  const [searchParams] = useSearchParams();
   const [category, setCategory] = useState("All Categories");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
@@ -54,6 +56,11 @@ export default function Stock() {
   const [detailItem, setDetailItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
+
+  useEffect(() => {
+    setQuery(searchParams.get("search") || "");
+    setPage(1);
+  }, [searchParams]);
 
   // ⭐ FIXED: Group by ref_no to show one row per product
   const filtered = useMemo(() => {
