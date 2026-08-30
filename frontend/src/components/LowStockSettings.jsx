@@ -13,50 +13,20 @@ export default function LowStockSettings() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { stock = [], fetchStock, updateStockItem, returns = [], deleteReturn } = useInventory();
-  const { settings, updateSettings } = useData();  // ⭐ FIXED: Added settings
+  const { settings } = useData();
 
-  // ⭐ FIXED: Get default threshold from settings
+  // Get default threshold from settings
   const defaultThreshold = settings?.lowQuantityThreshold ?? 10;
 
   const [thresholdSearch, setThresholdSearch] = useState("");
   const [thresholdEdits, setThresholdEdits] = useState({});
   const [isSaving, setIsSaving] = useState(false);
 
-  // ⭐ FIXED: Local state for default threshold edit
-  const [defaultEdit, setDefaultEdit] = useState(defaultThreshold);
-  const [isDefaultSaving, setIsDefaultSaving] = useState(false);
-
-  // ⭐ FIXED: Sync defaultEdit when settings change
-  useEffect(() => {
-    setDefaultEdit(defaultThreshold);
-  }, [defaultThreshold]);
-
   useEffect(() => {
     if (fetchStock) {
       fetchStock();
     }
   }, [fetchStock]);
-
-  // ⭐ FIXED: Handle default threshold save
-  const handleDefaultSave = async () => {
-    const value = Number(defaultEdit);
-    if (isNaN(value) || value < 0) {
-      toast.error("Please enter a valid number");
-      return;
-    }
-
-    setIsDefaultSaving(true);
-    try {
-      updateSettings({ lowQuantityThreshold: value });
-      toast.success(`Default threshold set to ${value}`);
-      setDefaultEdit(value);
-    } catch (error) {
-      toast.error("Failed to save settings");
-      setDefaultEdit(defaultThreshold);
-    } finally {
-      setIsDefaultSaving(false);
-    }
-  };
 
   const creditNotes = useMemo(() => {
     return (returns || []).filter(
@@ -238,49 +208,7 @@ export default function LowStockSettings() {
           </div>
         </section>
 
-        {/* ⭐ FIXED: Global Default Threshold Section */}
-        <section className="card lss-default-section">
-          <div className="lss-default-header">
-            <div className="lss-default-icon" style={{ background: "#EFF6FF", color: "#2563EB" }}>
-              <Sliders size={18} />
-            </div>
-            <div>
-              <h3 className="lss-default-title">Global Default Threshold</h3>
-              <p className="lss-default-subtitle">
-                This value is used as the fallback threshold for all products without custom thresholds.
-              </p>
-            </div>
-          </div>
 
-          <div className="lss-default-controls">
-            <div className="lss-default-input-group">
-              <label htmlFor="default-threshold">Default Low Stock Threshold</label>
-              <div className="lss-default-input-row">
-                <input
-                  id="default-threshold"
-                  type="number"
-                  min="0"
-                  value={defaultEdit}
-                  onChange={(e) => setDefaultEdit(e.target.value)}
-                  className="lss-default-input"
-                />
-                <button
-                  className="lss-default-save-btn"
-                  onClick={handleDefaultSave}
-                  disabled={isDefaultSaving || defaultEdit === defaultThreshold}
-                >
-                  {isDefaultSaving ? "Saving..." : "Update Default"}
-                </button>
-              </div>
-              <p className="lss-default-hint">
-                Current default: <strong>{defaultThreshold}</strong> units
-                {defaultEdit !== defaultThreshold && (
-                  <span className="lss-unsaved"> (Unsaved)</span>
-                )}
-              </p>
-            </div>
-          </div>
-        </section>
 
         {/* Credit Notes Management Section */}
         <section className="card lss-credit-section">

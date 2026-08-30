@@ -17,7 +17,7 @@ const PAGE_SIZE = 8;
 export default function StockHandle() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { stock, updateStockItem, toggleStockStatus, getInventoryId, issuedItems } = useInventory();
+  const { stock, fetchStock, updateStockItem, toggleStockStatus, getInventoryId, issuedItems } = useInventory();
   const [searchRef, setSearchRef] = useState("");
   const [foundItem, setFoundItem] = useState(null);
   const [search, setSearch] = useState("");
@@ -80,11 +80,13 @@ export default function StockHandle() {
     }
   };
 
-  // ⭐ Toggle status for a specific unit (for returned units)
+  // ⭐ Toggle status for a specific unit
   const handleToggleUnitStatus = async (unitId, refNo) => {
     const result = await toggleStockStatus(unitId);
     if (result.success) {
       toast.success(`Unit ${unitId} status updated`);
+      // ⭐ Refresh stock from backend
+      await fetchStock();
       // Update foundItem if needed
       if (foundItem && foundItem.refNo === refNo) {
         const updatedUnit = stock.find(s => s.id === unitId);
@@ -92,7 +94,11 @@ export default function StockHandle() {
           const updatedUnits = foundItem.units.map(u => 
             u.id === unitId ? { ...u, status: updatedUnit.status } : u
           );
-          setFoundItem({ ...foundItem, units: updatedUnits });
+          setFoundItem({ 
+            ...foundItem, 
+            units: updatedUnits, 
+            status: updatedUnit.status 
+          });
         }
       }
     } else {
@@ -100,7 +106,7 @@ export default function StockHandle() {
     }
   };
 
-  // ⭐ Toggle all units (for fresh products)
+  // ⭐ Toggle all units
   const handleToggleAllUnits = async (refNo, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     const productUnits = stock.filter(r => r.refNo === refNo);
@@ -110,6 +116,9 @@ export default function StockHandle() {
       const result = await toggleStockStatus(unit.id);
       if (result.success) successCount++;
     }
+    
+    // ⭐ Refresh stock from backend
+    await fetchStock();
     
     if (successCount === productUnits.length) {
       toast.success(`All ${successCount} units set to ${newStatus}`);
