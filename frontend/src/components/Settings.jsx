@@ -21,6 +21,7 @@ export default function Settings() {
   const [twoFactor, setTwoFactor] = useState(settings?.twoFactor || false);
   const [pwd, setPwd] = useState({ current: "", new: "", confirm: "" });
   const [logoutAllOpen, setLogoutAllOpen] = useState(false);
+  const [thresholdEdit, setThresholdEdit] = useState(settings?.lowQuantityThreshold ?? 10);
 
   const handle2FAToggle = () => {
     setTwoFactor(!twoFactor);
@@ -33,6 +34,18 @@ export default function Settings() {
   const handleDarkToggle = () => {
     toggleDarkMode();
     toast.success(`Dark mode ${!darkMode ? "enabled" : "disabled"}`);
+  };
+
+  const handleThresholdChange = (e) => {
+    const value = Number(e.target.value);
+    if (!isNaN(value) && value >= 0) {
+      setThresholdEdit(value);
+    }
+  };
+
+  const handleThresholdSave = () => {
+    updateSettings({ lowQuantityThreshold: thresholdEdit });
+    toast.success(`Default threshold set to ${thresholdEdit}`);
   };
 
   const handlePasswordChange = async () => {
@@ -58,17 +71,6 @@ export default function Settings() {
   };
 
   const sections = [
-    // Email Updates - Commented out for future use
-    // {
-    //   icon: Mail,
-    //   title: "Email Updates",
-    //   desc: "Keep it ON to receive notifications through email",
-    //   content: (
-    //     <div className="settings-toggle-wrapper">
-    //       <ToggleSwitch isOn={emailUpdates} onToggle={handleEmailToggle} />
-    //     </div>
-    //   ),
-    // },
     {
       icon: Moon,
       title: "Dark Mode",
@@ -76,6 +78,51 @@ export default function Settings() {
       content: (
         <div className="settings-toggle-wrapper">
           <ToggleSwitch isOn={darkMode} onToggle={handleDarkToggle} />
+        </div>
+      ),
+    },
+    // ⭐ FIXED: Added Default Threshold section
+    {
+      icon: Sliders,
+      title: "Default Low Stock Threshold",
+      desc: "Set the default threshold for all products without custom values",
+      content: (
+        <div className="settings-threshold-wrapper">
+          <div className="settings-threshold-row">
+            <input
+              type="number"
+              min="0"
+              value={thresholdEdit}
+              onChange={handleThresholdChange}
+              className="settings-threshold-input"
+              style={{
+                width: "100px",
+                padding: "6px 10px",
+                borderRadius: "6px",
+                border: "1px solid #D1D5DB",
+                fontSize: "14px",
+              }}
+            />
+            <button
+              onClick={handleThresholdSave}
+              disabled={thresholdEdit === (settings?.lowQuantityThreshold ?? 10)}
+              style={{
+                padding: "6px 16px",
+                borderRadius: "6px",
+                border: "none",
+                background: thresholdEdit === (settings?.lowQuantityThreshold ?? 10) ? "#E5E7EB" : "#2563EB",
+                color: thresholdEdit === (settings?.lowQuantityThreshold ?? 10) ? "#9CA3AF" : "white",
+                cursor: thresholdEdit === (settings?.lowQuantityThreshold ?? 10) ? "not-allowed" : "pointer",
+                fontWeight: "600",
+                fontSize: "13px",
+              }}
+            >
+              Save
+            </button>
+          </div>
+          <p style={{ fontSize: "12px", color: "#6B7280", marginTop: "4px" }}>
+            Current: <strong>{settings?.lowQuantityThreshold ?? 10}</strong> units
+          </p>
         </div>
       ),
     },

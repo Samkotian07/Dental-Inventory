@@ -8,7 +8,6 @@ class InventoryUnit:
         self.quantity = data.get('quantity', 1)
         self.status = data.get('status', 'active')
         self.is_returned = data.get('is_returned', False)
-        # ⭐ CRITICAL FIX: Read low_stock_threshold from database
         self.low_stock_threshold = data.get('low_stock_threshold', 10)
         self.created_by = data.get('created_by')
         self.created_at = data.get('created_at')
@@ -60,7 +59,6 @@ class InventoryUnit:
         updates = []
         params = []
         
-        # ⭐ Include low_stock_threshold in allowed fields
         allowed_fields = ['quantity', 'status', 'is_returned', 'low_stock_threshold']
         for field in allowed_fields:
             if field in data:
@@ -73,6 +71,18 @@ class InventoryUnit:
         query = f"UPDATE inventory_units SET {', '.join(updates)} WHERE id = %s"
         params.append(self.id)
         db.execute_query(query, tuple(params))
+        
+        # ⭐ Also update products table
+        if 'low_stock_threshold' in data:
+            try:
+                db.execute_query(
+                    "UPDATE products SET low_stock_threshold = %s WHERE ref_no = %s",
+                    (data['low_stock_threshold'], self.ref_no)
+                )
+                print(f"✅ Synced product {self.ref_no} threshold to {data['low_stock_threshold']}")
+            except Exception as e:
+                print(f"⚠️ Could not sync product threshold: {e}")
+        
         return InventoryUnit.find_by_id(self.id)
 
     def delete(self):
@@ -91,6 +101,7 @@ class InventoryUnit:
                 return val.isoformat()
             return str(val)
 
+        # ⭐ Get product data (source of truth for thresholds)
         product = Product.find_by_ref_no(self.ref_no)
         product_dict = product.to_dict() if product else {}
         
@@ -100,7 +111,8 @@ class InventoryUnit:
             'quantity': self.quantity,
             'status': self.status,
             'isReturned': bool(self.is_returned),
-            'lowStockThreshold': self.low_stock_threshold,  # ⭐ CRITICAL: Return to frontend
+            # ⭐ Use product threshold as source of truth
+            'lowStockThreshold': product_dict.get('lowStockThreshold', 10),
             'createdBy': self.created_by,
             'createdAt': fmt_date(self.created_at),
             **product_dict

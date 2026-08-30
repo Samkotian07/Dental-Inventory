@@ -31,7 +31,8 @@ function normalizeStock(item) {
     expiryDate: item.expiry_date || item.expiry || item.expiryDate || "",
     status: item.status || "active",
     isReturned: Boolean(item.is_returned || item.isReturned),
-    lowStockThreshold: item.low_stock_threshold || item.lowStockThreshold || 5,
+    // ⭐ FIXED: Use ?? 10 instead of || 5
+    lowStockThreshold: item.low_stock_threshold ?? item.lowStockThreshold ?? 10,
     isReturnable: item.is_returnable !== undefined ? item.is_returnable : true,
     documentType: item.document_type || item.documentType || "invoice",
     documentNumber: item.document_number || item.documentNumber || item.invoice_no || item.invoiceNo || "",

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Sliders, Search, TrendingDown, Receipt, Trash2 } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import { useMenuClick } from "../components/Layout.jsx";
+import { useData } from "../context/DataContext";  // ⭐ FIXED: Added import
 import { useInventory } from "../context/InventoryContext";
 import { useAuth } from "../context/AuthContext";
 import Button from "../components/common/Button"; 
@@ -12,16 +13,50 @@ export default function LowStockSettings() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { stock = [], fetchStock, updateStockItem, returns = [], deleteReturn } = useInventory();
+  const { settings, updateSettings } = useData();  // ⭐ FIXED: Added settings
+
+  // ⭐ FIXED: Get default threshold from settings
+  const defaultThreshold = settings?.lowQuantityThreshold ?? 10;
 
   const [thresholdSearch, setThresholdSearch] = useState("");
   const [thresholdEdits, setThresholdEdits] = useState({});
   const [isSaving, setIsSaving] = useState(false);
+
+  // ⭐ FIXED: Local state for default threshold edit
+  const [defaultEdit, setDefaultEdit] = useState(defaultThreshold);
+  const [isDefaultSaving, setIsDefaultSaving] = useState(false);
+
+  // ⭐ FIXED: Sync defaultEdit when settings change
+  useEffect(() => {
+    setDefaultEdit(defaultThreshold);
+  }, [defaultThreshold]);
 
   useEffect(() => {
     if (fetchStock) {
       fetchStock();
     }
   }, [fetchStock]);
+
+  // ⭐ FIXED: Handle default threshold save
+  const handleDefaultSave = async () => {
+    const value = Number(defaultEdit);
+    if (isNaN(value) || value < 0) {
+      toast.error("Please enter a valid number");
+      return;
+    }
+
+    setIsDefaultSaving(true);
+    try {
+      updateSettings({ lowQuantityThreshold: value });
+      toast.success(`Default threshold set to ${value}`);
+      setDefaultEdit(value);
+    } catch (error) {
+      toast.error("Failed to save settings");
+      setDefaultEdit(defaultThreshold);
+    } finally {
+      setIsDefaultSaving(false);
+    }
+  };
 
   const creditNotes = useMemo(() => {
     return (returns || []).filter(
@@ -105,7 +140,7 @@ export default function LowStockSettings() {
     }
   };
 
-  // ⭐ CRITICAL FIX: Use actual threshold from item, NO fallback to default
+  // ⭐ Group inventory by product
   const groupedInventory = useMemo(() => {
     const q = thresholdSearch.toLowerCase().trim();
     const map = {};
@@ -122,8 +157,7 @@ export default function LowStockSettings() {
           quantity: 0,
           qty: 0,
           units: [],
-          // ⭐ CRITICAL: Use item's actual threshold, NO fallback
-          lowStockThreshold: item.lowStockThreshold ?? 10,
+          lowStockThreshold: item.lowStockThreshold ?? defaultThreshold,
           status: item.status,
         };
       }
@@ -148,26 +182,23 @@ export default function LowStockSettings() {
     }
     
     return list;
-  }, [stock, thresholdSearch]);
+  }, [stock, thresholdSearch, defaultThreshold]);
 
-  // ⭐ CRITICAL FIX: Use item's actual threshold, NO fallback
   const getThresholdValue = (item) => {
     const itemId = item.refNo || item.id;
     if (thresholdEdits[itemId] !== undefined && thresholdEdits[itemId] !== "") {
       return thresholdEdits[itemId];
     }
-    // ⭐ Use the actual threshold from the item, fallback to 10 ONLY if undefined
-    return item.lowStockThreshold ?? 10;
+    return item.lowStockThreshold ?? defaultThreshold;
   };
 
   const unsavedCount = Object.keys(thresholdEdits).filter(
     (k) => thresholdEdits[k] !== "" && thresholdEdits[k] !== null && thresholdEdits[k] !== undefined
   ).length;
 
-  // ⭐ CRITICAL FIX: Use actual threshold, NO fallback
   const lowStockCount = groupedInventory.filter((i) => {
     const qty = i.quantity ?? i.qty ?? 0;
-    const threshold = i.lowStockThreshold ?? 10;
+    const threshold = i.lowStockThreshold ?? defaultThreshold;
     return qty <= threshold;
   }).length;
 
@@ -203,6 +234,50 @@ export default function LowStockSettings() {
             <div>
               <p className="lss-stat-number">{creditNotes.length}</p>
               <p className="lss-stat-label">Active credit notes</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ⭐ FIXED: Global Default Threshold Section */}
+        <section className="card lss-default-section">
+          <div className="lss-default-header">
+            <div className="lss-default-icon" style={{ background: "#EFF6FF", color: "#2563EB" }}>
+              <Sliders size={18} />
+            </div>
+            <div>
+              <h3 className="lss-default-title">Global Default Threshold</h3>
+              <p className="lss-default-subtitle">
+                This value is used as the fallback threshold for all products without custom thresholds.
+              </p>
+            </div>
+          </div>
+
+          <div className="lss-default-controls">
+            <div className="lss-default-input-group">
+              <label htmlFor="default-threshold">Default Low Stock Threshold</label>
+              <div className="lss-default-input-row">
+                <input
+                  id="default-threshold"
+                  type="number"
+                  min="0"
+                  value={defaultEdit}
+                  onChange={(e) => setDefaultEdit(e.target.value)}
+                  className="lss-default-input"
+                />
+                <button
+                  className="lss-default-save-btn"
+                  onClick={handleDefaultSave}
+                  disabled={isDefaultSaving || defaultEdit === defaultThreshold}
+                >
+                  {isDefaultSaving ? "Saving..." : "Update Default"}
+                </button>
+              </div>
+              <p className="lss-default-hint">
+                Current default: <strong>{defaultThreshold}</strong> units
+                {defaultEdit !== defaultThreshold && (
+                  <span className="lss-unsaved"> (Unsaved)</span>
+                )}
+              </p>
             </div>
           </div>
         </section>
@@ -321,8 +396,7 @@ export default function LowStockSettings() {
                   groupedInventory.map((item) => {
                     const itemId = item.refNo || item.id;
                     const itemQty = item.quantity ?? item.qty ?? 0;
-                    // ⭐ CRITICAL: Use actual threshold, NO fallback
-                    const currentThreshold = item.lowStockThreshold ?? 10;
+                    const currentThreshold = item.lowStockThreshold ?? defaultThreshold;
                     const isLow = itemQty <= currentThreshold;
                     const isEdited = thresholdEdits[itemId] !== undefined && thresholdEdits[itemId] !== "";
                     
@@ -338,19 +412,16 @@ export default function LowStockSettings() {
                         </td>
                         <td className="lss-threshold-cell">
                           <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
+                            type="number"
+                            min="0"
                             value={getThresholdValue(item)}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/[^0-9]/g, "");
+                            onChange={(e) =>
                               setThresholdEdits({
                                 ...thresholdEdits,
-                                [itemId]: val,
-                              });
-                            }}
+                                [itemId]: e.target.value,
+                              })
+                            }
                             className={`lss-threshold-input ${isEdited ? "lss-threshold-edited" : ""}`}
-                            placeholder="0"
                           />
                         </td>
                       </tr>
