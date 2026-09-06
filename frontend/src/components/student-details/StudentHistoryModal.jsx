@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import Modal from "./Modal.jsx";
 import { useInventory } from "../../context/InventoryContext.jsx";
-import { toRomanSemester } from "../../pages/StudentDetails.jsx";
+import { toRomanSemester } from "../../utils/formatters.js";
 
 function formatDate(iso) {
   if (!iso) return "-";
@@ -35,7 +35,9 @@ export default function StudentHistoryModal({ student, onClose }) {
           Student: <strong>{student.name}</strong> ({student.campusId || student.id})
         </h3>
         <p style={{ margin: 0, fontSize: "13px", color: "#6B7280" }}>
-          Course: {student.course || "—"} | Semester: {toRomanSemester(student.semester)} | Email: {student.email || "—"}
+          Course: {student.course || "—"} | 
+          Batch: {student.batch || "—"} | 
+          Email: {student.email || "—"}
         </p>
       </div>
 
@@ -85,45 +87,15 @@ export default function StudentHistoryModal({ student, onClose }) {
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
                         {isReturned ? (
-                          <span
-                            style={{
-                              padding: "3px 10px",
-                              borderRadius: "12px",
-                              fontSize: "12px",
-                              fontWeight: "600",
-                              background: "#D1FAE5",
-                              color: "#059669",
-                              display: "inline-block",
-                            }}
-                          >
+                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "#D1FAE5", color: "#059669", display: "inline-block" }}>
                             ✅ Returned
                           </span>
                         ) : isCondemned ? (
-                          <span
-                            style={{
-                              padding: "3px 10px",
-                              borderRadius: "12px",
-                              fontSize: "12px",
-                              fontWeight: "600",
-                              background: "#FEE2E2",
-                              color: "#DC2626",
-                              display: "inline-block",
-                            }}
-                          >
+                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "#FEE2E2", color: "#DC2626", display: "inline-block" }}>
                             🗑️ Condemned
                           </span>
                         ) : (
-                          <span
-                            style={{
-                              padding: "3px 10px",
-                              borderRadius: "12px",
-                              fontSize: "12px",
-                              fontWeight: "600",
-                              background: "#FEF3C7",
-                              color: "#D97706",
-                              display: "inline-block",
-                            }}
-                          >
+                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "#FEF3C7", color: "#D97706", display: "inline-block" }}>
                             ⚠️ PENDING
                           </span>
                         )}
@@ -141,18 +113,7 @@ export default function StudentHistoryModal({ student, onClose }) {
           </table>
         </div>
 
-        <div
-          style={{
-            marginTop: "16px",
-            padding: "10px 14px",
-            background: pendingCount > 0 ? "#FFFBEB" : "#F3F4F6",
-            borderRadius: "6px",
-            border: pendingCount > 0 ? "1px solid #F59E0B" : "1px solid #E5E7EB",
-            color: pendingCount > 0 ? "#92400E" : "#4B5563",
-            fontWeight: "600",
-            fontSize: "13px",
-          }}
-        >
+        <div style={{ marginTop: "16px", padding: "10px 14px", background: pendingCount > 0 ? "#FFFBEB" : "#F3F4F6", borderRadius: "6px", border: pendingCount > 0 ? "1px solid #F59E0B" : "1px solid #E5E7EB", color: pendingCount > 0 ? "#92400E" : "#4B5563", fontWeight: "600", fontSize: "13px" }}>
           ⚠️ Pending Returns: {pendingCount} {pendingCount === 1 ? "item" : "items"}
         </div>
       </div>

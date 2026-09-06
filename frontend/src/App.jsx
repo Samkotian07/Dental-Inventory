@@ -11,7 +11,6 @@ import Stock from "./pages/Stock.jsx";
 import FailedInventory from "./pages/FailedInventory.jsx";
 import AuditLog from "./pages/AuditLog.jsx";
 
-// Components
 import StaffManager from "./components/StaffManager.jsx";
 import LowStockSettings from "./components/LowStockSettings.jsx";
 import Settings from "./components/Settings.jsx";
@@ -19,11 +18,11 @@ import StockInsertion from "./components/StockInsertion.jsx";
 import StockHandle from "./components/StockHandle.jsx";
 
 import PublicProductHistory from "./pages/PublicProductHistory.jsx";
-
-// ⭐ ADD THIS IMPORT
 import UnitHistory from "./pages/UnitHistory.jsx";
 
-// Protected Route Component
+import ArchiveStudents from "./pages/ArchiveStudents.jsx";
+import Reports from "./pages/Reports.jsx"; // ⭐ Uncommented
+
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { isAuthenticated, user, loading } = useAuth();
 
@@ -42,7 +41,6 @@ function ProtectedRoute({ children, requireAdmin = false }) {
   return children;
 }
 
-// Admin only wrapper
 function AdminRoute({ children }) {
   return <ProtectedRoute requireAdmin>{children}</ProtectedRoute>;
 }
@@ -74,11 +72,20 @@ export default function App() {
         <Route path="/stock-insertion" element={<StockInsertion />} />
         <Route path="/stock-handle" element={<StockHandle />} />
         <Route path="/settings" element={<Settings />} />
-
-        {/* ⭐ ADD UNIT HISTORY ROUTE */}
         <Route path="/unit-history/:unitId" element={<UnitHistory />} />
 
+        {/* ⭐ Reports Route - All users */}
+        <Route path="/reports" element={<Reports />} />
+
         {/* Admin Only Routes */}
+        <Route
+          path="/archive-students"
+          element={
+            <AdminRoute>
+              <ArchiveStudents />
+            </AdminRoute>
+          }
+        />
         <Route
           path="/low-stock"
           element={

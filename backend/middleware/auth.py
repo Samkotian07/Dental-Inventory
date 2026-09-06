@@ -103,3 +103,40 @@ def get_user_name():
     """Get current user name for audit logs"""
     user = get_current_user()
     return user.name if user else 'System'
+def require_write_permission(f):
+    """Decorator to require write permission (admin or staff)"""
+    @wraps(f)
+    @token_required
+    def decorated(*args, **kwargs):
+        if request.current_user.role == 'readonly':
+            return jsonify({
+                'success': False,
+                'error': {
+                    'code': 'FORBIDDEN',
+                    'message': 'Read-only users cannot perform write operations'
+                }
+            }), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
+def get_user_permissions():
+    """Get user permissions based on role"""
+    user = get_current_user()
+    if not user:
+        return {
+            'can_read': False,
+            'can_write': False,
+            'can_delete': False,
+            'can_archive': False,
+            'is_admin': False
+        }
+    
+    role = user.role
+    return {
+        'can_read': True,
+        'can_write': role in ['admin', 'staff'],
+        'can_delete': role == 'admin',
+        'can_archive': role == 'admin',
+        'is_admin': role == 'admin'
+    }

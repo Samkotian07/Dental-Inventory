@@ -6,7 +6,7 @@ import { useMenuClick } from "../components/Layout.jsx";
 import "./css/AuditLog.css";
 
 const PAGE_SIZE = 10;
-const API_URL = "http://127.0.0.1:5000/api";  // ⭐ Changed to 127.0.0.1
+const API_URL = "http://127.0.0.1:5000/api";
 
 function formatTimestamp(ts) {
   if (!ts) return "—";
@@ -37,7 +37,15 @@ function getActionBadgeTone(action) {
     case "DISPOSE":
     case "CONDEMN":
     case "DELETE":
+    case "DELETE_RETURN":
       return "audit-badge--red";
+    case "BATCH_ARCHIVE":
+    case "ARCHIVE":
+      return "audit-badge--indigo";
+    case "LOGIN":
+    case "LOGOUT":
+    case "USER_LOGOUT":
+      return "audit-badge--neutral";
     default:
       return "audit-badge--neutral";
   }
@@ -81,13 +89,21 @@ export default function AuditLog() {
   const filteredLogs = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = logs.filter((log) => {
-      const matchAction =
-        actionFilter === "ALL" ||
-        log.action?.toUpperCase() === actionFilter.toUpperCase();
+      const action = log.action?.toUpperCase() || "";
+      
+      // ⭐ Filter logic: "ALL" excludes LOGIN/LOGOUT
+      let matchAction = false;
+      if (actionFilter === "ALL") {
+        matchAction = !["LOGIN", "LOGOUT", "USER_LOGOUT"].includes(action);
+      } else if (actionFilter === "LOGIN_LOGOUT") {
+        matchAction = ["LOGIN", "LOGOUT", "USER_LOGOUT"].includes(action);
+      } else {
+        matchAction = action === actionFilter.toUpperCase();
+      }
+      
       const matchQuery =
         !q ||
         (log.details || "").toLowerCase().includes(q) ||
-        // ⭐ FIXED: Support both camelCase and snake_case
         (log.userName || log.user_name || "").toLowerCase().includes(q) ||
         (log.entity_type || "").toLowerCase().includes(q) ||
         (log.entity_id || "").toLowerCase().includes(q);
@@ -149,10 +165,18 @@ export default function AuditLog() {
               <option value="ALL">All Actions</option>
               <option value="CREATE">CREATE</option>
               <option value="UPDATE">UPDATE</option>
+              <option value="UPDATE_RETURN_STATUS">UPDATE RETURN STATUS</option>
+              <option value="CREATE_RETURN">CREATE RETURN</option>
               <option value="ISSUE">ISSUE</option>
               <option value="RETURN">RETURN</option>
               <option value="RESTORE">RESTORE</option>
               <option value="DISPOSE">DISPOSE</option>
+              <option value="CONDEMN">CONDEMN</option>
+              <option value="DELETE">DELETE</option>
+              <option value="DELETE_RETURN">DELETE RETURN</option>
+              <option value="BATCH_ARCHIVE">BATCH ARCHIVE</option>
+              <option value="ARCHIVE">ARCHIVE</option>
+              <option value="LOGIN_LOGOUT">🔐 Login / Logout</option>
             </select>
           </div>
         </div>
@@ -209,7 +233,6 @@ export default function AuditLog() {
                         {log.entity_type} (#{log.entity_id})
                       </td>
                       <td className="audit-log__strong">
-                        {/* ⭐ FIXED: Support both camelCase and snake_case */}
                         {log.userName || log.user_name || log.user_id || "System"}
                       </td>
                       <td>{log.details}</td>

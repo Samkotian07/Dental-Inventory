@@ -21,10 +21,22 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(students_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(inventory_bp)
-app.register_blueprint(issued_bp)
+app.register_blueprint(issued_bp)  # ⭐ This is registered
 app.register_blueprint(failed_bp)
 app.register_blueprint(returns_bp)
 app.register_blueprint(audit_bp)
+
+# ⭐ ADD THIS: List all registered routes
+@app.route('/api/routes', methods=['GET'])
+def list_routes():
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': list(rule.methods),
+            'path': str(rule)
+        })
+    return jsonify({'routes': routes}), 200
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -45,4 +57,5 @@ def internal_error(error):
     return jsonify({'success': False, 'error': {'message': 'Internal server error'}}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=Config.PORT, debug=False)  # ⭐ debug=False to avoid reload issues
+    # ⭐ Set debug=True so you can see errors
+    app.run(host='0.0.0.0', port=Config.PORT, debug=True)

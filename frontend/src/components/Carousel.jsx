@@ -45,7 +45,7 @@ const slides = [
     key: "reports",
     title: "Reports",
     copy: "Generate detailed reports on asset movement.",
-    to: "/stock",
+    to: "/reports",
     icon: FileSpreadsheet, // Detailed reporting/spreadsheets
   },
 ];

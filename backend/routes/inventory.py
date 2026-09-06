@@ -18,12 +18,28 @@ def get_public_product_history(ref_no):
         print(f"🔍 QR SCAN: Looking for ref_no: {ref_no}")
         
         # Try multiple ways to find the item
-        item = Inventory.find_by_ref_no(ref_no)
+        unit = InventoryUnit.find_by_id(ref_no)
+        if unit:
+            product = Product.find_by_ref_no(unit.ref_no)
+            item = Inventory({
+                'id': unit.unit_id,
+                'ref_no': unit.ref_no,
+                'product_name': product.get_product_name() if product else unit.ref_no,
+                'category': product.get_category() if product else 'General',
+                'company_name': product.company_name if product else '',
+                'size': product.get_size() if product else '',
+                'lot_no': product.lot_no if product else '',
+                'quantity': unit.quantity,
+                'fresh_location': product.fresh_location if product else '',
+                'is_returned': unit.is_returned_from_student,
+                'status': unit.status,
+            })
+
         if not item:
-            print(f"   ⚠️ Not found by ref_no, trying by id...")
+            item = Inventory.find_by_ref_no(ref_no)
+        if not item:
             item = Inventory.find_by_id(ref_no)
         if not item:
-            print(f"   ⚠️ Not found by id, trying case-insensitive...")
             db = Inventory.get_db()
             results = db.execute_query(
                 "SELECT * FROM inventory WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(id) = LOWER(%s) LIMIT 1",
@@ -31,7 +47,6 @@ def get_public_product_history(ref_no):
             )
             if results:
                 item = Inventory(results[0])
-                print(f"   ✅ Found with case-insensitive: {item.ref_no}")
         
         if not item:
             print(f"❌ Item NOT FOUND for: {ref_no}")
@@ -235,9 +250,11 @@ def get_inventory():
     """Get all inventory units"""
     try:
         units = InventoryUnit.find_all()
+        products = Product.find_all()
+        product_map = {p.ref_no: p.to_dict() for p in products}
         return jsonify({
             'success': True,
-            'data': [u.to_dict() for u in units]
+            'data': [u.to_dict(product_map) for u in units]
         }), 200
     except Exception as e:
         print(f"InventoryUnit fetch error: {e}")

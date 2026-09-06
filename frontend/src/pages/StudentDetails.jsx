@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { Search, Download, Plus, Pencil, Trash2, Eye, ArrowUpDown } from "lucide-react";
+import { Search, Download, Plus, Pencil, Trash2, Eye, ArrowUpDown, Package } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import BulkImportPanel from "../components/student-details/BulkImportPanel.jsx";
@@ -8,6 +8,7 @@ import DeleteStudentModal from "../components/student-details/DeleteStudentModal
 import StudentHistoryModal from "../components/student-details/StudentHistoryModal.jsx";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
+import { useInventory } from "../context/InventoryContext.jsx";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useSearchParams } from "react-router-dom";
@@ -16,46 +17,33 @@ import "./css/StudentDetails.css";
 
 const PAGE_SIZE = 6;
 
+export { toRomanSemester } from "../utils/formatters.js";
+
 const CSV_COLUMNS = [
   { key: "campusId", label: "Campus ID" },
   { key: "name", label: "Name" },
   { key: "email", label: "Email" },
   { key: "course", label: "Course" },
-  { key: "semester", label: "Semester" },
+  { key: "batch", label: "Batch" },
+  { key: "pendingReturnCount", label: "Pending Returns" },
 ];
 
-const ROMAN_MAP = {
-  1: "I", 2: "II", 3: "III", 4: "IV", 5: "V",
-  6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X"
-};
-
-export function toRomanSemester(semester) {
-  if (!semester) return "—";
-  const str = String(semester).trim();
-
-  const romanMatch = str.match(/\b(I|II|III|IV|V|VI|VII|VIII|IX|X)\b/i);
-  if (romanMatch) {
-    return `Sem ${romanMatch[0].toUpperCase()}`;
-  }
-
-  const digitMatch = str.match(/\d+/);
-  if (digitMatch) {
-    const num = parseInt(digitMatch[0], 10);
-    const roman = ROMAN_MAP[num] || digitMatch[0];
-    return `Sem ${roman}`;
-  }
-
-  return str;
+function formatDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
 }
 
 export default function StudentDetails() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { students, loading, addStudent, updateStudent, deleteStudent, bulkImportStudents } = useData();
+  const { issuedItems = [] } = useInventory();
 
   const [query, setQuery] = useState("");
   const [searchParams] = useSearchParams();
-  const [selectedSemester, setSelectedSemester] = useState("All Semesters");
+  const [selectedBatch, setSelectedBatch] = useState("All Batches");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -68,43 +56,31 @@ export default function StudentDetails() {
     setPage(1);
   }, [searchParams]);
 
-  const availableSemesters = useMemo(() => {
+  const availableBatches = useMemo(() => {
     const set = new Set();
     (students || []).forEach((student) => {
-      if (student.semester) {
-        set.add(toRomanSemester(student.semester));
+      if (student.batch) {
+        set.add(student.batch);
       }
     });
-
-    const ORDER = ["Sem I", "Sem II", "Sem III", "Sem IV", "Sem V", "Sem VI", "Sem VII", "Sem VIII", "Sem IX", "Sem X"];
-    const sorted = Array.from(set).sort((a, b) => {
-      const idxA = ORDER.indexOf(a);
-      const idxB = ORDER.indexOf(b);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return a.localeCompare(b);
-    });
-
-    return ["All Semesters", ...sorted];
+    return ["All Batches", ...Array.from(set).sort()];
   }, [students]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = students.filter((r) => {
-      const romSem = toRomanSemester(r.semester);
-      const matchesSem =
-        selectedSemester === "All Semesters" ||
-        romSem === selectedSemester ||
-        String(r.semester) === selectedSemester;
+      const matchesBatch =
+        selectedBatch === "All Batches" ||
+        r.batch === selectedBatch;
       const matchesQuery =
         !q ||
         r.name?.toLowerCase().includes(q) ||
         r.id?.toLowerCase().includes(q) ||
         r.campusId?.toLowerCase().includes(q) ||
         r.course?.toLowerCase().includes(q) ||
-        r.email?.toLowerCase().includes(q);
-      return matchesSem && matchesQuery;
+        r.email?.toLowerCase().includes(q) ||
+        r.batch?.toLowerCase().includes(q);
+      return matchesBatch && matchesQuery;
     });
 
     if (sort.key) {
@@ -116,7 +92,7 @@ export default function StudentDetails() {
     }
 
     return list;
-  }, [students, query, selectedSemester, sort]);
+  }, [students, query, selectedBatch, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -177,8 +153,23 @@ export default function StudentDetails() {
     { key: "name", label: "Name" },
     { key: "email", label: "Email" },
     { key: "course", label: "Course" },
-    { key: "semester", label: "Semester" },
+    { key: "batch", label: "Batch" },
+    { key: "pendingReturns", label: "Pending Returns" },
   ];
+
+  const getPendingCount = (row) => {
+    const sId = (row.campusId || row.id || "").toLowerCase();
+    const sName = (row.name || "").toLowerCase();
+    const activeCount = (issuedItems || []).filter((i) => {
+      const matchId = (i.studentId || "").toLowerCase() === sId;
+      const matchName = (i.studentName || i.student || "").toLowerCase() === sName;
+      const isReturned = i.status?.toLowerCase() === "returned";
+      const isCondemned = i.status?.toLowerCase() === "condemned";
+      const isExchanged = i.status?.toLowerCase() === "vendor_exchange";
+      return (matchId || matchName) && !isReturned && !isCondemned && !isExchanged;
+    }).length;
+    return Math.max(Number(row.pendingReturnCount || 0), activeCount);
+  };
 
   return (
     <>
@@ -200,17 +191,17 @@ export default function StudentDetails() {
               />
             </div>
 
-            <div className="students__sem-filter">
+            <div className="students__batch-filter">
               <select
-                value={selectedSemester}
+                value={selectedBatch}
                 onChange={(e) => {
-                  setSelectedSemester(e.target.value);
+                  setSelectedBatch(e.target.value);
                   setPage(1);
                 }}
               >
-                {availableSemesters.map((sem) => (
-                  <option key={sem} value={sem}>
-                    {sem}
+                {availableBatches.map((batch) => (
+                  <option key={batch} value={batch}>
+                    {batch}
                   </option>
                 ))}
               </select>
@@ -261,45 +252,60 @@ export default function StudentDetails() {
                     </td>
                   </tr>
                 ) : (
-                  pageRows.map((row) => (
-                    <tr key={row.campusId || row.id}>
-                      <td className="students__mono">{row.campusId || row.id}</td>
-                      <td className="students__strong">{row.name}</td>
-                      <td>{row.email || "—"}</td>
-                      <td>
-                        <span className="students-tag">{row.course || "—"}</span>
-                      </td>
-                      <td>{toRomanSemester(row.semester)}</td>
-                      <td className="students__actions-cell">
-                        <div className="students__row-actions">
-                          <button
-                            className="students__icon-btn students__icon-btn--view"
-                            onClick={() => setHistoryStudent(row)}
-                            aria-label={`View history for ${row.name}`}
-                            title="View student history"
-                          >
-                            <Eye size={15} strokeWidth={2} />
-                          </button>
-                          <button
-                            className="students__icon-btn students__icon-btn--edit"
-                            onClick={() => setFormStudent(row)}
-                            aria-label={`Edit ${row.name}`}
-                            title="Edit student"
-                          >
-                            <Pencil size={15} strokeWidth={2} />
-                          </button>
-                          <button
-                            className="students__icon-btn students__icon-btn--danger"
-                            onClick={() => setDeleteTarget(row)}
-                            aria-label={`Remove ${row.name}`}
-                            title="Remove student"
-                          >
-                            <Trash2 size={15} strokeWidth={2} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                  pageRows.map((row) => {
+                    const pendingCount = getPendingCount(row);
+                    return (
+                      <tr key={row.campusId || row.id}>
+                        <td className="students__mono">{row.campusId || row.id}</td>
+                        <td className="students__strong">{row.name}</td>
+                        <td>{row.email || "—"}</td>
+                        <td>
+                          <span className="students-tag">{row.course || "—"}</span>
+                        </td>
+                        <td>
+                          <span className="students-batch-tag">{row.batch || "—"}</span>
+                        </td>
+                        <td>
+                          {pendingCount > 0 ? (
+                            <span className="students__pending-badge">
+                              <Package size={12} />
+                              {pendingCount} item{pendingCount > 1 ? 's' : ''}
+                            </span>
+                          ) : (
+                            <span className="students__no-pending">✅ Clear</span>
+                          )}
+                        </td>
+                        <td className="students__actions-cell">
+                          <div className="students__row-actions">
+                            <button
+                              className="students__icon-btn students__icon-btn--view"
+                              onClick={() => setHistoryStudent(row)}
+                              aria-label={`View history for ${row.name}`}
+                              title="View student history"
+                            >
+                              <Eye size={15} strokeWidth={2} />
+                            </button>
+                            <button
+                              className="students__icon-btn students__icon-btn--edit"
+                              onClick={() => setFormStudent(row)}
+                              aria-label={`Edit ${row.name}`}
+                              title="Edit student"
+                            >
+                              <Pencil size={15} strokeWidth={2} />
+                            </button>
+                            <button
+                              className="students__icon-btn students__icon-btn--danger"
+                              onClick={() => setDeleteTarget(row)}
+                              aria-label={`Remove ${row.name}`}
+                              title="Remove student"
+                            >
+                              <Trash2 size={15} strokeWidth={2} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

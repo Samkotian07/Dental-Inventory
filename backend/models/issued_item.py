@@ -21,6 +21,8 @@ class IssuedItem:
         self.returned_by = data.get('returned_by')
         self.created_at = data.get('created_at')
         self.updated_at = data.get('updated_at')
+        self.is_implant_abutment = data.get('is_implant_abutment', False)
+        self.exchange_reference_id = data.get('exchange_reference_id')
 
     @staticmethod
     def get_db():
@@ -46,7 +48,6 @@ class IssuedItem:
 
     @classmethod
     def find_active_by_unit(cls, unit_id):
-        """Check if a unit is currently active (issued but not returned)"""
         if not unit_id:
             return None
         db = cls.get_db()
@@ -59,28 +60,32 @@ class IssuedItem:
         return None
 
     @classmethod
+    def find_by_exchange_reference(cls, exchange_id):
+        db = cls.get_db()
+        results = db.execute_query(
+            "SELECT * FROM issued_items WHERE exchange_reference_id = %s",
+            (exchange_id,)
+        )
+        return [cls(row) for row in results]
+
+    @classmethod
     def create(cls, data):
         db = cls.get_db()
         
-        # ⭐ Get unit_id from data
         raw_unit_id = data.get('unit_id') or data.get('inventory_id')
+        ref_no = data.get('ref_no')
         
-        # ⭐ CRITICAL CHECK: Is this unit already active?
         if raw_unit_id:
             active = cls.find_active_by_unit(raw_unit_id)
             if active:
                 raise ValueError(f"Unit {raw_unit_id} is already issued to {active.student_name} and not returned yet")
         
-        # Generate issue_id
         issue_id = data.get('issue_id')
         if not issue_id:
             res = db.execute_query("SELECT IFNULL(MAX(CAST(SUBSTRING(issue_id, 5) AS UNSIGNED)), 0) + 1 AS next_id FROM issued_items")
             next_num = res[0]['next_id'] if res and res[0] and 'next_id' in res[0] else 1
             issue_id = f"ISS-{str(next_num).zfill(3)}"
         
-        ref_no = data.get('ref_no')
-
-        # ⭐ Find valid unit
         from models.inventory_unit import InventoryUnit
         valid_unit = None
         if raw_unit_id:
@@ -95,12 +100,15 @@ class IssuedItem:
             if units:
                 valid_unit = units[0]
 
-        target_unit_id = valid_unit.id if valid_unit else None
+        target_unit_id = valid_unit.unit_id if valid_unit else None
+        
+        is_implant = data.get('is_implant_abutment', False)
+        if is_implant:
+            target_unit_id = None
 
-        # ⭐ Insert into issued_items
         db.execute_query("""
-            INSERT INTO issued_items (issue_id, student_id, student_name, unit_id, product_name, lot_no, ref_no, quantity, issue_date, status, issued_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO issued_items (issue_id, student_id, student_name, unit_id, product_name, lot_no, ref_no, quantity, issue_date, status, issued_by, is_implant_abutment, exchange_reference_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             issue_id,
             data['student_id'],
@@ -112,10 +120,11 @@ class IssuedItem:
             data.get('quantity', 1),
             data.get('issue_date'),
             'active',
-            data.get('issued_by')
+            data.get('issued_by'),
+            is_implant,
+            data.get('exchange_reference_id')
         ))
         
-        # ⭐ Update inventory_units quantity - DECREASE by quantity
         try:
             if target_unit_id:
                 unit = InventoryUnit.find_by_id(target_unit_id)
@@ -136,23 +145,18 @@ class IssuedItem:
         
         return cls.find_by_id(issue_id)
 
-    # ⭐ FIXED INDENTATION - This was the issue!
     def return_item(self, return_date, condition, returned_by):
-        """Return an item"""
         db = self.get_db()
         
-        # ⭐ Check if already returned
         if self.status == 'returned':
             return self
         
-        # Update issued item record
         db.execute_query("""
             UPDATE issued_items 
             SET return_date = %s, return_condition = %s, status = 'returned', returned_by = %s 
             WHERE issue_id = %s
         """, (return_date, condition, returned_by, self.issue_id))
         
-        # ⭐ Restore quantity to unit - INCREASE by quantity
         target_id = self.unit_id or self.inventory_id
         if target_id:
             try:
@@ -160,9 +164,11 @@ class IssuedItem:
                 if unit:
                     new_qty = unit.quantity + self.quantity
                     unit.update({'quantity': new_qty})
-                    # ⭐ MARK AS RETURNED
                     unit.mark_returned()
-                    print(f"✅ Unit {target_id} returned, quantity: {new_qty}, is_returned: True")
+                    # ⭐ Generate QR code for returned unit
+                    qr_data = unit.generate_qr_code()
+                    unit.update({'qr_code': qr_data})
+                    print(f"✅ Unit {target_id} returned, quantity: {new_qty}, is_returned: True, QR generated")
                 else:
                     inventory = Inventory.find_by_id(target_id) or Inventory.find_by_ref_no(target_id)
                     if inventory:
@@ -182,9 +188,56 @@ class IssuedItem:
         
         return IssuedItem.find_by_id(self.issue_id)
 
-    def condemn(self, condemned_by):
-        """Condemn an item (mark as condemned)"""
+    def exchange_with_vendor(self, return_date, new_batch_no, exchanged_by):
+        """Exchange an implant/abutment with vendor"""
         db = self.get_db()
+        
+        if self.status == 'vendor_exchange':
+            return self
+        
+        if not self.is_implant_abutment:
+            raise ValueError("Only implants and abutments can be exchanged with vendor")
+        
+        # Create vendor return record
+        from models.vendor_return import VendorReturn
+        
+        vendor_return = VendorReturn.create({
+            'type': 'exchange',
+            'unit_id': self.unit_id,
+            'inventory_id': self.unit_id,
+            'ref_no': self.ref_no,
+            'product_name': self.product_name,
+            'old_batch_no': self.lot_no,
+            'new_batch_no': new_batch_no,
+            'quantity': self.quantity,
+            'reason': 'Defective implant/abutment - vendor exchange',
+            'return_date': return_date,
+            'created_by': exchanged_by
+        })
+        
+        # Update issued item
+        db.execute_query("""
+            UPDATE issued_items 
+            SET status = 'vendor_exchange', 
+                exchange_reference_id = %s,
+                return_date = %s,
+                returned_by = %s
+            WHERE issue_id = %s
+        """, (vendor_return.return_id, return_date, exchanged_by, self.issue_id))
+        
+        self.status = 'vendor_exchange'
+        self.exchange_reference_id = vendor_return.return_id
+        self.return_date = return_date
+        
+        return IssuedItem.find_by_id(self.issue_id)
+
+    def condemn(self, condemned_by):
+        db = self.get_db()
+        
+        # ⭐ Implants/Abutments cannot be condemned
+        if self.is_implant_abutment:
+            raise ValueError("Implants and abutments cannot be condemned. Use vendor exchange instead.")
+        
         db.execute_query("""
             UPDATE issued_items 
             SET status = 'condemned', returned_by = %s 
@@ -218,5 +271,8 @@ class IssuedItem:
             'issuedBy': self.issued_by,
             'returnedBy': self.returned_by,
             'createdAt': fmt_date(self.created_at),
-            'updatedAt': fmt_date(self.updated_at)
+            'updatedAt': fmt_date(self.updated_at),
+            'isImplantAbutment': self.is_implant_abutment,
+            'is_implant_abutment': self.is_implant_abutment,
+            'exchangeReferenceId': self.exchange_reference_id,
         }

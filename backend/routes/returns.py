@@ -37,7 +37,6 @@ def get_return(return_id):
         'data': item.to_dict()
     }), 200
 
-# ⭐ FIXED: Removed @admin_required - Staff can create returns
 @returns_bp.route('/', methods=['POST'])
 @token_required
 def create_return():
@@ -86,16 +85,18 @@ def create_return():
         unit = InventoryUnit.find_by_id(inventory_id)
         if unit:
             product = Product.find_by_ref_no(unit.ref_no)
+            # ⭐ FIXED: Use get_product_name() instead of product.product_name
+            product_name = product.get_product_name() if product else unit.ref_no
             inventory_item = Inventory({
-                'id': unit.id,
+                'id': unit.unit_id,
                 'ref_no': unit.ref_no,
-                'product_name': product.product_name if product else unit.ref_no,
-                'category': product.category if product else 'General',
+                'product_name': product_name,
+                'category': product.get_category() if product else 'General',
                 'company_name': product.company_name if product else '',
-                'size': product.size if product else '',
+                'size': product.get_size() if product else '',
                 'lot_no': product.lot_no if product else '',
                 'quantity': unit.quantity,
-                'is_returnable': product.is_returnable if product else True,
+                'is_returnable': product.get_is_returnable() if product else True,
             })
         else:
             inventory_item = Inventory.find_by_id(inventory_id) or Inventory.find_by_ref_no(inventory_id)
@@ -106,13 +107,13 @@ def create_return():
                 inventory_item = Inventory({
                     'id': data.get('ref_no'),
                     'ref_no': product.ref_no,
-                    'product_name': product.product_name,
-                    'category': product.category,
+                    'product_name': product.get_product_name(),
+                    'category': product.get_category(),
                     'company_name': product.company_name,
-                    'size': product.size,
+                    'size': product.get_size(),
                     'lot_no': product.lot_no,
                     'quantity': 1,
-                    'is_returnable': product.is_returnable,
+                    'is_returnable': product.get_is_returnable(),
                 })
 
         if not inventory_item and (data.get('product_name') or data.get('product')):
@@ -157,7 +158,6 @@ def create_return():
         
         vendor_return = VendorReturn.create(return_data)
         
-        # Log the action
         AuditLog.create(
             action='CREATE_RETURN',
             entity_type='VENDOR_RETURN',
@@ -174,6 +174,8 @@ def create_return():
         }), 201
     except Exception as e:
         print(f"❌ Error in create_return: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': {
@@ -182,7 +184,6 @@ def create_return():
             }
         }), 500
 
-# ⭐ FIXED: Removed @admin_required - Staff can update return status
 @returns_bp.route('/<return_id>/status', methods=['PUT'])
 @token_required
 def update_return_status(return_id):
@@ -227,11 +228,9 @@ def update_return_status(return_id):
     
     current_user = request.current_user
     
-    # If completing a credit note or providing credit note, store the credit note number
     provided_credit_note = data.get('credit_note') or data.get('creditNote')
     credit_note = provided_credit_note if provided_credit_note else (vendor_return.credit_note if status == 'completed' else None)
     
-    # Handle completion for exchange type
     new_batch_no = data.get('new_batch_no') or data.get('newBatchNo')
     if status == 'completed' and vendor_return.type == 'exchange':
         if not new_batch_no and not vendor_return.new_batch_no:
@@ -243,9 +242,17 @@ def update_return_status(return_id):
                 }
             }), 400
     
-    updated_return = vendor_return.update_status(status, credit_note_number=credit_note, new_batch_no=new_batch_no)
+    is_credit_note_used = data.get('is_credit_note_used') if 'is_credit_note_used' in data else (data.get('isCreditNoteUsed') if 'isCreditNoteUsed' in data else None)
+    replacement_unit_id = data.get('replacement_unit_id') or data.get('replacementUnitId')
     
-    # Log the action
+    updated_return = vendor_return.update_status(
+        status, 
+        credit_note_number=credit_note, 
+        new_batch_no=new_batch_no,
+        is_credit_note_used=is_credit_note_used,
+        replacement_unit_id=replacement_unit_id
+    )
+    
     AuditLog.create(
         action='UPDATE_RETURN_STATUS',
         entity_type='VENDOR_RETURN',

@@ -66,11 +66,16 @@ function normalizeIssued(item) {
     status: item.status === "returned" ? "Returned" : item.status === "condemned" ? "Condemned" : "Active",
     created: item.created_at || item.createdAt || "",
     createdAt: item.created_at || item.createdAt || "",
+    // ⭐ ADD THESE - CRITICAL FOR IMPLANT/ABUTMENT DETECTION
+    isImplantAbutment: Boolean(item.isImplantAbutment ?? item.is_implant_abutment ?? false),
+    is_implant_abutment: Boolean(item.isImplantAbutment ?? item.is_implant_abutment ?? false),
+    category: item.category || "",
   };
 }
 
 function normalizeReturn(item) {
   const resolvedUnitId = item.unit_id || item.unitId || item.inventory_id || item.inventoryId || "";
+  const cnUsed = Boolean(item.credit_note_used ?? item.creditNoteUsed ?? item.is_credit_note_used ?? item.isCreditNoteUsed ?? false);
   return {
     id: item.id || item.return_id || item.returnId,
     returnId: item.id || item.return_id || item.returnId,
@@ -83,6 +88,10 @@ function normalizeReturn(item) {
     qty: Number(item.quantity ?? item.qty ?? 1),
     reason: item.reason || "",
     creditNote: item.credit_note || item.creditNote || "",
+    creditNoteUsed: cnUsed,
+    is_credit_note_used: cnUsed,
+    isCreditNoteUsed: cnUsed,
+    replacementUnitId: item.replacement_unit_id || item.replacementUnitId || "",
     returnDate: item.return_date || item.returnDate || new Date().toISOString().slice(0, 10),
     status: item.status || "Pending",
     batchNo: item.old_batch_no || item.batchNo || item.lot_no || item.lotNo || "",
@@ -242,7 +251,7 @@ export function InventoryProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        await Promise.all([fetchStock(), fetchIssued()]);
+        Promise.all([fetchStock(), fetchIssued()]).catch(err => console.error("Sync error:", err));
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message || "Batch issue failed" };
@@ -274,7 +283,7 @@ export function InventoryProvider({ children }) {
 
       const data = await res.json();
       if (data.success) {
-        await Promise.all([fetchStock(), fetchIssued()]);
+        Promise.all([fetchStock(), fetchIssued()]).catch(err => console.error("Sync error:", err));
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message || data.message || "Failed to issue item" };
@@ -294,9 +303,9 @@ export function InventoryProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        await Promise.all([fetchStock(), fetchIssued()]);
+        Promise.all([fetchStock(), fetchIssued()]).catch(err => console.error("Sync error:", err));
         console.log("✅ Return completed, data refreshed");
-        return { success: true, data: data.data };
+        return { success: true, data: data.data, qr_data: data.qr_data };
       }
       return { success: false, message: data.error?.message };
     } catch (error) {
@@ -314,7 +323,7 @@ export function InventoryProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        await Promise.all([fetchIssued(), fetchStock()]);
+        Promise.all([fetchIssued(), fetchStock()]).catch(err => console.error("Sync error:", err));
         return { success: true, data: data.data };
       }
       return { success: false, message: data.error?.message };
@@ -525,6 +534,8 @@ export function InventoryProvider({ children }) {
         status: normalizedStatus,
         credit_note: typeof extraData === "string" ? extraData : extraData?.creditNote || extraData?.credit_note,
         new_batch_no: typeof extraData === "object" ? extraData?.newBatchNo || extraData?.new_batch_no : undefined,
+        is_credit_note_used: typeof extraData === "object" ? (extraData?.is_credit_note_used ?? extraData?.isCreditNoteUsed ?? extraData?.creditNoteUsed) : undefined,
+        replacement_unit_id: typeof extraData === "object" ? (extraData?.replacement_unit_id ?? extraData?.replacementUnitId) : undefined,
       };
 
       const res = await fetch(`${API_URL}/returns/${returnId}/status`, {
@@ -573,6 +584,31 @@ export function InventoryProvider({ children }) {
     return item?.id || refNo;
   }, [stock]);
 
+  // ⭐ EXCHANGE WITH VENDOR (For Implants/Abutments)
+  const exchangeWithVendor = async (issueId, returnDate, newBatchNo) => {
+    try {
+      const res = await fetch(`${API_URL}/issued/${issueId}/exchange`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          return_date: returnDate,
+          new_batch_no: newBatchNo,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        // ⭐ IMPORTANT: Refresh ALL data including returns
+        await Promise.all([fetchStock(), fetchIssued(), fetchReturns()]);
+        console.log("✅ Exchange completed, data refreshed");
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.error?.message };
+    } catch (error) {
+      console.error("Exchange error:", error);
+      return { success: false, message: "Network error" };
+    }
+  };
+
   const value = {
     stock,
     failed,
@@ -589,6 +625,7 @@ export function InventoryProvider({ children }) {
     batchIssueItems,
     returnIssuedItem,
     condemnIssuedItem,
+    exchangeWithVendor,  // ⭐ ADD THIS
     updateStockItem,
     toggleStockStatus,
     deleteStockItem,
@@ -611,3 +648,29 @@ export function useInventory() {
   if (!ctx) throw new Error("useInventory must be used within an InventoryProvider");
   return ctx;
 }
+
+// ⭐ RETURN ITEM (returns QR data)
+const returnIssuedItem = async (issueId, returnDate, condition = "Good") => {
+    try {
+        const res = await fetch(`${API_URL}/issued/${issueId}/return`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ return_date: returnDate, return_condition: condition }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            await Promise.all([fetchStock(), fetchIssued()]);
+            console.log("✅ Return completed, data refreshed");
+            // ⭐ Return QR data from response
+            return { 
+                success: true, 
+                data: data.data,
+                qr_data: data.qr_data  // ⭐ QR data from backend
+            };
+        }
+        return { success: false, message: data.error?.message };
+    } catch (error) {
+        console.error("Return error:", error);
+        return { success: false, message: "Network error" };
+    }
+};

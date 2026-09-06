@@ -76,15 +76,15 @@ def create_failed_item():
     if unit:
         product = Product.find_by_ref_no(unit.ref_no)
         inventory_item = Inventory({
-            'id': unit.id,
+            'id': unit.unit_id,
             'ref_no': unit.ref_no,
-            'product_name': product.product_name if product else unit.ref_no,
-            'category': product.category if product else 'General',
+            'product_name': product.get_product_name() if product else unit.ref_no,
+            'category': product.get_category() if product else 'General',
             'company_name': product.company_name if product else '',
-            'size': product.size if product else '',
+            'size': product.get_size() if product else '',
             'lot_no': product.lot_no if product else '',
             'quantity': unit.quantity,
-            'is_returnable': product.is_returnable if product else True,
+            'is_returnable': product.get_is_returnable() if product else True,
         })
     else:
         inventory_item = Inventory.find_by_id(inventory_id) or Inventory.find_by_ref_no(inventory_id)

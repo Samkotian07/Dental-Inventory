@@ -1,5 +1,6 @@
 from database.db import Database
 from models.inventory import Inventory
+import datetime
 
 class VendorReturn:
     def __init__(self, data):
@@ -66,7 +67,7 @@ class VendorReturn:
             if units:
                 valid_unit = units[0]
 
-        target_unit_id = valid_unit.id if valid_unit else None
+        target_unit_id = valid_unit.unit_id if valid_unit else None
         final_ref_no = ref_no or (valid_unit.ref_no if valid_unit else raw_unit_id)
 
         # Populate product_name & old_batch_no if missing
@@ -75,26 +76,33 @@ class VendorReturn:
 
         prod_name = data.get('product_name')
         if not prod_name or prod_name == 'Product':
-            prod_name = (product_info.product_name if product_info else None) or (inventory.product_name if inventory else None) or final_ref_no
+            prod_name = (product_info.get_product_name() if product_info else None) or final_ref_no
 
-        old_batch = data.get('old_batch_no') or data.get('batch_no')
+        old_batch = data.get('old_batch_no') or data.get('old_lot_no') or data.get('batch_no')
         if not old_batch:
-            old_batch = (product_info.lot_no if product_info else None) or (inventory.lot_no if inventory else None)
+            old_batch = (product_info.lot_no if product_info else None) or ''
+
+        issue_id = data.get('issue_id')
+        new_batch = data.get('new_batch_no') or data.get('new_lot_no')
+        return_date = data.get('return_date') or datetime.date.today().isoformat()
 
         db.execute_query("""
-            INSERT INTO vendor_returns (return_id, type, unit_id, ref_no, product_name, old_batch_no, new_batch_no, quantity, reason, return_date, credit_note, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO vendor_returns (return_id, type, issue_id, unit_id, ref_no, product_name, old_batch_no, old_lot_no, new_batch_no, new_lot_no, quantity, reason, return_date, credit_note, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             return_id,
             data['type'],
+            issue_id,
             target_unit_id,
             final_ref_no,
             prod_name,
             old_batch,
-            data.get('new_batch_no'),
+            old_batch,
+            new_batch,
+            new_batch,
             data.get('quantity', 1),
             data.get('reason'),
-            data.get('return_date'),
+            return_date,
             data.get('credit_note'),
             data.get('created_by')
         ))
@@ -106,7 +114,7 @@ class VendorReturn:
         db.execute_query("DELETE FROM vendor_returns WHERE return_id = %s", (self.return_id,))
         return True
 
-    def update_status(self, status, credit_note_number=None, new_batch_no=None):
+    def update_status(self, status, credit_note_number=None, new_batch_no=None, is_credit_note_used=None, replacement_unit_id=None):
         db = self.get_db()
         updates = ["status = %s"]
         params = [status]
@@ -120,6 +128,17 @@ class VendorReturn:
             updates.append("new_batch_no = %s")
             params.append(new_batch_no)
             self.new_batch_no = new_batch_no
+
+        if is_credit_note_used is not None:
+            val = 1 if is_credit_note_used else 0
+            updates.append("is_credit_note_used = %s")
+            updates.append("credit_note_used = %s")
+            params.extend([val, val])
+            self.credit_note_used = bool(val)
+
+        if replacement_unit_id:
+            updates.append("replacement_unit_id = %s")
+            params.append(replacement_unit_id)
         
         params.append(self.return_id)
         query = f"UPDATE vendor_returns SET {', '.join(updates)} WHERE return_id = %s"
@@ -170,9 +189,11 @@ class VendorReturn:
                 prod = Product.find_by_ref_no(ref)
                 if prod:
                     if not product_name or product_name == 'Product':
-                        product_name = prod.product_name
+                        product_name = prod.get_product_name()
                     if not old_batch_no:
                         old_batch_no = prod.lot_no
+
+        cn_used = bool(getattr(self, 'credit_note_used', False) or getattr(self, 'is_credit_note_used', False))
 
         return {
             'returnId': self.return_id,
@@ -189,7 +210,9 @@ class VendorReturn:
             'reason': self.reason,
             'returnDate': fmt_date(self.return_date),
             'creditNote': self.credit_note,
-            'creditNoteUsed': self.credit_note_used,
+            'creditNoteUsed': cn_used,
+            'isCreditNoteUsed': cn_used,
+            'replacementUnitId': getattr(self, 'replacement_unit_id', None),
             'status': self.status,
             'createdBy': self.created_by,
             'createdAt': fmt_date(self.created_at),

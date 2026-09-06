@@ -14,6 +14,8 @@ import {
   HomeIcon,
   AlertCircle,
   ScrollText,
+  FileText,
+  Archive,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import "./Sidebar.css";
@@ -33,6 +35,7 @@ const navItems = [
 
 const adminOnlyItems = [
   { label: "Stock Settings", to: "/low-stock-settings", icon: AlertCircle },
+  { label: "Archive Students", to: "/archive-students", icon: Archive },
   { label: "Staff Manager", to: "/staff-manager", icon: UserCog },
   { label: "Audit Log", to: "/audit-log", icon: ScrollText },
 ];
@@ -76,7 +79,20 @@ export default function Sidebar({ open, onClose }) {
               </li>
             ))}
 
-            {/* Only show these 2 options if admin */}
+            {/* ⭐ Reports - visible to all users */}
+            <li>
+              <NavLink
+                to="/reports"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `sidebar__link ${isActive ? "is-active" : ""}`
+                }
+              >
+                <FileText size={18} strokeWidth={2} />
+                <span>Reports</span>
+              </NavLink>
+            </li>
+
             {isAdmin &&
               adminOnlyItems.map(({ label, to, icon: Icon }) => (
                 <li key={label}>
@@ -95,11 +111,6 @@ export default function Sidebar({ open, onClose }) {
           </ul>
         </nav>
 
-        <button className="sidebar__logout" onClick={handleLogout}>
-          <LogOut size={18} strokeWidth={2} />
-          <span>Logout</span>
-        </button>
-
         <div className="sidebar__profile">
           <span className="sidebar__avatar">
             {user?.name?.charAt(0) || "A"}
@@ -112,6 +123,14 @@ export default function Sidebar({ open, onClose }) {
               {user?.role || "Guest"}
             </span>
           </div>
+          <button 
+            className="sidebar__logout-btn" 
+            onClick={handleLogout}
+            title="Logout"
+            aria-label="Logout"
+          >
+            <LogOut size={16} strokeWidth={2} />
+          </button>
         </div>
       </aside>
     </>

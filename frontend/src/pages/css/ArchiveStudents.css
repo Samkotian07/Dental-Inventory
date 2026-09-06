@@ -1,0 +1,303 @@
+/* Archive Students Page */
+.archive-students {
+  padding: 20px 28px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Toolbar */
+.archive-students__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.archive-students__filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.archive-students__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 8px 12px;
+  transition: border-color 0.2s;
+}
+
+.archive-students__search:focus-within {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.archive-students__search input {
+  border: none;
+  outline: none;
+  font-size: 14px;
+  background: transparent;
+  min-width: 200px;
+}
+
+.archive-students__search svg {
+  color: #9CA3AF;
+}
+
+.archive-students__select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+  background: white;
+  font-size: 14px;
+  color: #374151;
+  min-width: 140px;
+  cursor: pointer;
+}
+
+.archive-students__select:focus {
+  outline: none;
+  border-color: #2563EB;
+}
+
+.archive-students__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.archive-students__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.archive-students__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.archive-students__btn--primary {
+  background: #2563EB;
+  color: white;
+}
+
+.archive-students__btn--primary:hover:not(:disabled) {
+  background: #1D4ED8;
+}
+
+.archive-students__btn--batch {
+  background: #D97706;
+  color: white;
+}
+
+.archive-students__btn--batch:hover:not(:disabled) {
+  background: #B45309;
+}
+
+/* Info Banner */
+.archive-students__info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #EFF6FF;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #1E40AF;
+}
+
+.archive-students__info svg {
+  color: #2563EB;
+  flex-shrink: 0;
+}
+
+/* Table */
+.archive-students__card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #E5E7EB;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.archive-students__scroll {
+  overflow-x: auto;
+}
+
+.archive-students__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.archive-students__table thead {
+  background: #F9FAFB;
+}
+
+.archive-students__table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: #6B7280;
+  border-bottom: 1px solid #E5E7EB;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.archive-students__table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #F3F4F6;
+  vertical-align: middle;
+}
+
+.archive-students__table tr:hover td {
+  background: #F9FAFB;
+}
+
+.archive-students__row--dues {
+  background: #FEF2F2;
+}
+
+.archive-students__row--dues:hover td {
+  background: #FEE2E2;
+}
+
+.archive-students__checkbox-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9CA3AF;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.archive-students__checkbox-btn:hover:not(:disabled) {
+  background: #F3F4F6;
+  color: #2563EB;
+}
+
+.archive-students__checkbox-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.archive-students__checkbox-btn .is-checked {
+  color: #2563EB;
+}
+
+.archive-students__mono {
+  font-family: monospace;
+  font-size: 13px;
+  color: #4B5563;
+}
+
+.archive-students__strong {
+  font-weight: 600;
+  color: #111827;
+}
+
+.archive-students__batch-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  background: #EFF6FF;
+  color: #1D4ED8;
+  font-weight: 500;
+}
+
+.archive-students__dues-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+.archive-students__no-dues {
+  font-size: 13px;
+  color: #059669;
+  font-weight: 500;
+}
+
+.archive-students__status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.archive-students__status-badge.active {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.archive-students__status-badge.archived {
+  background: #E5E7EB;
+  color: #6B7280;
+}
+
+.archive-students__empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #9CA3AF;
+  font-size: 14px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .archive-students {
+    padding: 12px 16px 30px;
+  }
+
+  .archive-students__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .archive-students__filters {
+    flex-direction: column;
+  }
+
+  .archive-students__search input {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .archive-students__actions {
+    flex-direction: column;
+  }
+
+  .archive-students__btn {
+    justify-content: center;
+  }
+
+  .archive-students__info {
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+}

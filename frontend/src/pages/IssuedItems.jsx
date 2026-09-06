@@ -12,9 +12,10 @@ import Pagination from "../components/Pagination.jsx";
 import IssueDetailsModal from "../components/issued/IssueDetailsModal.jsx";
 import ReturnItemModal from "../components/issued/ReturnItemModal.jsx";
 import IssueItemModal from "../components/issued/IssueItemModal.jsx";
+import QRCodeDisplayModal from "../components/issued/QRCodeDisplayModal.jsx";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { useData } from "../context/DataContext.jsx";
 import { toast } from "sonner";
@@ -49,7 +50,7 @@ function formatDate(isoOrDate) {
 
 export default function IssuedItems() {
   const onMenuClick = useMenuClick();
-  const { issuedItems, issueItem, returnIssuedItem, condemnIssuedItem, stock, batchIssueItems } = useInventory();
+  const { issuedItems, issueItem, returnIssuedItem, condemnIssuedItem, stock, batchIssueItems, exchangeWithVendor } = useInventory();
   const { students } = useData();
 
   const [query, setQuery] = useState("");
@@ -61,8 +62,11 @@ export default function IssuedItems() {
   const [detailItem, setDetailItem] = useState(null);
   const [returnItem, setReturnItem] = useState(null);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
+  
+  // ⭐ QR Modal state
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrData, setQrData] = useState(null);
 
-  // ⭐ FIXED: Keep both features - searchParams and inventoryOptions
   useEffect(() => {
     setQuery(searchParams.get("search") || "");
     setPage(1);
@@ -128,12 +132,34 @@ export default function IssuedItems() {
     );
   };
 
+  // ⭐ UPDATED: Return handler with QR data
   const handleConfirmReturn = async (issueId, returnDateISO, condition = "Good") => {
     const result = await returnIssuedItem(issueId, returnDateISO, condition);
     if (result.success) {
       toast.success("Item returned to inventory successfully");
+      
+      // ⭐ Check if QR data was returned
+      if (result.qr_data) {
+        // Find the unit details to show in QR modal
+        const unit = stock.find(s => s.id === result.qr_data?.unit_id);
+        setQrData({
+          unitId: result.qr_data.unit_id || unit?.id,
+          refNo: result.qr_data.ref_no || unit?.refNo,
+          productName: unit?.product || unit?.productName || "Product",
+          location: unit?.freshLocation || unit?.location || "—",
+          returnDate: returnDateISO ? formatDate(returnDateISO) : formatDate(new Date()),
+          qrCode: result.qr_data,
+        });
+        setQrModalOpen(true);
+      }
+      
+      // Close return modal
+      setReturnItem(null);
+      setPage(1);
+      return result;
     } else {
       toast.error(result.message || "Failed to return item");
+      return result;
     }
   };
 
@@ -141,15 +167,33 @@ export default function IssuedItems() {
     const result = await condemnIssuedItem(issueId);
     if (result.success) {
       toast.success(`Item condemned: ${reason || "Discarded"}`);
+      setReturnItem(null);
+      setPage(1);
     } else {
       toast.error(result.message || "Failed to condemn item");
     }
   };
 
+  const handleExchange = async (issueId, returnDate, newBatchNo) => {
+    const result = await exchangeWithVendor(issueId, returnDate, newBatchNo);
+    if (result.success) {
+      toast.success(`Item exchanged with vendor. New batch: ${newBatchNo}`);
+      setReturnItem(null);
+      setPage(1);
+    } else {
+      toast.error(result.message || "Failed to exchange item with vendor");
+    }
+  };
+
   const handleIssueNew = async ({ studentId, refNo, qty, unitIds, lotNo, stockType }) => {
-    const student = students.find((s) => s.id === studentId);
+    console.log("🔍 IssueNew called with:", { studentId, refNo, qty, unitIds, lotNo, stockType });
     
-    // Use batch API for multiple units
+    const student = students.find((s) => s.id === studentId);
+    if (!student) {
+      toast.error("Student not found");
+      return;
+    }
+    
     if (unitIds && unitIds.length > 1) {
       const items = unitIds.map(unitId => ({
         student_id: studentId,
@@ -170,15 +214,20 @@ export default function IssuedItems() {
       }
     }
     
-    // Single unit issue
+    const targetId = unitIds?.[0] || refNo;
+    console.log("🔍 Issuing single unit:", { studentId, targetId, refNo, qty });
+    
     const result = await issueItem({
       studentId,
-      inventoryId: unitIds?.[0],
+      inventoryId: targetId,
+      unitId: targetId,
       refNo,
       qty: Number(qty),
       issueDate: new Date().toISOString().slice(0, 10),
       stockType: stockType || "fresh",
     });
+
+    console.log("🔍 Issue result:", result);
 
     if (result.success) {
       toast.success(result.message || `Issued ${qty} unit(s) to ${student?.name || studentId}`);
@@ -189,12 +238,16 @@ export default function IssuedItems() {
     }
   };
 
+  const openIssueModal = () => {
+    console.log("🔍 Opening Issue Modal");
+    setIssueModalOpen(true);
+  };
+
   const columns = [
     { key: "issueId", label: "Issue ID" },
     { key: "student", label: "Student" },
     { key: "studentId", label: "Student ID" },
     { key: "product", label: "Product" },
-    { key: "unitId", label: "Unit ID" },
     { key: "lotNo", label: "Lot No" },
     { key: "refNo", label: "Ref No" },
     { key: "qty", label: "Qty" },
@@ -243,7 +296,7 @@ export default function IssuedItems() {
             </button>
             <button
               className="issued__btn issued__btn--primary"
-              onClick={() => setIssueModalOpen(true)}
+              onClick={openIssueModal}
             >
               <Plus size={15} strokeWidth={2.4} />
               Issue Item
@@ -285,9 +338,14 @@ export default function IssuedItems() {
                     <td className="issued__strong">{row.student || row.studentName}</td>
                     <td className="issued__mono">{row.studentId}</td>
                     <td>{row.product || row.productName}</td>
-                    <td className="issued__mono">{row.unitId || row.inventoryId || "—"}</td>
                     <td className="issued__mono">{row.lotNo}</td>
-                    <td className="issued__mono">{row.refNo}</td>
+                    <td className="issued__mono">
+                      <Link to={`/unit-history/${encodeURIComponent(row.unitId || row.inventoryId || row.refNo)}`} 
+                            style={{ color: "#2563EB", textDecoration: "none" }}
+                            title="View Unit History">
+                        {row.refNo}
+                      </Link>
+                    </td>
                     <td>{row.qty ?? row.quantity}</td>
                     <td>{row.date || row.issuedDate || row.issueDate}</td>
                     <td>
@@ -348,6 +406,8 @@ export default function IssuedItems() {
           onClose={() => setReturnItem(null)}
           onConfirm={handleConfirmReturn}
           onCondemn={handleCondemn}
+          onExchange={handleExchange}
+          isReturning={qrModalOpen}
         />
       )}
 
@@ -355,6 +415,24 @@ export default function IssuedItems() {
         <IssueItemModal
           onClose={() => setIssueModalOpen(false)}
           onConfirm={handleIssueNew}
+        />
+      )}
+
+      {/* ⭐ QR Code Display Modal */}
+      {qrModalOpen && qrData && (
+        <QRCodeDisplayModal
+          isOpen={qrModalOpen}
+          onClose={() => {
+            setQrModalOpen(false);
+            setQrData(null);
+            setReturnItem(null);
+            setPage(1);
+          }}
+          unitId={qrData.unitId}
+          refNo={qrData.refNo}
+          productName={qrData.productName}
+          location={qrData.location}
+          returnDate={qrData.returnDate}
         />
       )}
     </>

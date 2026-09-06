@@ -117,7 +117,7 @@ class Inventory:
                 'status': data.get('status', 'active'),
                 'created_by': data.get('created_by'),
             })
-            return cls.find_by_id(unit.id)
+            return cls.find_by_id(unit.unit_id)
         except Exception as e:
             print(f"Inventory.create fallback error: {e}")
             try:

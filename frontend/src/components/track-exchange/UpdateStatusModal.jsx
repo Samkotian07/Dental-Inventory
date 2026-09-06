@@ -2,8 +2,15 @@ import { useState } from "react";
 import Modal from "./Modal.jsx";
 
 export default function UpdateStatusModal({ item, onClose, onConfirm }) {
+  const isReasonString = (val) =>
+    !val || ["Damaged", "Defective", "Expired", "Failed in Patient", "Other"].includes(String(val).trim());
+
+  const defaultBatch = !isReasonString(item.newBatchNo)
+    ? item.newBatchNo
+    : (item.oldBatchNo || item.batchNo || item.lotNo || "");
+
   const [newStatus, setNewStatus] = useState(item.status || "Pending");
-  const [newBatchNo, setNewBatchNo] = useState(item.newBatchNo || "");
+  const [newBatchNo, setNewBatchNo] = useState(defaultBatch);
   const [creditNote, setCreditNote] = useState(item.creditNote || "");
 
   const isExchange = item.type === "exchange";

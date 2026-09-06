@@ -63,7 +63,7 @@ class FailedInventory:
             if units:
                 valid_unit = units[0]
 
-        target_unit_id = valid_unit.id if valid_unit else None
+        target_unit_id = valid_unit.unit_id if valid_unit else None
 
         db.execute_query("""
             INSERT INTO failed_inventory (id, ref_no, product_name, category, company_name, size, lot_no, quantity, expiry_date, failure_reason, original_inventory_id, unit_id, moved_by)

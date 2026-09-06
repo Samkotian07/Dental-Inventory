@@ -9,19 +9,23 @@ import { InventoryProvider } from "./context/InventoryContext.jsx";  // ✅ CORR
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { Toaster } from "sonner";
 
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <DataProvider>
-            <InventoryProvider>
-              <Toaster richColors position="top-right" />
-              <App />
-            </InventoryProvider>
-          </DataProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ThemeProvider>
+          <AuthProvider>
+            <DataProvider>
+              <InventoryProvider>
+                <Toaster richColors position="top-right" />
+                <App />
+              </InventoryProvider>
+            </DataProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

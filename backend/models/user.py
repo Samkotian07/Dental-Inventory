@@ -12,8 +12,11 @@ class User:
         self.password_hash = data.get('password_hash')
         self.role = data.get('role', 'staff')
         self.status = data.get('status', 'active')
-        self.created_at = data.get('created_at')
         self.token_version = data.get('token_version', 1)
+        self.last_login_at = data.get('last_login_at')
+        self.last_login_ip = data.get('last_login_ip')
+        self.created_at = data.get('created_at')
+        self.updated_at = data.get('updated_at')
     
     @staticmethod
     def get_db():
@@ -21,13 +24,11 @@ class User:
     
     @staticmethod
     def hash_password(password):
-        """Hash a password using bcrypt"""
         salt = bcrypt.gensalt()
         return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
     
     @staticmethod
     def verify_password(password, password_hash):
-        """Verify a password against a hash"""
         try:
             return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
         except ValueError:
@@ -35,7 +36,6 @@ class User:
 
     @classmethod
     def _ensure_token_blacklist_table(cls):
-        """Ensure token_blacklist table exists"""
         try:
             db = cls.get_db()
             db.execute_query("""
@@ -52,7 +52,6 @@ class User:
 
     @classmethod
     def blacklist_token(cls, token, user_id=None):
-        """Blacklist a single token"""
         try:
             cls._ensure_token_blacklist_table()
             db = cls.get_db()
@@ -67,7 +66,6 @@ class User:
 
     @classmethod
     def is_token_blacklisted(cls, token):
-        """Check if a token is in the blacklist"""
         try:
             cls._ensure_token_blacklist_table()
             db = cls.get_db()
@@ -81,14 +79,12 @@ class User:
 
     @classmethod
     def revoke_all_user_tokens(cls, user_id):
-        """Revoke all tokens for a user by blacklisting or updating token_version if column exists"""
         try:
             db = cls.get_db()
-            # Attempt to add token_version column if missing, then increment
             try:
                 db.execute_query("ALTER TABLE users ADD COLUMN token_version INT DEFAULT 1")
             except Exception:
-                pass # Column likely exists
+                pass
             
             db.execute_query(
                 "UPDATE users SET token_version = COALESCE(token_version, 1) + 1 WHERE id = %s",
@@ -101,11 +97,9 @@ class User:
     
     @classmethod
     def generate_token(cls, user_data):
-        """Generate JWT token for a user"""
         user_id = user_data['id']
         token_version = user_data.get('token_version', 1)
         
-        # If user has token_version in db, fetch it
         user = cls.find_by_id(user_id)
         if user and getattr(user, 'token_version', None) is not None:
             token_version = user.token_version
@@ -121,13 +115,11 @@ class User:
     
     @classmethod
     def verify_token(cls, token):
-        """Verify and decode a JWT token"""
         try:
             payload = jwt.decode(token, Config.JWT_SECRET, algorithms=['HS256'])
             if cls.is_token_blacklisted(token):
                 return None
             
-            # Check user token_version if present
             if 'token_version' in payload:
                 user = cls.find_by_id(payload['user_id'])
                 if user and getattr(user, 'token_version', None) is not None:
@@ -142,7 +134,6 @@ class User:
     
     @classmethod
     def find_by_email(cls, email):
-        """Find a user by email"""
         db = cls.get_db()
         result = db.execute_query(
             "SELECT * FROM users WHERE email = %s",
@@ -154,7 +145,6 @@ class User:
     
     @classmethod
     def find_by_email_exclude_id(cls, email, exclude_id):
-        """Find a user by email excluding a specific user ID"""
         db = cls.get_db()
         result = db.execute_query(
             "SELECT * FROM users WHERE email = %s AND id != %s",
@@ -166,7 +156,6 @@ class User:
     
     @classmethod
     def find_by_id(cls, user_id):
-        """Find a user by ID"""
         db = cls.get_db()
         result = db.execute_query(
             "SELECT * FROM users WHERE id = %s",
@@ -178,9 +167,11 @@ class User:
     
     @classmethod
     def create(cls, name, email, password, role='staff'):
-        """Create a new user"""
         db = cls.get_db()
         password_hash = cls.hash_password(password)
+        
+        if role not in ['admin', 'staff', 'readonly']:
+            role = 'staff'
         
         user_id = db.execute_query(
             """INSERT INTO users (name, email, password_hash, role, status, created_at)
@@ -191,7 +182,6 @@ class User:
         return cls.find_by_id(user_id)
     
     def update(self, data):
-        """Update user data"""
         db = self.get_db()
         updates = []
         params = []
@@ -212,7 +202,6 @@ class User:
         return User.find_by_id(self.id)
     
     def update_password(self, new_password):
-        """Update user password"""
         db = self.get_db()
         password_hash = self.hash_password(new_password)
         db.execute_query(
@@ -221,8 +210,19 @@ class User:
         )
         return True
     
+    def is_admin(self):
+        return self.role == 'admin'
+    
+    def is_staff(self):
+        return self.role in ['admin', 'staff']
+    
+    def is_readonly(self):
+        return self.role == 'readonly'
+    
+    def can_write(self):
+        return self.role in ['admin', 'staff']
+    
     def to_dict(self):
-        """Convert user to dictionary (excludes sensitive data)"""
         return {
             'id': self.id,
             'name': self.name,

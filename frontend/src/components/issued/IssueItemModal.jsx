@@ -3,6 +3,7 @@ import Modal from "./Modal.jsx";
 import { useData } from "../../context/DataContext.jsx";
 import { useInventory } from "../../context/InventoryContext.jsx";
 import { toast } from "sonner";
+import "./IssueItemModal.css";
 
 function formatDisplayDate(iso) {
   if (!iso) return "—";
@@ -20,7 +21,6 @@ export default function IssueItemModal({ onClose, onConfirm }) {
   const [qty, setQty] = useState(1);
   const [stockSource, setStockSource] = useState("all");
   const [selectedUnitId, setSelectedUnitId] = useState(null);
-  const [viewHistoryUnitId, setViewHistoryUnitId] = useState(null);
 
   // Group stock by ref_no
   const groupedStock = useMemo(() => {
@@ -38,6 +38,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           size: r.size,
           lotNo: r.lotNo,
           expiry: r.expiry,
+          isReturnable: r.isReturnable,
           totalQuantity: 0,
           units: [],
           unitIds: [],
@@ -71,7 +72,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
       return groupedStock.filter(g => g.hasFresh);
     }
     if (stockSource === "returned") {
-      return groupedStock.filter(g => g.hasReturned);
+      return groupedStock.filter(g => g.hasReturned && g.isReturnable !== false);
     }
     return groupedStock;
   }, [groupedStock, stockSource]);
@@ -81,7 +82,6 @@ export default function IssueItemModal({ onClose, onConfirm }) {
     [filteredGroupedStock, itemId]
   );
 
-  // ⭐ For returned stock, show individual units with history
   const returnedUnits = useMemo(() => {
     if (!selectedItem || stockSource !== "returned") return [];
     return selectedItem.units
@@ -98,13 +98,35 @@ export default function IssueItemModal({ onClose, onConfirm }) {
     
   const canSubmit = studentId && itemId && qty > 0 && qty <= maxQty;
 
+  // ⭐ Check if product is non-returnable (implant/abutment)
+  const isNonReturnable = selectedItem?.isReturnable === false;
+
   const handleSubmit = () => {
     if (!canSubmit || !selectedItem) return;
     
     let unitIds = [];
+    let isImplantAbutment = false;
     
-    if (stockSource === "returned") {
-      // For returned stock, use selected unit IDs
+    // ⭐ CRITICAL: For implants/abutments, we DON'T use unit_id
+    if (isNonReturnable) {
+      // Implant/Abutment - use ref_no directly (no unit)
+      isImplantAbutment = true;
+      
+      // Check if there's a unit for this product (should not happen for implants)
+      const availableUnits = selectedItem.units.filter(u => {
+        const isActive = issuedItems.some(i => i.inventoryId === u.id && i.status === 'Active');
+        return !isActive && u.quantity > 0;
+      });
+      
+      if (availableUnits.length > 0) {
+        // If units exist, use them (but this shouldn't happen for implants)
+        unitIds = availableUnits.slice(0, qty).map(u => u.id);
+      } else {
+        // No units - use ref_no (this is correct for implants)
+        toast.info(`Issuing ${selectedItem.product} (${selectedItem.refNo}) as implant/abutment`);
+      }
+    } else if (stockSource === "returned") {
+      // Returned stock - use returned units
       const availableUnits = returnedUnits.map(u => u.id);
       if (selectedUnitId) {
         unitIds = [selectedUnitId];
@@ -112,7 +134,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
         unitIds = availableUnits.slice(0, qty);
       }
     } else {
-      // For fresh/all stock, find available units
+      // Fresh stock - use available units
       const availableUnits = selectedItem.units.filter(u => {
         const isActive = issuedItems.some(i => i.inventoryId === u.id && i.status === 'Active');
         return !isActive && u.quantity > 0;
@@ -120,7 +142,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
       unitIds = availableUnits.slice(0, qty).map(u => u.id);
     }
 
-    if (unitIds.length === 0) {
+    if (unitIds.length === 0 && !isImplantAbutment) {
       toast.error("No available units found");
       return;
     }
@@ -129,13 +151,16 @@ export default function IssueItemModal({ onClose, onConfirm }) {
       unitIds.includes(u.id) && u.isReturned === true
     );
     
+    // ⭐ Pass isImplantAbutment flag to backend
     onConfirm({
       studentId,
       refNo: selectedItem.refNo,
-      qty: unitIds.length,
-      unitIds: unitIds,
+      qty: isImplantAbutment ? 1 : unitIds.length,
+      unitIds: isImplantAbutment ? [] : unitIds,
       lotNo: selectedItem.lotNo,
       stockType: hasReturned ? "returned" : "fresh",
+      isNonReturnable: isNonReturnable,
+      isImplantAbutment: isImplantAbutment,
     });
   };
 
@@ -180,6 +205,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           {filteredGroupedStock.map((group) => (
             <option key={group.refNo} value={group.refNo}>
               {group.product} ({group.refNo}) - {group.totalQuantity} available
+              {group.isReturnable === false && " 🔒 Non-Returnable (Implant/Abutment)"}
             </option>
           ))}
         </select>
@@ -249,6 +275,11 @@ export default function IssueItemModal({ onClose, onConfirm }) {
               🔄 Returned Stock
             </button>
           </div>
+          {isNonReturnable && (
+            <small style={{ color: '#D97706', display: 'block', marginTop: '4px' }}>
+              ⚠️ This product is non-returnable (implant/abutment). It will be marked as issued and can only be exchanged with vendor if defective.
+            </small>
+          )}
         </div>
       )}
 
@@ -310,7 +341,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
         </div>
       )}
 
-      {/* Quantity - For Returned Stock, auto-set to 1 */}
+      {/* Quantity */}
       <div className="modal__field">
         <label htmlFor="issue-qty">Quantity</label>
         <input

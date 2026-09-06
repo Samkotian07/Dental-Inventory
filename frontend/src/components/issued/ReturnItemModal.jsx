@@ -2,97 +2,75 @@ import { useState, useMemo } from "react";
 import Modal from "./Modal.jsx";
 import QRCode from "react-qr-code";
 import { useInventory } from "../../context/InventoryContext.jsx";
+import { toast } from "sonner";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, onExchange }) {
+export default function ReturnItemModal({ 
+  item, 
+  onClose, 
+  onConfirm, 
+  onCondemn, 
+  onExchange 
+}) {
   const { stock = [], issuedItems = [] } = useInventory();
+  
   const [returnDate, setReturnDate] = useState(todayISO());
   const [step, setStep] = useState("confirm");
   const [actionType, setActionType] = useState("return");
   const [condemnReason, setCondemnReason] = useState("");
   const [exchangeReason, setExchangeReason] = useState("Damaged");
-  const [showCondemnFields, setShowCondemnFields] = useState(false);
-  const [showExchangeFields, setShowExchangeFields] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Match item in stock to get expiry date
+  // ⭐ Detect if this is an implant/abutment
+  const isImplantAbutment = useMemo(() => {
+    const flag = item?.isImplantAbutment || item?.is_implant_abutment || false;
+    const category = item?.category || "";
+    const isImplantCategory = category.toLowerCase() === 'implant';
+    const isAbutmentCategory = category.toLowerCase() === 'abutment';
+    return flag || isImplantCategory || isAbutmentCategory;
+  }, [item]);
+
+  // Match item in stock to get location
   const stockMatch = useMemo(() => {
     if (!item) return null;
-    return stock.find((s) => s.id === item.inventoryId);
+    return stock.find((s) => s.id === item.inventoryId || s.unitId === item.unitId);
   }, [stock, item]);
+
+  const location = useMemo(() => {
+    return stockMatch?.freshLocation || stockMatch?.location || "—";
+  }, [stockMatch]);
 
   const expiryDate = useMemo(() => {
     return item?.expiry || item?.expiryDate || stockMatch?.expiry || stockMatch?.expiryDate || "—";
   }, [item, stockMatch]);
 
-  // ⭐ FIXED: History for THIS SPECIFIC UNIT (by inventoryId)
-  const productHistory = useMemo(() => {
-    if (!item) return [];
-    
-    const inventoryId = item.inventoryId || item.id;
-    
-    const matches = (issuedItems || []).filter((iss) => {
-      return iss.inventoryId === inventoryId;
-    });
+  // ⭐ Generate QR URL - Use unit_id if available, fallback to ref_no
+  const unitId = item?.unitId || item?.inventoryId || "";
+  const qrUnitId = unitId || item?.refNo || "";
+  const scanUrl = `${window.location.origin}/unit-history/${encodeURIComponent(qrUnitId)}`;
 
-    matches.sort((a, b) => new Date(a.date || a.issuedDate || 0) - new Date(b.date || b.issuedDate || 0));
-
-    if (matches.length === 0 && item) {
-      matches.push({
-        issueId: item.issueId || item.id || "ISS-001",
-        student: item.student || item.studentName || "Student",
-        date: item.date || item.issuedDate || todayISO(),
-        returnDate: returnDate,
-        status: "Returned",
-      });
+  const unitHistory = useMemo(() => {
+    const list = (issuedItems || [])
+      .filter(i => (qrUnitId && i.unitId === qrUnitId) || (item?.unitId && i.unitId === item?.unitId) || (item?.issueId && i.issueId === item?.issueId))
+      .sort((a, b) => new Date(a.issueDate || a.date || 0) - new Date(b.issueDate || b.date || 0));
+    if (list.length === 0 && item) {
+      return [{
+        issueId: item.issueId || item.id,
+        student: item.student || item.studentName,
+        issueDate: item.date || item.issuedDate,
+        returnDate: null,
+      }];
     }
+    return list;
+  }, [issuedItems, qrUnitId, item]);
 
-    return matches.map((iss, index) => {
-      const s = String(iss.status || "").toLowerCase();
-      let statusLabel = "🔄 Current";
-
-      if (s === "returned") {
-        statusLabel = "✅ Complete";
-      } else if (s === "condemned") {
-        statusLabel = "❌ Condemned";
-      }
-
-      return {
-        cycle: index + 1,
-        student: iss.student || iss.studentName || "Student",
-        issued: iss.date || iss.issuedDate || "-",
-        returned: s === "returned" ? (iss.returnDate || returnDate || "-") : (s === "condemned" ? (iss.returnDate || "-") : "NULL"),
-        status: statusLabel,
-        rawStatus: s,
-      };
-    });
-  }, [item, issuedItems, returnDate]);
-
-  const summaryText = useMemo(() => {
-    const total = productHistory.length;
-    return `Summary: ${total} ${total === 1 ? "cycle" : "cycles"}`;
-  }, [productHistory]);
-
-  const handleConfirm = () => {
-    if (actionType === "return") {
-      onConfirm(item.issueId, returnDate);
-      setStep("qr");
-    } else if (actionType === "condemn") {
-      onCondemn(item.issueId, returnDate, condemnReason);
-      setStep("condemn-done");
-    } else if (actionType === "exchange") {
-      if (onExchange) {
-        onExchange(item.issueId, returnDate, exchangeReason);
-      }
-      setStep("exchange-done");
-    }
-  };
-
+  // PRINT STICKER FUNCTION
   const handlePrint = () => {
-    const batchVal = item.lotNo || item.batchNo || "4510315832";
-    const unitId = item.inventoryId || item.id || item.refNo;
+    const batchVal = item.lotNo || item.batchNo || "—";
+    const productName = item.product || item.productName || "Product";
 
     let qrSvgHtml = "";
     const qrContainerEl = document.getElementById("modal-qr-container");
@@ -113,7 +91,7 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
       <!DOCTYPE html>
       <html>
         <head>
-          <title>PRINT STICKER - ${item.product}</title>
+          <title>PRINT STICKER - ${productName}</title>
           <style>
             @media print {
               body { margin: 0; padding: 10px; background: white; color: #1F2937; }
@@ -205,12 +183,15 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
             <div class="qr-box">${qrSvgHtml}</div>
             <br/>
             <div class="badge">✅ RETURNED</div>
-            <div class="product-name">Product: ${item.product} (Unit: ${unitId})</div>
+            <div class="product-name">Product: ${productName} (Unit: ${qrUnitId})</div>
             <div class="batch-info">
               <strong>Batch:</strong> ${batchVal} | <strong>Expiry Date:</strong> ${expiryDate}
             </div>
             <div class="detail-line">
-              Last Student: ${item.student} | Returned: ${returnDate}
+              Last Student: ${item.student || item.studentName || "Student"} | Returned: ${returnDate}
+            </div>
+            <div class="detail-line">
+              <strong>Restock Location:</strong> ${location}
             </div>
             <div class="scan-note">
               📱 Scan QR code to view complete unit history
@@ -229,98 +210,107 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
     printWindow.focus();
   };
 
-  const scanUrl = `${window.location.origin}/unit-history/${encodeURIComponent(item?.inventoryId || item?.id || item?.refNo || "")}`;
-
-  // Step: Confirm Return
+  // ============================================================
+  // ⭐ STEP 1: CONFIRM ACTION
+  // ============================================================
   if (step === "confirm") {
     return (
-      <Modal title="Return / Condemn Item" onClose={onClose} width={480}>
+      <Modal title={isImplantAbutment ? "Exchange with Vendor" : "Return / Condemn Item"} onClose={onClose} width={500}>
         <p className="modal__lead">
-          Processing <strong>{item.product}</strong> (Unit: {item.inventoryId || item.id}) from{" "}
-          <strong>{item.student}</strong>.
+          Processing <strong>{item.product || item.productName}</strong> 
+          {item.unitId && ` (Unit: ${item.unitId})`} from{" "}
+          <strong>{item.student || item.studentName}</strong>.
         </p>
 
-        {/* Action Type Selection */}
+        {isImplantAbutment && (
+          <div style={{
+            padding: "12px 16px",
+            background: "#FEF3C7",
+            border: "1px solid #F59E0B",
+            borderRadius: "8px",
+            marginBottom: "16px",
+          }}>
+            <p style={{ margin: 0, color: "#92400E", fontSize: "14px", fontWeight: "600" }}>
+              ⚠️ This is an <strong>Implant or Abutment</strong>
+            </p>
+            <p style={{ margin: "4px 0 0", color: "#92400E", fontSize: "13px" }}>
+              This item cannot be returned to stock. Only <strong>Exchange with Vendor</strong> is available.
+            </p>
+          </div>
+        )}
+
         <div className="modal__field">
-          <label>Action Type / Return Mode</label>
+          <label>Select Action</label>
           <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "6px" }}>
-            <button
-              type="button"
-              onClick={() => {
-                setActionType("return");
-                setShowCondemnFields(false);
-                setShowExchangeFields(false);
-              }}
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                borderRadius: "8px",
-                textAlign: "left",
-                border: actionType === "return" ? "2px solid #059669" : "1px solid #D1D5DB",
-                background: actionType === "return" ? "#D1FAE5" : "white",
-                fontWeight: actionType === "return" ? "600" : "400",
-                cursor: "pointer",
-                fontSize: "14px",
-                color: actionType === "return" ? "#059669" : "#374151",
-              }}
-            >
-              ✅ Return to Inventory
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActionType("condemn");
-                setShowCondemnFields(true);
-                setShowExchangeFields(false);
-              }}
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                borderRadius: "8px",
-                textAlign: "left",
-                border: actionType === "condemn" ? "2px solid #DC2626" : "1px solid #D1D5DB",
-                background: actionType === "condemn" ? "#FEE2E2" : "white",
-                fontWeight: actionType === "condemn" ? "600" : "400",
-                cursor: "pointer",
-                fontSize: "14px",
-                color: actionType === "condemn" ? "#DC2626" : "#374151",
-              }}
-            >
-              🗑️ Condemn (Discard)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActionType("exchange");
-                setShowCondemnFields(false);
-                setShowExchangeFields(true);
-              }}
-              style={{
-                width: "100%",
-                padding: "10px 14px",
-                borderRadius: "8px",
-                textAlign: "left",
-                border: actionType === "exchange" ? "2px solid #D97706" : "1px solid #D1D5DB",
-                background: actionType === "exchange" ? "#FEF3C7" : "white",
-                fontWeight: actionType === "exchange" ? "600" : "400",
-                cursor: "pointer",
-                fontSize: "14px",
-                color: actionType === "exchange" ? "#D97706" : "#374151",
-              }}
-            >
-              🔄 Failed - Send for Exchange
-            </button>
+
+            {!isImplantAbutment && (
+              <button
+                type="button"
+                onClick={() => setActionType("return")}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  textAlign: "left",
+                  border: actionType === "return" ? "2px solid #059669" : "1px solid #D1D5DB",
+                  background: actionType === "return" ? "#D1FAE5" : "white",
+                  fontWeight: actionType === "return" ? "600" : "400",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  color: actionType === "return" ? "#059669" : "#374151",
+                }}
+              >
+                ✅ Return to Stock
+              </button>
+            )}
+
+            {isImplantAbutment && (
+              <button
+                type="button"
+                onClick={() => setActionType("exchange")}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  textAlign: "left",
+                  border: actionType === "exchange" ? "2px solid #D97706" : "1px solid #D1D5DB",
+                  background: actionType === "exchange" ? "#FEF3C7" : "white",
+                  fontWeight: actionType === "exchange" ? "600" : "400",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  color: actionType === "exchange" ? "#D97706" : "#374151",
+                }}
+              >
+                🔄 Exchange with Vendor (Only Option)
+              </button>
+            )}
+
+            {!isImplantAbutment && (
+              <button
+                type="button"
+                onClick={() => setActionType("condemn")}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  textAlign: "left",
+                  border: actionType === "condemn" ? "2px solid #DC2626" : "1px solid #D1D5DB",
+                  background: actionType === "condemn" ? "#FEE2E2" : "white",
+                  fontWeight: actionType === "condemn" ? "600" : "400",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  color: actionType === "condemn" ? "#DC2626" : "#374151",
+                }}
+              >
+                🗑️ Condemn (Discard)
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Return Date Field */}
         <div className="modal__field">
           <label htmlFor="return-date">
-            {actionType === "condemn"
-              ? "Condemn Date"
-              : actionType === "exchange"
-              ? "Exchange Request Date"
-              : "Return Date"}
+            {actionType === "condemn" ? "Condemn Date" : actionType === "exchange" ? "Exchange Date" : "Return Date"}
           </label>
           <input
             id="return-date"
@@ -330,52 +320,7 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
           />
         </div>
 
-        {/* Condemn Reason Field */}
-        {showCondemnFields && (
-          <div className="modal__field">
-            <label htmlFor="condemn-reason">Condemn Reason *</label>
-            <select
-              id="condemn-reason"
-              value={condemnReason}
-              onChange={(e) => setCondemnReason(e.target.value)}
-              required
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "8px",
-                border: "1px solid #D1D5DB",
-                fontSize: "14px",
-                background: "white",
-              }}
-            >
-              <option value="">Select a reason...</option>
-              <option value="Damaged">Damaged</option>
-              <option value="Expired">Expired</option>
-              <option value="Quality Failed">Quality Failed</option>
-              <option value="Returned">Returned</option>
-              <option value="Other">Other</option>
-            </select>
-            {condemnReason === "Other" && (
-              <input
-                type="text"
-                placeholder="Please specify reason..."
-                value={condemnReason}
-                onChange={(e) => setCondemnReason(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #D1D5DB",
-                  fontSize: "14px",
-                  marginTop: "8px",
-                }}
-              />
-            )}
-          </div>
-        )}
-
-        {/* Exchange Reason Field */}
-        {showExchangeFields && (
+        {actionType === "exchange" && isImplantAbutment && (
           <div className="modal__field">
             <label htmlFor="exchange-reason">Exchange Reason *</label>
             <select
@@ -392,10 +337,10 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
                 background: "white",
               }}
             >
-              <option value="Damaged">Damaged</option>
               <option value="Defective">Defective</option>
+              <option value="Damaged">Damaged</option>
               <option value="Expired">Expired</option>
-              <option value="Quality Failed">Quality Failed</option>
+              <option value="Failed in Patient">Failed in Patient</option>
               <option value="Other">Other</option>
             </select>
             {exchangeReason === "Other" && (
@@ -417,66 +362,113 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
           </div>
         )}
 
-        {/* Info Message */}
-        {actionType === "return" && (
-          <p style={{ fontSize: "13px", color: "#059669", marginTop: "8px" }}>
-            ✅ This will add <strong>{item.qty}</strong> item(s) back to inventory.
-          </p>
-        )}
         {actionType === "condemn" && (
-          <p style={{ fontSize: "13px", color: "#DC2626", marginTop: "8px" }}>
-            ⚠️ This will mark <strong>{item.qty}</strong> item(s) as condemned
-            and remove them from inventory. This cannot be undone.
+          <div className="modal__field">
+            <label htmlFor="condemn-reason">Condemn Reason *</label>
+            <select
+              id="condemn-reason"
+              value={condemnReason}
+              onChange={(e) => setCondemnReason(e.target.value)}
+              required
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid #D1D5DB",
+                fontSize: "14px",
+                background: "white",
+              }}
+            >
+              <option value="">Select a reason...</option>
+              <option value="Damaged">Damaged</option>
+              <option value="Expired">Expired</option>
+              <option value="Quality Failed">Quality Failed</option>
+              <option value="Other">Other</option>
+            </select>
+            {condemnReason === "Other" && (
+              <input
+                type="text"
+                placeholder="Please specify reason..."
+                value={condemnReason}
+                onChange={(e) => setCondemnReason(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #D1D5DB",
+                  fontSize: "14px",
+                  marginTop: "8px",
+                }}
+              />
+            )}
+          </div>
+        )}
+
+        {actionType === "return" && !isImplantAbutment && (
+          <p style={{ fontSize: "13px", color: "#059669", marginTop: "8px" }}>
+            ✅ This will generate a QR code and add the item back to inventory.
           </p>
         )}
-        {actionType === "exchange" && (
+        {actionType === "exchange" && isImplantAbutment && (
           <p style={{ fontSize: "13px", color: "#D97706", marginTop: "8px" }}>
-            🔄 This item will be marked as failed and sent for exchange with vendor (added to Track Returns).
+            🔄 This will mark the implant/abutment as exchanged with vendor.
+          </p>
+        )}
+        {actionType === "condemn" && !isImplantAbutment && (
+          <p style={{ fontSize: "13px", color: "#DC2626", marginTop: "8px" }}>
+            ⚠️ This will remove the item from inventory. This cannot be undone.
           </p>
         )}
 
         <div className="modal__actions">
-          <button className="modal__btn" onClick={onClose}>
-            Cancel
-          </button>
+          <button className="modal__btn" onClick={onClose}>Cancel</button>
           <button
             className="modal__btn modal__btn--primary"
-            onClick={handleConfirm}
+            onClick={() => {
+              if (actionType === "return") {
+                setStep("qr");
+              } else if (actionType === "exchange" && isImplantAbutment) {
+                setIsProcessing(true);
+                onExchange?.(item.issueId, returnDate, exchangeReason);
+                setIsProcessing(false);
+                onClose();
+              } else if (actionType === "condemn") {
+                if (!condemnReason) {
+                  alert("Please select a condemn reason");
+                  return;
+                }
+                onCondemn?.(item.issueId, returnDate, condemnReason);
+                onClose();
+              }
+            }}
             disabled={
               (actionType === "condemn" && !condemnReason) ||
-              (actionType === "exchange" && !exchangeReason)
+              (actionType === "return" && isImplantAbutment) ||
+              isProcessing
             }
-            style={{
-              opacity:
-                (actionType === "condemn" && !condemnReason) ||
-                (actionType === "exchange" && !exchangeReason)
-                  ? 0.5
-                  : 1,
-              cursor:
-                (actionType === "condemn" && !condemnReason) ||
-                (actionType === "exchange" && !exchangeReason)
-                  ? "not-allowed"
-                  : "pointer",
-            }}
           >
-            {actionType === "condemn"
-              ? "Confirm Condemn"
-              : actionType === "exchange"
-              ? "Confirm Send for Exchange"
-              : "Confirm Return & Generate QR"}
+            {isProcessing 
+              ? "Processing..." 
+              : actionType === "condemn" 
+                ? "Confirm Condemn" 
+                : actionType === "exchange" 
+                  ? "Send to Vendor" 
+                  : "Generate QR & Confirm Return"}
           </button>
         </div>
       </Modal>
     );
   }
 
-  // Step: QR Display
+  // ============================================================
+  // ⭐ STEP 2: QR DISPLAY
+  // ============================================================
   if (step === "qr") {
-    const batchVal = item.lotNo || item.batchNo || "4510315832";
-    const unitId = item.inventoryId || item.id || item.refNo;
-    
+    const productName = item.product || item.productName || "Product";
+    const batchVal = item.lotNo || item.batchNo || "—";
+
     return (
-      <Modal title="QR Code & Unit History" onClose={onClose} width={640}>
+      <Modal title="QR Code Generated - Print Sticker" onClose={onClose} width={640}>
         <div style={{ padding: "10px 0" }}>
           <div
             style={{
@@ -517,26 +509,27 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
                   color: "#059669",
                 }}
               >
-                ✅ RETURNED
+                ✅ READY TO RETURN
               </div>
               <h4 style={{ margin: "4px 0", fontSize: "16px", color: "#0F172A", fontWeight: "700" }}>
-                Product: {item.product} (Unit: {unitId})
+                Product: {productName} (Unit: {qrUnitId})
               </h4>
               <p style={{ margin: "4px 0", fontSize: "13.5px", color: "#475569" }}>
                 <strong>Batch:</strong> {batchVal} | <strong>Expiry Date:</strong> {expiryDate}
               </p>
               <p style={{ margin: "4px 0", fontSize: "13px", color: "#64748B" }}>
-                Last Student: {item.student} | Returned: {returnDate}
+                Last Student: {item.student || item.studentName} | Returned: {returnDate}
+              </p>
+              <p style={{ margin: "4px 0", fontSize: "13px", color: "#64748B" }}>
+                <strong>Restock Location:</strong> {location}
               </p>
             </div>
           </div>
 
-          {/* Unit Lifecycle History Table */}
           <div>
             <h4 style={{ margin: "0 0 10px", fontSize: "14px", color: "#1E293B", fontWeight: "700" }}>
               📋 Unit History
             </h4>
-
             <div style={{ overflowX: "auto", border: "1px solid #E2E8F0", borderRadius: "8px" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                 <thead>
@@ -549,47 +542,43 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
                   </tr>
                 </thead>
                 <tbody>
-                  {productHistory.map((h) => (
-                    <tr key={h.cycle} style={{ borderBottom: "1px solid #F1F5F9" }}>
-                      <td style={{ padding: "9px 12px", textAlign: "center", fontWeight: "600", fontFamily: "monospace" }}>
-                        {h.cycle}
-                      </td>
-                      <td style={{ padding: "9px 12px", fontWeight: "500", color: "#1E293B" }}>
-                        {h.student}
-                      </td>
-                      <td style={{ padding: "9px 12px", color: "#475569" }}>{h.issued}</td>
-                      <td style={{ padding: "9px 12px", color: "#475569" }}>{h.returned}</td>
-                      <td style={{ padding: "9px 12px", textAlign: "center" }}>
-                        <span
-                          style={{
-                            padding: "3px 10px",
-                            borderRadius: "12px",
-                            fontSize: "12px",
-                            fontWeight: "600",
-                            background:
-                              h.rawStatus === "returned"
-                                ? "#D1FAE5"
-                                : h.rawStatus === "condemned"
-                                ? "#FEE2E2"
-                                : "#FEF3C7",
-                            color:
-                              h.rawStatus === "returned"
-                                ? "#059669"
-                                : h.rawStatus === "condemned"
-                                ? "#DC2626"
-                                : "#D97706",
-                            display: "inline-block",
-                          }}
-                        >
-                          {h.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {unitHistory.map((h, index) => {
+                    const isReturned = h.status === "Returned" || Boolean(h.returnDate);
+                    return (
+                      <tr key={h.issueId || index} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                        <td style={{ padding: "9px 12px", textAlign: "center", fontWeight: "600", fontFamily: "monospace" }}>
+                          {index + 1}
+                        </td>
+                        <td style={{ padding: "9px 12px", fontWeight: "500", color: "#1E293B" }}>
+                          {h.student || h.studentName}
+                        </td>
+                        <td style={{ padding: "9px 12px", color: "#475569" }}>
+                          {h.issueDate || h.date || "—"}
+                        </td>
+                        <td style={{ padding: "9px 12px", color: "#475569" }}>
+                          {h.returnDate || (h.issueId === item?.issueId ? `${returnDate} (Will be updated)` : "—")}
+                        </td>
+                        <td style={{ padding: "9px 12px", textAlign: "center" }}>
+                          <span
+                            style={{
+                              padding: "3px 10px",
+                              borderRadius: "12px",
+                              fontSize: "12px",
+                              fontWeight: "600",
+                              background: isReturned ? "#D1FAE5" : "#FEF3C7",
+                              color: isReturned ? "#059669" : "#D97706",
+                              display: "inline-block",
+                            }}
+                          >
+                            {isReturned ? "✅ Returned" : "🔄 Returning"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
-
             <div
               style={{
                 marginTop: "12px",
@@ -603,7 +592,7 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
                 textAlign: "center",
               }}
             >
-              {summaryText}
+              Summary: {unitHistory.length} {unitHistory.length === 1 ? "cycle" : "cycles"}
             </div>
           </div>
         </div>
@@ -615,89 +604,94 @@ export default function ReturnItemModal({ item, onClose, onConfirm, onCondemn, o
           <button className="modal__btn modal__btn--primary" onClick={handlePrint}>
             🖨️ Print Sticker
           </button>
-          <button className="modal__btn" onClick={onClose}>
-            Done
+          <button 
+            className="modal__btn" 
+            style={{ background: "#059669", color: "white", fontWeight: "600" }}
+            onClick={async () => {
+              setIsProcessing(true);
+              try {
+                const targetIssueId = item?.issueId || item?.id;
+                const result = await onConfirm(targetIssueId, returnDate);
+                if (result.success) {
+                  setStep("complete");
+                } else {
+                  toast.error(result.message || "Failed to return item");
+                }
+              } catch (err) {
+                toast.error("Failed to return item");
+              } finally {
+                setIsProcessing(false);
+              }
+            }}
+          >
+            ✅ Confirm Return
           </button>
         </div>
       </Modal>
     );
   }
 
-  // Step: Condemn Done
-  if (step === "condemn-done") {
-    return (
-      <Modal title="Item Condemned" onClose={onClose} width={440}>
-        <div style={{ textAlign: "center", padding: "30px 0" }}>
-          <div style={{ fontSize: "64px", marginBottom: "16px" }}>🗑️</div>
-          <div style={{
-            display: "inline-block",
-            padding: "6px 20px",
-            borderRadius: "20px",
-            fontSize: "16px",
-            fontWeight: "bold",
-            marginBottom: "16px",
-            background: "#FEE2E2",
-            color: "#DC2626",
-          }}>CONDEMNED</div>
-          <p style={{ fontSize: "18px", fontWeight: "600", margin: "8px 0" }}>{item.product}</p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Unit: {item.inventoryId || item.id}</p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Student: {item.student}</p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Condemned on: {returnDate}</p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Qty: {item.qty}</p>
-          <div style={{
-            marginTop: "16px",
-            padding: "12px",
-            background: "#FEF3C7",
-            borderRadius: "8px",
-            border: "1px solid #F59E0B",
-          }}>
-            <p style={{ margin: 0, color: "#92400E", fontSize: "14px", fontWeight: "500" }}>⚠️ Reason: {condemnReason}</p>
-            <p style={{ margin: "4px 0 0", color: "#92400E", fontSize: "12px" }}>This unit has been removed from inventory</p>
-          </div>
-        </div>
-        <div className="modal__actions">
-          <button className="modal__btn" onClick={() => setStep("confirm")}>Back</button>
-          <button className="modal__btn modal__btn--primary" onClick={onClose}>Done</button>
-        </div>
-      </Modal>
-    );
-  }
+  // ============================================================
+  // ⭐ STEP 3: RETURN COMPLETE
+  // ============================================================
+  if (step === "complete") {
+    const productName = item.product || item.productName || "Product";
 
-  // Step: Exchange Done
-  if (step === "exchange-done") {
     return (
-      <Modal title="Sent for Exchange" onClose={onClose} width={440}>
-        <div style={{ textAlign: "center", padding: "30px 0" }}>
-          <div style={{ fontSize: "64px", marginBottom: "16px" }}>🔄</div>
-          <div style={{
-            display: "inline-block",
-            padding: "6px 20px",
-            borderRadius: "20px",
-            fontSize: "16px",
-            fontWeight: "bold",
-            marginBottom: "16px",
-            background: "#FEF3C7",
-            color: "#D97706",
-          }}>FAILED - SENT FOR EXCHANGE</div>
-          <p style={{ fontSize: "18px", fontWeight: "600", margin: "8px 0" }}>{item.product}</p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Unit: {item.inventoryId || item.id}</p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Student: {item.student}</p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Exchange Date: {returnDate}</p>
-          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>Qty: {item.qty}</p>
-          <div style={{
-            marginTop: "16px",
-            padding: "12px",
-            background: "#FFFBEB",
-            borderRadius: "8px",
-            border: "1px solid #F59E0B",
-          }}>
-            <p style={{ margin: 0, color: "#92400E", fontSize: "14px", fontWeight: "500" }}>⚠️ Reason: {exchangeReason}</p>
-            <p style={{ margin: "4px 0 0", color: "#92400E", fontSize: "12px" }}>Created exchange request in Track Returns</p>
+      <Modal title="Return Complete" onClose={onClose} width={500}>
+        <div style={{ textAlign: "center", padding: "20px 0" }}>
+          <div style={{ fontSize: "64px", marginBottom: "16px" }}>✅</div>
+          <div
+            style={{
+              display: "inline-block",
+              padding: "6px 20px",
+              borderRadius: "20px",
+              fontSize: "16px",
+              fontWeight: "bold",
+              marginBottom: "16px",
+              background: "#D1FAE5",
+              color: "#059669",
+            }}
+          >
+            RETURNED SUCCESSFULLY
+          </div>
+          <p style={{ fontSize: "18px", fontWeight: "600", margin: "8px 0" }}>
+            {productName}
+          </p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
+            Unit: {qrUnitId}
+          </p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
+            Student: {item.student || item.studentName}
+          </p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
+            Returned on: {returnDate}
+          </p>
+          <p style={{ margin: "4px 0", color: "#666", fontSize: "14px" }}>
+            Restock Location: {location || "—"}
+          </p>
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "12px",
+              background: "#EFF6FF",
+              borderRadius: "8px",
+              border: "1px solid #BFDBFE",
+            }}
+          >
+            <p style={{ margin: 0, color: "#1E40AF", fontSize: "13px" }}>
+              📱 QR Code has been generated and saved in the database.
+            </p>
           </div>
         </div>
-        <div className="modal__actions">
-          <button className="modal__btn" onClick={() => setStep("confirm")}>Back</button>
-          <button className="modal__btn modal__btn--primary" onClick={onClose}>Done</button>
+
+        <div className="modal__actions" style={{ display: "flex", gap: "10px" }}>
+          <button className="modal__btn modal__btn--primary" onClick={handlePrint}>
+            🖨️ Print Sticker
+          </button>
+          <button className="modal__btn" onClick={onClose}>
+            Done
+          </button>
         </div>
       </Modal>
     );
