@@ -9,8 +9,22 @@
 .unit-history-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.unit-history-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.unit-history-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .unit-history-header h1 {

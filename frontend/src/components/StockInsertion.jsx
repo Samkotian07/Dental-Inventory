@@ -225,58 +225,45 @@ export default function StockInsertion() {
     }
 
     const totalQty = Number(form.quantity);
-    let successCount = 0;
-    const createdUnits = [];
 
-    for (let i = 0; i < totalQty; i++) {
-      const suffix = String.fromCharCode(65 + i);
-      const itemData = {
-        documentNumber: form.invoiceNumber,
-        invoiceNumber: form.invoiceNumber,
-        creditNoteNumber: form.creditNoteNumber || "",
-        category: form.category,
-        companyName: form.companyName,
-        productName: form.productName,
-        size: form.size,
-        lotNo: form.lotNo,
-        expiryDate: form.expiryDate,
-        refNo: generateId("INV"),
-        documentType: form.creditNoteNumber ? "creditNote" : "invoice",
-        invoiceNo: form.invoiceNumber,
-        creditNoteNo: form.creditNoteNumber || "",
-        freshLocation: form.freshLocation,
-        returnedLocation: form.returnedLocation,
-        qty: 1,
-        quantity: 1,
-        product: form.productName,
-        company: form.companyName,
-        expiry: form.expiryDate,
-        status: "active",
-        lot_no: form.lotNo,
-      };
-      
-      const result = await addStockItem(itemData);
-      if (result.success) {
-        successCount++;
-        if (result.data) {
-          createdUnits.push(result.data);
-        }
+    const itemData = {
+      documentNumber: form.invoiceNumber,
+      invoiceNumber: form.invoiceNumber,
+      creditNoteNumber: form.creditNoteNumber || "",
+      category: form.category,
+      companyName: form.companyName,
+      productName: form.productName,
+      size: form.size,
+      lotNo: form.lotNo,
+      expiryDate: form.expiryDate,
+      refNo: generateId("INV"),
+      documentType: form.creditNoteNumber ? "creditNote" : "invoice",
+      invoiceNo: form.invoiceNumber,
+      creditNoteNo: form.creditNoteNumber || "",
+      freshLocation: form.freshLocation,
+      returnedLocation: form.returnedLocation,
+      qty: totalQty,
+      quantity: totalQty,
+      product: form.productName,
+      company: form.companyName,
+      expiry: form.expiryDate,
+      status: "active",
+      lot_no: form.lotNo,
+    };
+    
+    const result = await addStockItem(itemData);
+
+    if (result.success) {
+      if (form.creditNoteNumber && vendorReturn) {
+        const replacementUnitId = result.data?.id || result.data?.unitId || result.data?.refNo || itemData.refNo;
+        await updateReturnStatus(vendorReturn.returnId || vendorReturn.id, "completed", {
+          is_credit_note_used: true,
+          replacement_unit_id: replacementUnitId,
+        });
+        toast.success(`Credit note ${form.creditNoteNumber} marked as used and linked to ${replacementUnitId}`);
       }
-    }
 
-    // ⭐ Link credit note to vendor return
-    if (form.creditNoteNumber && vendorReturn && successCount > 0) {
-      const firstUnit = createdUnits[0];
-      const replacementUnitId = firstUnit?.id || firstUnit?.unitId || firstUnit?.refNo || firstUnit?.ref_no || "";
-      await updateReturnStatus(vendorReturn.returnId || vendorReturn.id, "completed", {
-        is_credit_note_used: true,
-        replacement_unit_id: replacementUnitId,
-      });
-      toast.success(`Credit note ${form.creditNoteNumber} marked as used and linked to ${replacementUnitId}`);
-    }
-
-    if (successCount === totalQty) {
-      toast.success(`Added ${successCount} individual units successfully`);
+      toast.success(`Added stock item ${form.productName} (Quantity: ${totalQty}) successfully`);
       setForm({
         invoiceNumber: "",
         creditNoteNumber: "",
@@ -291,11 +278,11 @@ export default function StockInsertion() {
         returnedLocation: "",
       });
     } else {
-      toast.warning(`Added ${successCount} of ${totalQty} units. Some failed.`);
+      toast.error(result.message || "Failed to add stock item");
     }
   };
 
-  // ⭐ File handlers (same as before)
+  // ⭐ File handlers
   const handleFile = (file) => {
     if (!file) return;
     
@@ -308,14 +295,10 @@ export default function StockInsertion() {
         const jsonData = XLSX.utils.sheet_to_json(firstSheet);
         
         const valid = jsonData.filter((r) => r.productName && r.lotNo);
-        if (valid.length === 0) {
-          toast.error("No valid rows found");
-          return;
-        }
         setCsvPreview(valid);
-      } catch (error) {
-        toast.error("Error reading file. Please check the format.");
-        console.error(error);
+        toast.success(`Loaded ${valid.length} items from Excel`);
+      } catch (err) {
+        toast.error("Failed to parse Excel file");
       }
     };
     reader.readAsArrayBuffer(file);
@@ -332,33 +315,29 @@ export default function StockInsertion() {
     
     csvPreview.forEach((row) => {
       const qty = Number(row.quantity) || 1;
-      
-      for (let i = 0; i < qty; i++) {
-        const suffix = String.fromCharCode(65 + i);
-        const itemData = {
-          ...row,
-          refNo: generateId("INV"),
-          documentType: form.creditNoteNumber ? "creditNote" : "invoice",
-          invoiceNo: form.invoiceNumber || row.invoiceNumber || row.documentNumber || "",
-          creditNoteNo: form.creditNoteNumber || "",
-          category: row.category || "General",
-          qty: 1,
-          quantity: 1,
-          product: row.productName || row.product || "Dental Item",
-          company: row.companyName || row.company || "Vendor",
-          expiry: row.expiryDate || row.expiry || "",
-          size: row.size || "",
-          status: "active",
-          lot_no: row.lotNo,
-          freshLocation: row.freshLocation || "",
-          returnedLocation: row.returnedLocation || "",
-        };
-        addStockItem(itemData);
-        totalImported++;
-      }
+      const itemData = {
+        ...row,
+        refNo: generateId("INV"),
+        documentType: form.creditNoteNumber ? "creditNote" : "invoice",
+        invoiceNo: form.invoiceNumber || row.invoiceNumber || row.documentNumber || "",
+        creditNoteNo: form.creditNoteNumber || "",
+        category: row.category || "General",
+        qty: qty,
+        quantity: qty,
+        product: row.productName || row.product || "Dental Item",
+        company: row.companyName || row.company || "Vendor",
+        expiry: row.expiryDate || row.expiry || "",
+        size: row.size || "",
+        status: "active",
+        lot_no: row.lotNo,
+        freshLocation: row.freshLocation || "",
+        returnedLocation: row.returnedLocation || "",
+      };
+      addStockItem(itemData);
+      totalImported++;
     });
     
-    toast.success(`Imported ${totalImported} individual units successfully`);
+    toast.success(`Imported ${totalImported} stock items successfully`);
     setCsvPreview(null);
   };
 

@@ -11,7 +11,7 @@ function Rows({ items }) {
   if (items.length === 0) {
     return (
       <tr>
-        <td colSpan={5} className="inv-table__empty">
+        <td colSpan={6} className="inv-table__empty">
           No items match your search or filter.
         </td>
       </tr>
@@ -19,38 +19,61 @@ function Rows({ items }) {
   }
 
   return items.map((item) => (
-    <tr key={item.id}>
+    <tr key={item.refNo || item.id}>
       <td>
-        <span className={`inv-table__tag inv-table__tag--${item.category.toLowerCase()}`}>
-          {item.category}
+        <span className={`inv-table__tag inv-table__tag--${(item.category || "general").toLowerCase()}`}>
+          {item.category || "General"}
         </span>
       </td>
       <td>{item.company}</td>
       <td>{item.product}</td>
-      <td>{item.size}</td>
-      <td className="inv-table__ref">{item.id}</td>
+      <td>{item.size || "Standard"}</td>
+      <td className="inv-table__ref">{item.refNo || item.id}</td>
+      <td style={{ fontWeight: 700, color: "#111827" }}>{item.quantity ?? item.totalQty ?? 0}</td>
     </tr>
   ));
 }
 
-export default function InventoryTable({ items, activeCategory, onCategoryChange }) {
+export default function InventoryTable({ items = [], activeCategory, onCategoryChange }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [fullViewPage, setFullViewPage] = useState(1);
 
+  const groupedStock = useMemo(() => {
+    const groups = {};
+    (items || []).forEach((item) => {
+      const key = item.refNo || item.ref_no || item.id;
+      if (!groups[key]) {
+        groups[key] = {
+          ...item,
+          refNo: item.refNo || item.ref_no || item.id,
+          product: item.product || item.productName || item.product_name || "Product",
+          company: item.company || item.companyName || item.company_name || "Company",
+          quantity: 0,
+          totalQty: 0,
+        };
+      }
+      const itemQty = Number(item.quantity ?? item.qty ?? 1);
+      groups[key].quantity += itemQty;
+      groups[key].totalQty += itemQty;
+    });
+    return Object.values(groups);
+  }, [items]);
+
   const filtered = useMemo(() => {
-    return items.filter((item) => {
+    return groupedStock.filter((item) => {
       const matchesCategory = activeCategory === "All Categories" || item.category === activeCategory;
       const q = query.trim().toLowerCase();
       const matchesQuery =
         !q ||
-        item.product.toLowerCase().includes(q) ||
-        item.company.toLowerCase().includes(q) ||
-        item.id.toLowerCase().includes(q);
+        (item.product || "").toLowerCase().includes(q) ||
+        (item.company || "").toLowerCase().includes(q) ||
+        (item.refNo || "").toLowerCase().includes(q) ||
+        (item.id || "").toLowerCase().includes(q);
       return matchesCategory && matchesQuery;
     });
-  }, [items, activeCategory, query]);
+  }, [groupedStock, activeCategory, query]);
 
   const totalFullViewPages = Math.max(1, Math.ceil(filtered.length / FULL_VIEW_PAGE_SIZE));
   const currentFullViewPage = Math.min(fullViewPage, totalFullViewPages);
@@ -96,6 +119,7 @@ export default function InventoryTable({ items, activeCategory, onCategoryChange
           <th>Product</th>
           <th>Size</th>
           <th>Ref No</th>
+          <th>Quantity</th>
         </tr>
       </thead>
       <tbody>

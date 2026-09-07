@@ -64,7 +64,7 @@ export default function Login() {
         <div className="login-header">
           <div className="login-brand">
             <img src={inventoryIcon} alt="" className="login-brand-icon" />
-            <h1>YEN LEDGER</h1>
+            <h1>CaviTrack</h1>
           </div>
           <p>Inventory Management System</p>
         </div>

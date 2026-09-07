@@ -6,7 +6,7 @@ import {
   ClipboardCheck, // Issued - represents checkouts/borrowed items
   GitBranch, // Exchange - represents movement between departments
   PackageSearch, // Inventory - represents stock tracking/search
-  TrendingUp, // Analytics - represents data trends/insights
+  GraduationCap, // Students - represents student directory & profiles
   FileSpreadsheet, // Reports - represents detailed reporting/spreadsheets
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -35,11 +35,11 @@ const slides = [
     icon: PackageSearch, // Searching/tracking inventory
   },
   {
-    key: "analytics",
-    title: "Analytics",
-    copy: "Track usage patterns and optimize inventory flow.",
-    to: "/audit-log",
-    icon: TrendingUp, // Growth/trends analysis
+    key: "students",
+    title: "Students",
+    copy: "Manage student records, batches, and issued items.",
+    to: "/students",
+    icon: GraduationCap, // Student profiles & directory
   },
   {
     key: "reports",

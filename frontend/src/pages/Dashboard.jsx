@@ -59,22 +59,26 @@ export default function Dashboard() {
     return months;
   }, [issuedItems, returns]);
 
+  const uniqueProductsCount = useMemo(() => {
+    return new Set((stock || []).map((s) => s.refNo || s.id)).size;
+  }, [stock]);
+
   const totalItemsCount = useMemo(() => {
-    return stock.reduce((sum, item) => sum + Number(item.qty || item.quantity || 0), 0);
+    return (stock || []).reduce((sum, item) => sum + Number(item.qty || item.quantity || 0), 0);
   }, [stock]);
 
   const lowStockItems = useMemo(() => {
-    return stock.filter((item) => Number(item.qty || item.quantity || 0) <= 10);
+    return (stock || []).filter((item) => Number(item.qty || item.quantity || 0) <= (item.lowStockThreshold || 10));
   }, [stock]);
 
   const stats = useMemo(
     () => [
-      { key: "total", label: "Total Items", value: totalItemsCount, tone: "blue" },
+      { key: "total", label: "Total Items", value: `${totalItemsCount} (${uniqueProductsCount} products)`, tone: "blue" },
       { key: "low", label: "Low Stock", value: lowStockItems.length, tone: "amber" },
       { key: "expiring", label: "Failed Items", value: failed.length, tone: "red" },
       { key: "issued", label: "Issued Items", value: issuedItems.filter((i) => i.status === "Active").length, tone: "green" },
     ],
-    [totalItemsCount, lowStockItems.length, failed.length, issuedItems]
+    [totalItemsCount, uniqueProductsCount, lowStockItems.length, failed.length, issuedItems]
   );
 
   const lowStockAlerts = useMemo(() => {

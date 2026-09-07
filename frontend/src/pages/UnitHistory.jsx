@@ -2,10 +2,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect, useMemo } from "react";
 import { 
   ArrowLeft, Package, History, User, Calendar, CheckCircle, Clock, 
-  XCircle, RotateCcw, Ban, AlertTriangle, LogIn 
+  XCircle, RotateCcw, Ban, AlertTriangle, LogIn, Search, Plus
 } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
+import Modal from "../components/issued/Modal.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
+import { useData } from "../context/DataContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useMenuClick } from "../components/Layout.jsx";
 import { toast } from "sonner";
@@ -51,16 +53,37 @@ export default function UnitHistory() {
   const navigate = useNavigate();
   const onMenuClick = useMenuClick();
   const { stock, issuedItems, getUnitHistory, issueItem, returnIssuedItem, condemnIssuedItem } = useInventory();
+  const { students = [] } = useData();
   const { isAuthenticated, user } = useAuth();
   
   const [isActionLoading, setIsActionLoading] = useState(false);
-
   const [loading, setLoading] = useState(true);
   const [apiUnit, setApiUnit] = useState(null);
   const [apiHistory, setApiHistory] = useState([]);
 
+  // Modal states
+  const [issueModalOpen, setIssueModalOpen] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnCondition, setReturnCondition] = useState("Good");
+  const [returnDateVal, setReturnDateVal] = useState(new Date().toISOString().slice(0, 10));
+
   const canWrite = user?.role === 'admin' || user?.role === 'staff';
   const isAdmin = user?.role === 'admin';
+
+  const filteredStudents = useMemo(() => {
+    if (!studentSearch.trim()) return students || [];
+    const q = studentSearch.toLowerCase();
+    return (students || []).filter(s =>
+      (s.name || "").toLowerCase().includes(q) ||
+      (s.campusId || s.id || "").toLowerCase().includes(q) ||
+      (s.course || "").toLowerCase().includes(q) ||
+      (s.batch || "").toLowerCase().includes(q)
+    );
+  }, [students, studentSearch]);
 
   useEffect(() => {
     if (!unitId) {
@@ -149,7 +172,16 @@ export default function UnitHistory() {
   }, [unitId, stock, issuedItems]);
 
   const unit = apiUnit;
-  const history = apiHistory;
+  const history = useMemo(() => {
+    return [...(apiHistory || [])].sort((a, b) => {
+      const timeA = new Date(a.issueDate || a.date || 0).getTime();
+      const timeB = new Date(b.issueDate || b.date || 0).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+      const idA = String(a.issueId || a.id || '');
+      const idB = String(b.issueId || b.id || '');
+      return idB.localeCompare(idA);
+    });
+  }, [apiHistory]);
 
   const handleGoBack = () => {
     navigate(-1);
@@ -170,31 +202,26 @@ export default function UnitHistory() {
 
   const currentStatus = getCurrentStatus();
 
-  const handleIssue = async () => {
-    if (!isAuthenticated) {
-      toast.error("Please login to issue this unit");
-      navigate(`/login?redirect=/unit-history/${unitId}`);
+  const handleConfirmIssue = async () => {
+    if (!selectedStudentId) {
+      toast.error("Please select a student to issue");
       return;
     }
-    if (!canWrite) {
-      toast.error("You don't have permission to issue items");
-      return;
-    }
-    
-    const studentId = prompt("Enter student ID to issue this unit:");
-    if (!studentId) return;
-    
     setIsActionLoading(true);
     try {
       const result = await issueItem({
-        studentId: studentId,
+        studentId: selectedStudentId,
         unitId: unitId,
         refNo: unit?.refNo,
         qty: 1,
+        issueDate: issueDate,
         stockType: unit?.isReturned ? 'returned' : 'fresh',
       });
       if (result.success) {
         toast.success(`Unit ${unitId} issued successfully`);
+        setIssueModalOpen(false);
+        setSelectedStudentId("");
+        setStudentSearch("");
       } else {
         toast.error(result.message || "Failed to issue unit");
       }
@@ -205,31 +232,22 @@ export default function UnitHistory() {
     }
   };
 
-  const handleReturn = async () => {
-    if (!isAuthenticated) {
-      toast.error("Please login to return this unit");
-      navigate(`/login?redirect=/unit-history/${unitId}`);
-      return;
-    }
-    if (!canWrite) {
-      toast.error("You don't have permission to return items");
-      return;
-    }
-    
+  const handleConfirmReturn = async () => {
     const activeIssue = history.find(h => h.status === 'Active' || h.status === 'active');
     if (!activeIssue) {
       toast.error("No active issue found for this unit");
       return;
     }
-    
-    const condition = prompt("Enter return condition (Good, Damaged, Expired):", "Good");
-    if (!condition) return;
-    
     setIsActionLoading(true);
     try {
-      const result = await returnIssuedItem(activeIssue.issueId || activeIssue.id, new Date().toISOString().slice(0, 10), condition);
+      const result = await returnIssuedItem(
+        activeIssue.issueId || activeIssue.id,
+        returnDateVal,
+        returnCondition
+      );
       if (result.success) {
         toast.success(`Unit ${unitId} returned successfully`);
+        setReturnModalOpen(false);
       } else {
         toast.error(result.message || "Failed to return unit");
       }
@@ -311,10 +329,50 @@ export default function UnitHistory() {
       <main className="unit-history-page">
         <div className="unit-history-container">
           <div className="unit-history-header">
-            <button className="unit-history-back-btn" onClick={handleGoBack}>
-              <ArrowLeft size={16} /> Back
-            </button>
-            <h1>Unit History</h1>
+            <div className="unit-history-header-left">
+              <button className="unit-history-back-btn" onClick={handleGoBack}>
+                <ArrowLeft size={16} /> Back
+              </button>
+              <h1>Unit History</h1>
+            </div>
+
+            {isAuthenticated && canWrite && (
+              <div className="unit-history-quick-actions">
+                {currentStatus === 'available' || currentStatus === 'returned' ? (
+                  <button
+                    className="unit-action-btn unit-action-issue"
+                    onClick={() => setIssueModalOpen(true)}
+                    disabled={isActionLoading}
+                  >
+                    <RotateCcw size={16} /> Issue Unit
+                  </button>
+                ) : currentStatus === 'issued' ? (
+                  <>
+                    <button
+                      className="unit-action-btn unit-action-return"
+                      onClick={() => setReturnModalOpen(true)}
+                      disabled={isActionLoading}
+                    >
+                      <CheckCircle size={16} /> Return Unit
+                    </button>
+                    {isAdmin && (
+                      <button
+                        className="unit-action-btn unit-action-condemn"
+                        onClick={handleCondemn}
+                        disabled={isActionLoading}
+                      >
+                        <Ban size={16} /> Condemn
+                      </button>
+                    )}
+                  </>
+                ) : currentStatus === 'condemned' ? (
+                  <div className="unit-action-condemned-msg">
+                    <AlertTriangle size={16} />
+                    <span>Condemned</span>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
 
           <div className="unit-info-card">
@@ -352,7 +410,7 @@ export default function UnitHistory() {
                 <span>Lot No</span>
                 <p>{productInfo?.lotNo || '—'}</p>
               </div>
-              {/* ⭐ RESTOCK LOCATION - ADDED */}
+              {/* ⭐ RESTOCK LOCATION */}
               <div className="unit-info-detail">
                 <span>Restock Location</span>
                 <p>{productInfo?.freshLocation || '—'}</p>
@@ -367,47 +425,6 @@ export default function UnitHistory() {
               </div>
             </div>
           </div>
-
-          {isAuthenticated && canWrite && (
-            <div className="unit-actions-card">
-              <h4>Quick Actions</h4>
-              <div className="unit-actions-buttons">
-                {currentStatus === 'available' || currentStatus === 'returned' ? (
-                  <button
-                    className="unit-action-btn unit-action-issue"
-                    onClick={handleIssue}
-                    disabled={isActionLoading}
-                  >
-                    <RotateCcw size={16} /> Issue Unit
-                  </button>
-                ) : currentStatus === 'issued' ? (
-                  <>
-                    <button
-                      className="unit-action-btn unit-action-return"
-                      onClick={handleReturn}
-                      disabled={isActionLoading}
-                    >
-                      <CheckCircle size={16} /> Return Unit
-                    </button>
-                    {isAdmin && (
-                      <button
-                        className="unit-action-btn unit-action-condemn"
-                        onClick={handleCondemn}
-                        disabled={isActionLoading}
-                      >
-                        <Ban size={16} /> Condemn
-                      </button>
-                    )}
-                  </>
-                ) : currentStatus === 'condemned' ? (
-                  <div className="unit-action-condemned-msg">
-                    <AlertTriangle size={16} />
-                    <span>This unit has been condemned</span>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          )}
 
           {!isAuthenticated && (
             <div className="unit-actions-card unit-actions-login-required">
@@ -521,6 +538,144 @@ export default function UnitHistory() {
           )}
         </div>
       </main>
+
+      {/* ISSUE UNIT MODAL */}
+      {issueModalOpen && (
+        <Modal
+          title={`Issue Unit ${unitId}`}
+          onClose={() => {
+            setIssueModalOpen(false);
+            setStudentSearch("");
+            setSelectedStudentId("");
+          }}
+          width={480}
+        >
+          <div className="modal__lead">
+            Directly issue unit <strong>{unitId}</strong> ({productInfo?.productName || 'Product'}) to a student.
+          </div>
+
+          <div className="modal__field">
+            <label htmlFor="student-search-input">Search Student</label>
+            <div style={{ position: "relative" }}>
+              <Search size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#6B7280" }} />
+              <input
+                id="student-search-input"
+                type="text"
+                placeholder="Type student name, campus ID, course..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                style={{ paddingLeft: "36px" }}
+              />
+            </div>
+          </div>
+
+          <div className="modal__field">
+            <label htmlFor="student-select">Choose Student ({filteredStudents.length} matches)</label>
+            <select
+              id="student-select"
+              value={selectedStudentId}
+              onChange={(e) => setSelectedStudentId(e.target.value)}
+              size={Math.min(Math.max(filteredStudents.length + 1, 3), 6)}
+              style={{ marginTop: "4px" }}
+            >
+              <option value="">-- Select Student --</option>
+              {filteredStudents.map((s) => (
+                <option key={s.id || s._id} value={s.id || s._id}>
+                  {s.name} ({s.campusId || s.id}) {s.course ? `— ${s.course}` : ""} {s.batch ? `[${s.batch}]` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="modal__field" style={{ marginTop: "14px" }}>
+            <label htmlFor="issue-date-input">Issue Date</label>
+            <input
+              id="issue-date-input"
+              type="date"
+              value={issueDate}
+              onChange={(e) => setIssueDate(e.target.value)}
+            />
+          </div>
+
+          <div className="modal__actions">
+            <button
+              type="button"
+              className="modal__btn"
+              onClick={() => {
+                setIssueModalOpen(false);
+                setStudentSearch("");
+                setSelectedStudentId("");
+              }}
+              disabled={isActionLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="modal__btn modal__btn--primary"
+              onClick={handleConfirmIssue}
+              disabled={isActionLoading || !selectedStudentId}
+            >
+              {isActionLoading ? "Issuing..." : "Confirm & Issue Unit"}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* RETURN UNIT MODAL */}
+      {returnModalOpen && (
+        <Modal
+          title={`Return Unit ${unitId}`}
+          onClose={() => setReturnModalOpen(false)}
+          width={420}
+        >
+          <div className="modal__lead">
+            Return unit <strong>{unitId}</strong> back to inventory.
+          </div>
+
+          <div className="modal__field">
+            <label htmlFor="return-condition-select">Return Condition</label>
+            <select
+              id="return-condition-select"
+              value={returnCondition}
+              onChange={(e) => setReturnCondition(e.target.value)}
+            >
+              <option value="Good">Good (Usable for Restock)</option>
+              <option value="Damaged">Damaged</option>
+              <option value="Condemned">Condemned</option>
+            </select>
+          </div>
+
+          <div className="modal__field" style={{ marginTop: "14px" }}>
+            <label htmlFor="return-date-input">Return Date</label>
+            <input
+              id="return-date-input"
+              type="date"
+              value={returnDateVal}
+              onChange={(e) => setReturnDateVal(e.target.value)}
+            />
+          </div>
+
+          <div className="modal__actions">
+            <button
+              type="button"
+              className="modal__btn"
+              onClick={() => setReturnModalOpen(false)}
+              disabled={isActionLoading}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="modal__btn modal__btn--primary"
+              onClick={handleConfirmReturn}
+              disabled={isActionLoading}
+            >
+              {isActionLoading ? "Returning..." : "Confirm Return"}
+            </button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

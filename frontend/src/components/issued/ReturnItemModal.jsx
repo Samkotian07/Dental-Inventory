@@ -179,7 +179,7 @@ export default function ReturnItemModal({
         </head>
         <body>
           <div class="sticker">
-            <div class="header">YEN LEDGER — RETURN STICKER</div>
+            <div class="header">CaviTrack — RETURN STICKER</div>
             <div class="qr-box">${qrSvgHtml}</div>
             <br/>
             <div class="badge">✅ RETURNED</div>
