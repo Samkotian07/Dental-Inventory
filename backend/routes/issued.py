@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from middleware.auth import token_required, admin_required
+from middleware.auth import token_required, admin_required, readonly_required
 from models.issued_item import IssuedItem
 from models.inventory import Inventory
 from models.student import Student
@@ -53,6 +53,7 @@ def get_student_issued_items(student_id):
 
 @issued_bp.route('/', methods=['POST'])
 @token_required
+@readonly_required
 def issue_item():
     """Issue an item to a student (supports both regular items and implants/abutments)"""
     data = request.get_json()
@@ -253,6 +254,7 @@ def issue_item():
 
 @issued_bp.route('/<issue_id>/return', methods=['PUT'])
 @token_required
+@readonly_required
 def return_item(issue_id):
     """Return an issued item (regular items only)"""
     issued_item = IssuedItem.find_by_id(issue_id)
@@ -381,6 +383,7 @@ def return_item(issue_id):
 # ⭐⭐⭐ NEW: EXCHANGE WITH VENDOR ENDPOINT (For Implants/Abutments)
 @issued_bp.route('/<issue_id>/exchange', methods=['PUT'])
 @token_required
+@readonly_required
 def exchange_item(issue_id):
     """Exchange an implant/abutment with vendor"""
     issued_item = IssuedItem.find_by_id(issue_id)
@@ -520,6 +523,7 @@ def exchange_item(issue_id):
 @issued_bp.route('/<issue_id>/condemn', methods=['PUT'])
 @token_required
 @admin_required
+@readonly_required
 def condemn_item(issue_id):
     """Condemn an issued item (Admin only)"""
     issued_item = IssuedItem.find_by_id(issue_id)
@@ -610,6 +614,7 @@ def condemn_item(issue_id):
 
 @issued_bp.route('/batch', methods=['POST'])
 @token_required
+@readonly_required
 def batch_issue_items():
     """
     Issue multiple units in a single request for better performance.

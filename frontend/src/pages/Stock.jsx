@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Download, Eye, Pencil, Trash2, ArrowUpDown, Power } from "lucide-react";
+import { Search, Download, Eye, Pencil, Trash2, ArrowUpDown } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import ItemDetailsModal from "../components/stock/ItemDetailsModal.jsx";
@@ -10,6 +10,7 @@ import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useSearchParams } from "react-router-dom";
 import { useInventory } from "../context/InventoryContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import { toast } from "sonner";
 import "./css/Stock.css";
 
@@ -45,6 +46,8 @@ function isExpiringSoon(iso) {
 
 export default function Stock() {
   const onMenuClick = useMenuClick();
+  const { user } = useAuth();
+  const canWrite = user?.role !== 'readonly';
   const { stock: rows, updateStockItem, deleteStockItem, moveStockToFailed, toggleStockStatus, getInventoryId } = useInventory();
 
   const [query, setQuery] = useState("");
@@ -324,36 +327,32 @@ export default function Stock() {
                       <div className="stock__row-actions">
                         <button
                           className="stock__icon-btn"
-                          onClick={() => handleToggleStatus(row)}
-                          aria-label={`Toggle status ${row.refNo}`}
-                          title={`Toggle status (Current: ${row.status || 'active'})`}
-                        >
-                          <Power size={15} strokeWidth={2} style={{ color: row.status === 'inactive' ? '#DC2626' : '#059669' }} />
-                        </button>
-                        <button
-                          className="stock__icon-btn"
                           onClick={() => setDetailItem(row)}
                           aria-label={`View ${row.refNo}`}
                           title="View details"
                         >
                           <Eye size={16} strokeWidth={2} />
                         </button>
-                        <button
-                          className="stock__icon-btn"
-                          onClick={() => setEditItem(row)}
-                          aria-label={`Edit ${row.refNo}`}
-                          title="Edit item"
-                        >
-                          <Pencil size={15} strokeWidth={2} />
-                        </button>
-                        <button
-                          className="stock__icon-btn stock__icon-btn--danger"
-                          onClick={() => setDeleteItem(row)}
-                          aria-label={`Delete ${row.refNo}`}
-                          title="Delete item"
-                        >
-                          <Trash2 size={15} strokeWidth={2} />
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button
+                              className="stock__icon-btn"
+                              onClick={() => setEditItem(row)}
+                              aria-label={`Edit ${row.refNo}`}
+                              title="Edit item"
+                            >
+                              <Pencil size={16} strokeWidth={2} />
+                            </button>
+                            <button
+                              className="stock__icon-btn stock__icon-btn--danger"
+                              onClick={() => setDeleteItem(row)}
+                              aria-label={`Delete ${row.refNo}`}
+                              title="Delete item"
+                            >
+                              <Trash2 size={16} strokeWidth={2} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

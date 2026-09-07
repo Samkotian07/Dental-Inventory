@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
-import { Edit, Trash2, Plus, UserCheck, UserX } from "lucide-react";
+import { Edit, Trash2, Plus } from "lucide-react";
 import { useData } from "../context/DataContext";
 import SearchBar from "./common/SearchBar";
-import Select from "./common/Select";
 import Table from "./common/Table";
 import Modal from "./issued/Modal.jsx";
 import Button from "./common/Button";
@@ -17,15 +16,15 @@ import "./StaffManager.css";
 
 export default function StaffManager() {
   const onMenuClick = useMenuClick();
-  const { staff, addStaff, updateStaff, deleteStaff, toggleStaffStatus } = useData();
+  const { staff, addStaff, updateStaff, deleteStaff } = useData();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState({
     name: "",
     email: "",
+    role: "staff",
     password: "",
     confirmPassword: "",
   });
@@ -36,10 +35,9 @@ export default function StaffManager() {
         !search ||
         s.name.toLowerCase().includes(search.toLowerCase()) ||
         s.email.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = statusFilter === "all" || s.status === statusFilter;
-      return matchSearch && matchStatus;
+      return matchSearch;
     });
-  }, [staff, search, statusFilter]);
+  }, [staff, search]);
 
   const columns = [
     {
@@ -57,17 +55,8 @@ export default function StaffManager() {
       key: "role",
       label: "Role",
       render: (s) => (
-        <Badge variant={s.role === "admin" ? "secondary" : "primary"}>
+        <Badge variant={s.role === "admin" ? "secondary" : s.role === "readonly" ? "neutral" : "primary"}>
           {s.role}
-        </Badge>
-      ),
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (s) => (
-        <Badge variant={s.status === "active" ? "success" : "neutral"}>
-          {s.status}
         </Badge>
       ),
     },
@@ -78,7 +67,6 @@ export default function StaffManager() {
     },
   ];
 
-  // ⭐ FIXED: Removed user?.name parameter
   const handleAdd = async () => {
     if (!form.name || !form.email || !form.password) {
       toast.error("All fields are required");
@@ -99,22 +87,22 @@ export default function StaffManager() {
     const result = await addStaff({
       name: form.name,
       email: form.email,
+      role: form.role || "staff",
       password: form.password
     });
     if (!result.success) {
       toast.error(result.message || "Failed to add staff member");
       return;
     }
-    setForm({ name: "", email: "", password: "", confirmPassword: "" });
+    setForm({ name: "", email: "", role: "staff", password: "", confirmPassword: "" });
     setAddOpen(false);
     toast.success("Staff member added successfully");
   };
 
-  // ⭐ FIXED: Removed user?.name parameter
   const handleEditSave = async () => {
     const result = await updateStaff(
       editTarget.id,
-      { name: editTarget.name, email: editTarget.email }
+      { name: editTarget.name, email: editTarget.email, role: editTarget.role }
     );
     if (!result.success) {
       toast.error(result.message || "Failed to update staff member");
@@ -124,7 +112,6 @@ export default function StaffManager() {
     toast.success("Staff member updated");
   };
 
-  // ⭐ FIXED: Removed user?.name parameter
   const handleDelete = async () => {
     const result = await deleteStaff(deleteTarget.id);
     if (!result.success) {
@@ -140,17 +127,8 @@ export default function StaffManager() {
       { key: "name", label: "Name" },
       { key: "email", label: "Email" },
       { key: "role", label: "Role" },
-      { key: "status", label: "Status" },
     ]);
     toast.success("Excel exported successfully");
-  };
-
-  // ⭐ FIXED: Removed user?.name parameter
-  const handleToggleStatus = async (id) => {
-    const result = await toggleStaffStatus(id);
-    if (!result.success) {
-      toast.error(result.message || "Failed to update staff status");
-    }
   };
 
   return (
@@ -164,16 +142,6 @@ export default function StaffManager() {
             onChange={setSearch}
             placeholder="Search by name or email..."
             className="staff-search"
-          />
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            options={[
-              { value: "all", label: "All Status" },
-              { value: "active", label: "Active" },
-              { value: "inactive", label: "Inactive" },
-            ]}
-            className="staff-filter-select"
           />
           <Button
             variant="secondary"
@@ -200,18 +168,6 @@ export default function StaffManager() {
                   title="Edit"
                 >
                   <Edit size={16} />
-                </button>
-                {/* ⭐ FIXED: Using handleToggleStatus without user?.name */}
-                <button
-                  onClick={() => handleToggleStatus(item.id)}
-                  className={`staff-action-btn ${item.status === "active" ? "staff-action-deactivate" : "staff-action-activate"}`}
-                  title={item.status === "active" ? "Deactivate" : "Activate"}
-                >
-                  {item.status === "active" ? (
-                    <UserX size={16} />
-                  ) : (
-                    <UserCheck size={16} />
-                  )}
                 </button>
                 {item.role !== "admin" && (
                   <button
@@ -250,6 +206,18 @@ export default function StaffManager() {
               />
             </div>
             <div className="modal__field">
+              <label htmlFor="staff-role">Role</label>
+              <select
+                id="staff-role"
+                value={form.role || "staff"}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+              >
+                <option value="admin">Admin</option>
+                <option value="staff">Staff</option>
+                <option value="readonly">Read Only</option>
+              </select>
+            </div>
+            <div className="modal__field">
               <label htmlFor="staff-password">Password</label>
               <input
                 id="staff-password"
@@ -267,9 +235,6 @@ export default function StaffManager() {
                 value={form.confirmPassword}
                 onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
               />
-            </div>
-            <div className="staff-role-hint">
-              <p>Role: <Badge variant="primary">Staff</Badge> (fixed)</p>
             </div>
             <div className="modal__actions">
               <button className="modal__btn" onClick={() => setAddOpen(false)}>Cancel</button>
@@ -297,6 +262,18 @@ export default function StaffManager() {
                 value={editTarget.email}
                 onChange={(e) => setEditTarget({ ...editTarget, email: e.target.value })}
               />
+            </div>
+            <div className="modal__field">
+              <label htmlFor="edit-staff-role">Role</label>
+              <select
+                id="edit-staff-role"
+                value={editTarget.role}
+                onChange={(e) => setEditTarget({ ...editTarget, role: e.target.value })}
+              >
+                <option value="admin">Admin</option>
+                <option value="staff">Staff</option>
+                <option value="readonly">Read Only</option>
+              </select>
             </div>
             <div className="modal__actions">
               <button className="modal__btn" onClick={() => setEditTarget(null)}>Cancel</button>

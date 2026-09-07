@@ -101,7 +101,7 @@ def create_user():
         }), 400
     
     role = data.get('role', 'staff')
-    if role not in ['admin', 'staff']:
+    if role not in ['admin', 'staff', 'readonly']:
         role = 'staff'
     
     user = User.create(
@@ -167,7 +167,7 @@ def update_user(user_id):
 
     # Prevent logged-in admin from demoting themselves
     if 'role' in data:
-        if data['role'] not in ['admin', 'staff']:
+        if data['role'] not in ['admin', 'staff', 'readonly']:
             data['role'] = 'staff'
         if request.current_user.id == user_id and data['role'] != 'admin':
             return jsonify({

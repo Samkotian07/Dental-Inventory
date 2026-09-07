@@ -28,21 +28,24 @@ const navItems = [
   { label: "Issued", to: "/issued", icon: ClipboardList },
   { label: "Failed Inventory", to: "/failed-inventory", icon: AlertTriangle },
   { label: "Track Returns", to: "/track-exchange", icon: Repeat },
-  { label: "Stock Insertion", to: "/stock-insertion", icon: PackagePlus },
-  { label: "Stock Handle", to: "/stock-handle", icon: PackageMinus },
-  { label: "Settings", to: "/settings", icon: Settings },
+  { label: "Stock Insertion", to: "/stock-insertion", icon: PackagePlus, writeOnly: true },
+  { label: "Stock Handle", to: "/stock-handle", icon: PackageMinus, writeOnly: true },
 ];
 
 const adminOnlyItems = [
   { label: "Stock Settings", to: "/low-stock-settings", icon: AlertCircle },
   { label: "Archive Students", to: "/archive-students", icon: Archive },
   { label: "Staff Manager", to: "/staff-manager", icon: UserCog },
+  { label: "Settings", to: "/settings", icon: Settings },
   { label: "Audit Log", to: "/audit-log", icon: ScrollText },
 ];
 
 export default function Sidebar({ open, onClose }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "admin";
+  const isReadonly = user?.role === "readonly";
+
+  const visibleNavItems = navItems.filter(item => isReadonly ? !item.writeOnly : true);
 
   const handleLogout = () => {
     logout();
@@ -64,7 +67,7 @@ export default function Sidebar({ open, onClose }) {
 
         <nav className="sidebar__nav">
           <ul>
-            {navItems.map(({ label, to, icon: Icon }) => (
+            {visibleNavItems.map(({ label, to, icon: Icon }) => (
               <li key={label}>
                 <NavLink
                   to={to}

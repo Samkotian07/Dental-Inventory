@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search, ScrollText, Filter, ArrowUpDown } from "lucide-react";
+import { Search, ScrollText, Filter, ArrowUpDown, Clock } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import { useMenuClick } from "../components/Layout.jsx";
@@ -9,16 +9,35 @@ const PAGE_SIZE = 10;
 const API_URL = "http://127.0.0.1:5000/api";
 
 function formatTimestamp(ts) {
-  if (!ts) return "—";
+  if (!ts) return { date: "—", time: "" };
   const d = new Date(ts);
-  if (isNaN(d.getTime())) return ts;
-  return d.toLocaleString("en-US", {
-    month: "short",
-    day: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (isNaN(d.getTime())) return { date: ts, time: "" };
+  return {
+    date: d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    }),
+    time: d.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }),
+  };
+}
+
+function renderDetails(details) {
+  if (details === null || details === undefined) return "—";
+  if (typeof details === "string") return details;
+  if (typeof details === "object") {
+    if (typeof details.message === "string") return details.message;
+    try {
+      return JSON.stringify(details);
+    } catch {
+      return String(details);
+    }
+  }
+  return String(details);
 }
 
 function getActionBadgeTone(action) {
@@ -101,12 +120,13 @@ export default function AuditLog() {
         matchAction = action === actionFilter.toUpperCase();
       }
       
+      const detailsText = renderDetails(log.details);
       const matchQuery =
         !q ||
-        (log.details || "").toLowerCase().includes(q) ||
+        detailsText.toLowerCase().includes(q) ||
         (log.userName || log.user_name || "").toLowerCase().includes(q) ||
-        (log.entity_type || "").toLowerCase().includes(q) ||
-        (log.entity_id || "").toLowerCase().includes(q);
+        (log.entity_type || log.entityType || "").toLowerCase().includes(q) ||
+        (log.entity_id || log.entityId || "").toLowerCase().includes(q);
       return matchAction && matchQuery;
     });
 
@@ -144,7 +164,7 @@ export default function AuditLog() {
             <Search size={14} strokeWidth={2.2} />
             <input
               type="text"
-              placeholder="Search details, user, entity..."
+              placeholder="Search details, user..."
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -196,7 +216,6 @@ export default function AuditLog() {
                     </button>
                   </th>
                   <th>Action</th>
-                  <th>Entity</th>
                   <th>User</th>
                   <th>Details</th>
                 </tr>
@@ -204,40 +223,48 @@ export default function AuditLog() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="audit-log__empty">
+                    <td colSpan={4} className="audit-log__empty">
                       Loading audit logs...
                     </td>
                   </tr>
                 ) : pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="audit-log__empty">
+                    <td colSpan={4} className="audit-log__empty">
                       No audit log entries found.
                     </td>
                   </tr>
                 ) : (
-                  pageRows.map((log) => (
-                    <tr key={log.id}>
-                      <td className="audit-log__mono">
-                        {formatTimestamp(log.timestamp)}
-                      </td>
-                      <td>
-                        <span
-                          className={`audit-badge ${getActionBadgeTone(
-                            log.action
-                          )}`}
-                        >
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="audit-log__mono">
-                        {log.entity_type} (#{log.entity_id})
-                      </td>
-                      <td className="audit-log__strong">
-                        {log.userName || log.user_name || log.user_id || "System"}
-                      </td>
-                      <td>{log.details}</td>
-                    </tr>
-                  ))
+                  pageRows.map((log) => {
+                    const ts = formatTimestamp(log.timestamp);
+                    return (
+                      <tr key={log.id}>
+                        <td>
+                          <div className="audit-log__time-wrapper">
+                            <span className="audit-log__date">{ts.date}</span>
+                            {ts.time && (
+                              <span className="audit-log__time">
+                                <Clock size={12} strokeWidth={2} />
+                                {ts.time}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span
+                            className={`audit-badge ${getActionBadgeTone(
+                              log.action
+                            )}`}
+                          >
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="audit-log__strong">
+                          {log.userName || log.user_name || log.user_id || "System"}
+                        </td>
+                        <td>{renderDetails(log.details)}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from middleware.auth import token_required, admin_required
+from middleware.auth import token_required, admin_required, readonly_required
 from models.vendor_return import VendorReturn
 from models.inventory import Inventory
 from models.audit_log import AuditLog
@@ -39,6 +39,7 @@ def get_return(return_id):
 
 @returns_bp.route('/', methods=['POST'])
 @token_required
+@readonly_required
 def create_return():
     """Create a new vendor return"""
     try:
@@ -186,6 +187,7 @@ def create_return():
 
 @returns_bp.route('/<return_id>/status', methods=['PUT'])
 @token_required
+@readonly_required
 def update_return_status(return_id):
     """Update vendor return status"""
     vendor_return = VendorReturn.find_by_id(return_id)
@@ -270,6 +272,7 @@ def update_return_status(return_id):
 
 @returns_bp.route('/<return_id>', methods=['DELETE'])
 @token_required
+@readonly_required
 def delete_return(return_id):
     """Delete / remove a credit note or vendor return record"""
     vendor_return = VendorReturn.find_by_id(return_id)

@@ -19,6 +19,7 @@ import { useSearchParams, Link } from "react-router-dom";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { useData } from "../context/DataContext.jsx";
 import { toast } from "sonner";
+import { useAuth } from "../context/AuthContext.jsx";
 import "./css/IssuedItems.css";
 
 const PAGE_SIZE = 6;
@@ -50,6 +51,8 @@ function formatDate(isoOrDate) {
 
 export default function IssuedItems() {
   const onMenuClick = useMenuClick();
+  const { user } = useAuth();
+  const canWrite = user?.role !== 'readonly';
   const { issuedItems, issueItem, returnIssuedItem, condemnIssuedItem, stock, batchIssueItems, exchangeWithVendor } = useInventory();
   const { students } = useData();
 
@@ -294,13 +297,15 @@ export default function IssuedItems() {
               <Download size={15} strokeWidth={2.2} />
               Export
             </button>
-            <button
-              className="issued__btn issued__btn--primary"
-              onClick={openIssueModal}
-            >
-              <Plus size={15} strokeWidth={2.4} />
-              Issue Item
-            </button>
+            {canWrite && (
+              <button
+                className="issued__btn issued__btn--primary"
+                onClick={openIssueModal}
+              >
+                <Plus size={15} strokeWidth={2.4} />
+                Issue Item
+              </button>
+            )}
           </div>
         </div>
 
@@ -365,7 +370,7 @@ export default function IssuedItems() {
                         >
                           <Eye size={16} strokeWidth={2} />
                         </button>
-                        {row.status === "Active" && (
+                        {canWrite && row.status === "Active" && (
                           <button
                             className="issued__icon-btn"
                             onClick={() => setReturnItem(row)}

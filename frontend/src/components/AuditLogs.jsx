@@ -10,6 +10,21 @@ import "./AuditLogs.css";
 const PAGE_SIZE = 10;
 const API_URL = "http://localhost:5000/api";
 
+// ⭐ Helper to safely render details
+const renderDetails = (details) => {
+  if (details === null || details === undefined) return "—";
+  if (typeof details === "string") return details;
+  if (typeof details === "object") {
+    if (typeof details.message === "string") return details.message;
+    try {
+      return JSON.stringify(details);
+    } catch {
+      return String(details);
+    }
+  }
+  return String(details);
+};
+
 export default function AuditLogs() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
@@ -46,7 +61,7 @@ export default function AuditLogs() {
 
   const filtered = logs.filter(log => {
     const matchSearch = !search || 
-      log.details?.toLowerCase().includes(search.toLowerCase()) ||
+      renderDetails(log.details).toLowerCase().includes(search.toLowerCase()) ||
       log.entityId?.toLowerCase().includes(search.toLowerCase()) ||
       log.userName?.toLowerCase().includes(search.toLowerCase());
     const matchAction = filterAction === "all" || log.action === filterAction;
@@ -69,7 +84,10 @@ export default function AuditLogs() {
       MOVE_TO_FAILED: "badge-danger",
       CONDEMN: "badge-danger",
       UPDATE_RETURN_STATUS: "badge-primary",
-      CREATE_RETURN: "badge-info"
+      CREATE_RETURN: "badge-info",
+      LOGIN: "badge-neutral",
+      LOGOUT: "badge-neutral",
+      EXCHANGE: "badge-warning"
     };
     return colors[action] || "badge-secondary";
   };
@@ -104,6 +122,11 @@ export default function AuditLogs() {
             <option value="RESTORE">RESTORE</option>
             <option value="DISPOSE">DISPOSE</option>
             <option value="SENT_TO_VENDOR">SENT_TO_VENDOR</option>
+            <option value="LOGIN">LOGIN</option>
+            <option value="LOGOUT">LOGOUT</option>
+            <option value="EXCHANGE">EXCHANGE</option>
+            <option value="UPDATE_RETURN_STATUS">UPDATE_RETURN_STATUS</option>
+            <option value="CREATE_RETURN">CREATE_RETURN</option>
           </select>
         </div>
 
@@ -115,52 +138,61 @@ export default function AuditLogs() {
                   <th>Time</th>
                   <th>Action</th>
                   <th>User</th>
-                  <th>Entity</th>
                   <th>Details</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan="6" className="audit-logs__empty">Loading...</td></tr>
+                  <tr><td colSpan="5" className="audit-logs__empty">Loading...</td></tr>
                 ) : paginated.length === 0 ? (
-                  <tr><td colSpan="6" className="audit-logs__empty">No logs found</td></tr>
+                  <tr><td colSpan="5" className="audit-logs__empty">No logs found</td></tr>
                 ) : (
-                  paginated.map((log) => (
-                    <tr key={log.id}>
-                      <td className="audit-logs__time">
-                        <Clock size={14} />
-                        {new Date(log.timestamp).toLocaleString()}
-                      </td>
-                      <td>
-                        <span className={`badge ${getActionBadge(log.action)}`}>
-                          {log.action}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="audit-logs__user">
-                          <User size={14} />
-                          {log.userName || "System"}
-                        </div>
-                      </td>
-                      <td>
-                        <span className="audit-logs__entity">
-                          {log.entityType}
-                        </span>
-                        <span className="audit-logs__entity-id">{log.entityId}</span>
-                      </td>
-                      <td className="audit-logs__details">{log.details}</td>
-                      <td>
-                        <button
-                          className="audit-logs__view-btn"
-                          onClick={() => setSelectedLog(log)}
-                          title="View details"
-                        >
-                          <Eye size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  paginated.map((log) => {
+                    const d = new Date(log.timestamp);
+                    const isValid = !isNaN(d.getTime());
+                    const dateStr = isValid ? d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : log.timestamp;
+                    const timeStr = isValid ? d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true }) : "";
+                    
+                    return (
+                      <tr key={log.id}>
+                        <td>
+                          <div className="audit-log__time-wrapper">
+                            <span className="audit-log__date">{dateStr}</span>
+                            {timeStr && (
+                              <span className="audit-log__time">
+                                <Clock size={12} strokeWidth={2} />
+                                {timeStr}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge ${getActionBadge(log.action)}`}>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="audit-logs__user">
+                            <User size={14} />
+                            {log.userName || "System"}
+                          </div>
+                        </td>
+                        <td className="audit-logs__details">
+                          {renderDetails(log.details)}
+                        </td>
+                        <td>
+                          <button
+                            className="audit-logs__view-btn"
+                            onClick={() => setSelectedLog(log)}
+                            title="View details"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -184,7 +216,7 @@ export default function AuditLogs() {
               <p><strong>Action:</strong> {selectedLog.action}</p>
               <p><strong>User:</strong> {selectedLog.userName || "System"}</p>
               <p><strong>Entity:</strong> {selectedLog.entityType} ({selectedLog.entityId})</p>
-              <p><strong>Details:</strong> {selectedLog.details}</p>
+              <p><strong>Details:</strong> {renderDetails(selectedLog.details)}</p>
               <p><strong>Timestamp:</strong> {new Date(selectedLog.timestamp).toLocaleString()}</p>
             </div>
             <button className="audit-logs__modal-close" onClick={() => setSelectedLog(null)}>Close</button>

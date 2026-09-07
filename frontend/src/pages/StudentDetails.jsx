@@ -171,6 +171,8 @@ export default function StudentDetails() {
     return Math.max(Number(row.pendingReturnCount || 0), activeCount);
   };
 
+  const canWrite = user?.role !== 'readonly';
+
   return (
     <>
       <DashboardHeader title="Student Details" onMenuClick={onMenuClick} />
@@ -213,14 +215,16 @@ export default function StudentDetails() {
               <Download size={15} strokeWidth={2.2} />
               Export
             </button>
-            <button className="students__btn students__btn--primary" onClick={() => setFormStudent(null)}>
-              <Plus size={15} strokeWidth={2.4} />
-              Add Student
-            </button>
+            {canWrite && (
+              <button className="students__btn students__btn--primary" onClick={() => setFormStudent(null)}>
+                <Plus size={15} strokeWidth={2.4} />
+                Add Student
+              </button>
+            )}
           </div>
         </div>
 
-        <BulkImportPanel onImport={handleBulkImport} />
+        {canWrite && <BulkImportPanel onImport={handleBulkImport} />}
 
         <section className="card students__card">
           <div className="students__scroll">
@@ -285,22 +289,26 @@ export default function StudentDetails() {
                             >
                               <Eye size={15} strokeWidth={2} />
                             </button>
-                            <button
-                              className="students__icon-btn students__icon-btn--edit"
-                              onClick={() => setFormStudent(row)}
-                              aria-label={`Edit ${row.name}`}
-                              title="Edit student"
-                            >
-                              <Pencil size={15} strokeWidth={2} />
-                            </button>
-                            <button
-                              className="students__icon-btn students__icon-btn--danger"
-                              onClick={() => setDeleteTarget(row)}
-                              aria-label={`Remove ${row.name}`}
-                              title="Remove student"
-                            >
-                              <Trash2 size={15} strokeWidth={2} />
-                            </button>
+                            {canWrite && (
+                              <>
+                                <button
+                                  className="students__icon-btn students__icon-btn--edit"
+                                  onClick={() => setFormStudent(row)}
+                                  aria-label={`Edit ${row.name}`}
+                                  title="Edit student"
+                                >
+                                  <Pencil size={15} strokeWidth={2} />
+                                </button>
+                                <button
+                                  className="students__icon-btn students__icon-btn--danger"
+                                  onClick={() => setDeleteTarget(row)}
+                                  aria-label={`Remove ${row.name}`}
+                                  title="Remove student"
+                                >
+                                  <Trash2 size={15} strokeWidth={2} />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

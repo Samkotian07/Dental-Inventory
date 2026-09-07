@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from middleware.auth import token_required, admin_required
+from middleware.auth import token_required, admin_required, readonly_required
 from models.student import Student
 from models.audit_log import AuditLog
 
@@ -150,6 +150,7 @@ def get_student(campus_id):
 
 @students_bp.route('/', methods=['POST'])
 @token_required
+@readonly_required
 def create_student():
     """Create a new student"""
     data = request.get_json()
@@ -173,6 +174,7 @@ def create_student():
 
 @students_bp.route('/<campus_id>', methods=['PUT'])
 @token_required
+@readonly_required
 def update_student(campus_id):
     """Update a student"""
     student = Student.find_by_id(campus_id)
@@ -205,6 +207,7 @@ def update_student(campus_id):
 
 @students_bp.route('/<campus_id>', methods=['DELETE'])
 @token_required
+@readonly_required
 def delete_student(campus_id):
     """Delete a student"""
     try:

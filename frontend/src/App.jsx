@@ -45,6 +45,14 @@ function AdminRoute({ children }) {
   return <ProtectedRoute requireAdmin>{children}</ProtectedRoute>;
 }
 
+function WriteRoute({ children }) {
+  const { user } = useAuth();
+  if (user?.role === "readonly") {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -69,15 +77,22 @@ export default function App() {
         <Route path="/track-returns" element={<TrackReturns />} />
         <Route path="/stock" element={<Stock />} />
         <Route path="/failed-inventory" element={<FailedInventory />} />
-        <Route path="/stock-insertion" element={<StockInsertion />} />
-        <Route path="/stock-handle" element={<StockHandle />} />
-        <Route path="/settings" element={<Settings />} />
+        <Route path="/stock-insertion" element={<WriteRoute><StockInsertion /></WriteRoute>} />
+        <Route path="/stock-handle" element={<WriteRoute><StockHandle /></WriteRoute>} />
         <Route path="/unit-history/:unitId" element={<UnitHistory />} />
 
         {/* ⭐ Reports Route - All users */}
         <Route path="/reports" element={<Reports />} />
 
         {/* Admin Only Routes */}
+        <Route
+          path="/settings"
+          element={
+            <AdminRoute>
+              <Settings />
+            </AdminRoute>
+          }
+        />
         <Route
           path="/archive-students"
           element={

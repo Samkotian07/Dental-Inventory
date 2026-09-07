@@ -151,6 +151,29 @@
   color: #475569;
 }
 
+/* Beautiful Timestamp Styling */
+.audit-log__time-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.audit-log__date {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.audit-log__time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
 /* Dark Mode Overrides for Audit Log */
 :root.dark .audit-log__filter select option {
   background: #141416;

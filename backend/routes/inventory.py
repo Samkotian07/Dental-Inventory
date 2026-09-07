@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from middleware.auth import token_required, admin_required
+from middleware.auth import token_required, admin_required, readonly_required
 from models.inventory import Inventory
 from models.product import Product
 from models.inventory_unit import InventoryUnit
@@ -216,6 +216,7 @@ def get_products():
 
 @inventory_bp.route('/products', methods=['POST'])
 @token_required
+@readonly_required
 def create_product():
     """Create a new product"""
     data = request.get_json()
@@ -313,6 +314,7 @@ def get_inventory_unit(unit_id):
 
 @inventory_bp.route('/', methods=['POST'])
 @token_required
+@readonly_required
 def create_inventory_unit():
     """Create a new inventory unit"""
     data = request.get_json()
@@ -354,6 +356,7 @@ def create_inventory_unit():
 
 @inventory_bp.route('/<unit_id>', methods=['PUT'])
 @token_required
+@readonly_required
 def update_inventory_unit(unit_id):
     """Update an inventory unit"""
     unit = None
@@ -405,6 +408,7 @@ def update_inventory_unit(unit_id):
 
 @inventory_bp.route('/<unit_id>/status', methods=['PUT'])
 @token_required
+@readonly_required
 def toggle_unit_status(unit_id):
     """Toggle inventory unit status"""
     unit = None
@@ -447,6 +451,7 @@ def toggle_unit_status(unit_id):
 
 @inventory_bp.route('/<unit_id>', methods=['DELETE'])
 @token_required
+@readonly_required
 def delete_inventory_unit(unit_id):
     """Delete an inventory unit"""
     unit = None

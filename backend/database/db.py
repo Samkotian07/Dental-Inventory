@@ -93,4 +93,4 @@ class Database:
         except:
             pass
         self.connection = None
-        self.cursor = None
+        self.cursor = None
