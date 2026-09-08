@@ -1,15 +1,18 @@
 .dashboard {
-  padding: 24px 28px 60px;
+  padding: 16px 24px 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
+  min-height: calc(100vh - 75px);
+  box-sizing: border-box;
 }
 
 .dashboard__grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 14px;
   align-items: stretch;
+  flex: 1;
 }
 
 .dashboard__col {

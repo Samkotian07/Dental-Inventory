@@ -63,7 +63,13 @@ function normalizeIssued(item) {
     date: item.issued_date || item.date || item.issuedDate || new Date().toISOString().slice(0, 10),
     issuedDate: item.issued_date || item.date || item.issuedDate || new Date().toISOString().slice(0, 10),
     returnDate: item.return_date || item.returnDate || null,
-    status: item.status === "returned" ? "Returned" : item.status === "condemned" ? "Condemned" : "Active",
+    status: (item.status?.toLowerCase() === "returned" || item.status === "Returned") 
+      ? "Returned" 
+      : (item.status?.toLowerCase() === "condemned" || item.status === "Condemned") 
+      ? "Condemned" 
+      : (item.status?.toLowerCase() === "vendor_exchange" || item.status === "Vendor Exchange") 
+      ? "Vendor Exchange" 
+      : "Active",
     created: item.created_at || item.createdAt || "",
     createdAt: item.created_at || item.createdAt || "",
     // ⭐ ADD THESE - CRITICAL FOR IMPLANT/ABUTMENT DETECTION
@@ -354,18 +360,23 @@ export function InventoryProvider({ children }) {
   };
 
   // ⭐ TOGGLE STATUS
-  const toggleStockStatus = async (itemId) => {
+  const toggleStockStatus = async (itemId, targetStatus = null) => {
     try {
-      const res = await fetch(`${API_URL}/inventory/${itemId}/status`, {
+      const payload = targetStatus ? { status: targetStatus } : {};
+      const res = await fetch(`${API_URL}/inventory/${encodeURIComponent(itemId)}/status`, {
         method: "PUT",
-        headers: getAuthHeaders(),
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: targetStatus ? JSON.stringify(payload) : undefined,
       });
       const data = await res.json();
       if (data.success) {
         await fetchStock();
         return { success: true, data: data.data };
       }
-      return { success: false, message: data.error?.message };
+      return { success: false, message: data.error?.message || data.message || "Failed to update status" };
     } catch (error) {
       console.error("Toggle status error:", error);
       return { success: false, message: "Network error" };
@@ -425,13 +436,20 @@ export function InventoryProvider({ children }) {
   };
 
   // ⭐ MOVE STOCK TO FAILED INVENTORY
-  const moveStockToFailed = async (itemId, reason = "Damaged") => {
+  const moveStockToFailed = async (itemId, reason = "Damaged", quantity = 1, itemDetails = {}) => {
     try {
       const payload = {
         inventory_id: itemId,
         unit_id: itemId,
+        ref_no: itemDetails.refNo || itemDetails.ref_no || itemId,
+        product_name: itemDetails.product || itemDetails.productName || itemDetails.product_name,
+        category: itemDetails.category,
+        company_name: itemDetails.company || itemDetails.companyName || itemDetails.company_name,
+        size: itemDetails.size,
+        lot_no: itemDetails.lotNo || itemDetails.lot_no,
         failure_reason: reason,
         reason: reason,
+        quantity: Number(quantity) || 1,
       };
 
       const res = await fetch(`${API_URL}/failed-inventory/`, {

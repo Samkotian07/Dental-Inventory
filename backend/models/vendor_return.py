@@ -152,22 +152,34 @@ class VendorReturn:
             if not inventory and self.ref_no:
                 inventory = Inventory.find_by_ref_no(self.ref_no)
 
-            if inventory:
-                new_inv_data = {
-                    'product_name': inventory.product_name,
-                    'category': inventory.category,
-                    'company_name': inventory.company_name,
-                    'size': inventory.size,
-                    'lot_no': self.new_batch_no,
-                    'quantity': self.quantity,
-                    'expiry_date': inventory.expiry_date,
-                    'low_stock_threshold': inventory.low_stock_threshold,
-                    'is_returnable': inventory.is_returnable,
-                    'document_type': 'exchange',
-                    'document_number': self.return_id,
-                    'created_by': self.created_by
-                }
-                Inventory.create(new_inv_data)
+            from models.product import Product
+            product = Product.find_by_ref_no(self.ref_no) if self.ref_no else None
+
+            prod_name = inventory.product_name if inventory else (product.get_product_name() if product else self.product_name)
+            cat = inventory.category if inventory else (product.get_category() if product else 'General')
+            comp = inventory.company_name if inventory else (product.company_name if product else '')
+            sz = inventory.size if inventory else (product.get_size() if product else '')
+            exp = inventory.expiry_date if inventory else (product.expiry_date if product else None)
+            is_ret = inventory.is_returnable if inventory else (product.get_is_returnable() if product else True)
+
+            new_inv_data = {
+                'ref_no': self.ref_no,
+                'product_name': prod_name,
+                'category': cat,
+                'company_name': comp,
+                'size': sz,
+                'lot_no': self.new_batch_no,
+                'quantity': self.quantity,
+                'expiry_date': exp,
+                'low_stock_threshold': 10,
+                'is_returnable': is_ret,
+                'document_type': 'exchange',
+                'document_number': self.return_id,
+                'created_by': self.created_by
+            }
+            new_item = Inventory.create(new_inv_data)
+            if new_item:
+                print(f"✅ Added {self.quantity} unit(s) of {prod_name} with new batch {self.new_batch_no} to stock")
         
         return VendorReturn.find_by_id(self.return_id)
 

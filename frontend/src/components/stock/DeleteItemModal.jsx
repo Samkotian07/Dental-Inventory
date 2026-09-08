@@ -9,11 +9,14 @@ const failReasons = FAILED_REASONS;
 export default function DeleteItemModal({ item, onClose, onConfirm }) {
   if (!item) return null;
 
+  const maxQty = Number(item.quantity ?? item.qty ?? 1);
   const [reason, setReason] = useState(failReasons[0] || "Damaged");
   const [moveToFailed, setMoveToFailed] = useState(true);
+  const [deleteQty, setDeleteQty] = useState(maxQty);
 
   const handleDelete = () => {
-    onConfirm(item.refNo || item.id, { reason, moveToFailed });
+    const qty = Math.min(Math.max(1, Number(deleteQty) || 1), maxQty);
+    onConfirm(item.refNo || item.id, { reason, moveToFailed, quantity: qty });
   };
 
   return (
@@ -27,6 +30,22 @@ export default function DeleteItemModal({ item, onClose, onConfirm }) {
           action cannot be undone.
         </p>
       </div>
+
+      {maxQty > 1 && (
+        <div className="modal__field">
+          <label htmlFor="delete-qty">
+            Quantity to {moveToFailed ? "Move to Failed" : "Delete"} (Available: {maxQty})
+          </label>
+          <input
+            id="delete-qty"
+            type="number"
+            min="1"
+            max={maxQty}
+            value={deleteQty}
+            onChange={(e) => setDeleteQty(e.target.value)}
+          />
+        </div>
+      )}
 
       <div className="modal__field">
         <label htmlFor="delete-reason">Reason</label>
@@ -53,7 +72,7 @@ export default function DeleteItemModal({ item, onClose, onConfirm }) {
           Cancel
         </button>
         <button className="modal__btn modal__btn--danger" onClick={handleDelete}>
-          Delete
+          {moveToFailed ? "Move to Failed" : "Delete"}
         </button>
       </div>
     </Modal>

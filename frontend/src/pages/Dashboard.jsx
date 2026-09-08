@@ -59,39 +59,60 @@ export default function Dashboard() {
     return months;
   }, [issuedItems, returns]);
 
-  const uniqueProductsCount = useMemo(() => {
-    return new Set((stock || []).map((s) => s.refNo || s.id)).size;
+  const productsList = useMemo(() => {
+    const map = new Map();
+    (stock || []).forEach((item) => {
+      const key = item.refNo || item.ref_no || item.id;
+      if (!key) return;
+      if (!map.has(key)) {
+        map.set(key, {
+          refNo: key,
+          product: item.product || item.productName || item.product_name || "Product",
+          productName: item.product || item.productName || item.product_name || "Product",
+          company: item.company || item.companyName || item.company_name || "Vendor",
+          category: item.category || "General",
+          size: item.size || "Standard",
+          lowStockThreshold: item.lowStockThreshold ?? item.low_stock_threshold ?? 10,
+          totalQty: 0,
+        });
+      }
+      const p = map.get(key);
+      p.totalQty += Number(item.quantity ?? item.qty ?? 1);
+    });
+    return Array.from(map.values());
   }, [stock]);
 
-  const totalItemsCount = useMemo(() => {
-    return (stock || []).reduce((sum, item) => sum + Number(item.qty || item.quantity || 0), 0);
-  }, [stock]);
+  const uniqueProductsCount = productsList.length;
 
-  const lowStockItems = useMemo(() => {
-    return (stock || []).filter((item) => Number(item.qty || item.quantity || 0) <= (item.lowStockThreshold || 10));
-  }, [stock]);
+  const lowStockProducts = useMemo(() => {
+    return productsList.filter((p) => p.totalQty <= p.lowStockThreshold);
+  }, [productsList]);
+
+  const uniqueFailedProductsCount = useMemo(() => {
+    return new Set((failed || []).map((f) => f.refNo || f.id)).size;
+  }, [failed]);
 
   const stats = useMemo(
     () => [
-      { key: "total", label: "Total Items", value: `${totalItemsCount} (${uniqueProductsCount} products)`, tone: "blue" },
-      { key: "low", label: "Low Stock", value: lowStockItems.length, tone: "amber" },
-      { key: "expiring", label: "Failed Items", value: failed.length, tone: "red" },
+      { key: "total", label: "Total Products", value: uniqueProductsCount, tone: "blue" },
+      { key: "low", label: "Low Stock Products", value: lowStockProducts.length, tone: "amber" },
+      { key: "expiring", label: "Failed Products", value: uniqueFailedProductsCount, tone: "red" },
       { key: "issued", label: "Issued Items", value: issuedItems.filter((i) => i.status === "Active").length, tone: "green" },
     ],
-    [totalItemsCount, uniqueProductsCount, lowStockItems.length, failed.length, issuedItems]
+    [uniqueProductsCount, lowStockProducts.length, uniqueFailedProductsCount, issuedItems]
   );
 
   const lowStockAlerts = useMemo(() => {
-    return lowStockItems.map((item) => ({
-      id: item.refNo || item.id,
-      product: item.product || item.productName || "Dental Item",
-      left: Number(item.qty || item.quantity || 0),
+    return lowStockProducts.map((item) => ({
+      id: item.refNo,
+      product: item.product,
+      left: item.totalQty,
     }));
-  }, [lowStockItems]);
+  }, [lowStockProducts]);
 
   const categoryDistribution = useMemo(() => {
     const counts = {};
-    stock.forEach((item) => {
+    productsList.forEach((item) => {
       const cat = item.category || "General";
       counts[cat] = (counts[cat] || 0) + 1;
     });
@@ -106,7 +127,7 @@ export default function Dashboard() {
       value: counts[cat],
       color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
     }));
-  }, [stock]);
+  }, [productsList]);
 
   return (
     <>

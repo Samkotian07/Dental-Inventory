@@ -137,10 +137,11 @@ class Student:
         """Update pending return count for a student based on active issues"""
         db = cls.get_db()
         
-        # Count active issues (including active, issued, NULL, or empty status)
+        # Count active returnable issues (excluding implants/abutments)
         result = db.execute_query("""
             SELECT COUNT(*) as count FROM issued_items 
             WHERE student_id = %s 
+            AND (is_implant_abutment = 0 OR is_implant_abutment IS NULL)
             AND (LOWER(status) = 'active' OR LOWER(status) = 'issued' OR status IS NULL OR status = '')
         """, (student_id,))
         count = result[0]['count'] if result else 0

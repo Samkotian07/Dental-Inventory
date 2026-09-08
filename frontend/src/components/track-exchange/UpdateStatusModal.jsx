@@ -5,9 +5,7 @@ export default function UpdateStatusModal({ item, onClose, onConfirm }) {
   const isReasonString = (val) =>
     !val || ["Damaged", "Defective", "Expired", "Failed in Patient", "Other"].includes(String(val).trim());
 
-  const defaultBatch = !isReasonString(item.newBatchNo)
-    ? item.newBatchNo
-    : (item.oldBatchNo || item.batchNo || item.lotNo || "");
+  const defaultBatch = !isReasonString(item.newBatchNo) ? (item.newBatchNo || "") : "";
 
   const [newStatus, setNewStatus] = useState(item.status || "Pending");
   const [newBatchNo, setNewBatchNo] = useState(defaultBatch);
@@ -46,7 +44,7 @@ export default function UpdateStatusModal({ item, onClose, onConfirm }) {
     <Modal title="Update Return Status" onClose={onClose} width={480}>
       <div className="modal__field">
         <label htmlFor="status-update">Current Return</label>
-        <p style={{ fontSize: "14px", color: "#475569", margin: "4px 0 12px" }}>
+        <p style={{ fontSize: "14px", color: "var(--ink)", margin: "4px 0 12px", fontWeight: "600" }}>
           {item.productName} ({item.refNo}) - {item.type === "exchange" ? "Exchange" : "Credit Note"}
         </p>
         <label htmlFor="status-update">New Status</label>
@@ -58,13 +56,14 @@ export default function UpdateStatusModal({ item, onClose, onConfirm }) {
             width: "100%",
             padding: "10px 12px",
             borderRadius: "8px",
-            border: "1px solid #D1D5DB",
+            border: "1px solid var(--line)",
             fontSize: "14px",
-            background: "white",
+            background: "var(--surface)",
+            color: "var(--ink)",
           }}
         >
           {statusOptions.map((s) => (
-            <option key={s} value={s}>
+            <option key={s} value={s} style={{ background: "var(--surface)", color: "var(--ink)" }}>
               {s}
             </option>
           ))}
@@ -84,11 +83,13 @@ export default function UpdateStatusModal({ item, onClose, onConfirm }) {
               width: "100%",
               padding: "10px 12px",
               borderRadius: "8px",
-              border: "1px solid #D1D5DB",
+              border: "1px solid var(--line)",
               fontSize: "14px",
+              background: "var(--surface)",
+              color: "var(--ink)",
             }}
           />
-          <small style={{ color: "#6B7280", marginTop: "4px", display: "block" }}>
+          <small style={{ color: "var(--ink-soft)", marginTop: "4px", display: "block" }}>
             This will create a new inventory item with the new batch number
           </small>
         </div>
@@ -107,8 +108,10 @@ export default function UpdateStatusModal({ item, onClose, onConfirm }) {
               width: "100%",
               padding: "10px 12px",
               borderRadius: "8px",
-              border: "1px solid #D1D5DB",
+              border: "1px solid var(--line)",
               fontSize: "14px",
+              background: "var(--surface)",
+              color: "var(--ink)",
             }}
           />
         </div>

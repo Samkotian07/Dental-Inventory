@@ -277,3 +277,60 @@
     padding: 16px;
   }
 }
+
+/* ⭐ Force light mode styles for PDF export regardless of dark theme */
+.reports-content.force-light-print {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: none !important;
+}
+
+.reports-content.force-light-print * {
+  border-color: #e2e8f0 !important;
+}
+
+.reports-content.force-light-print .reports-header {
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+.reports-content.force-light-print .reports-header h2 {
+  color: #0f172a !important;
+}
+
+.reports-content.force-light-print .reports-header p,
+.reports-content.force-light-print .reports-footer p,
+.reports-content.force-light-print p {
+  color: #475569 !important;
+}
+
+.reports-content.force-light-print h3 {
+  color: #0f172a !important;
+}
+
+.reports-content.force-light-print .reports-table th {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+.reports-content.force-light-print .reports-table td {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.reports-content.force-light-print .category-tag {
+  background-color: #eff6ff !important;
+  color: #1d4ed8 !important;
+}
+
+.reports-content.force-light-print .status-badge.active {
+  background-color: #fef3c7 !important;
+  color: #d97706 !important;
+}
+
+.reports-content.force-light-print .status-badge.returned {
+  background-color: #d1fae5 !important;
+  color: #059669 !important;
+}

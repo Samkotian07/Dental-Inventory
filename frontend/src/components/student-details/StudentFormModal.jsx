@@ -9,17 +9,6 @@ const courses = [
   "Pediatric Dentistry",
 ];
 
-const semesters = [
-  { value: "1", label: "Sem I" },
-  { value: "2", label: "Sem II" },
-  { value: "3", label: "Sem III" },
-  { value: "4", label: "Sem IV" },
-  { value: "5", label: "Sem V" },
-  { value: "6", label: "Sem VI" },
-  { value: "7", label: "Sem VII" },
-  { value: "8", label: "Sem VIII" },
-];
-
 export default function StudentFormModal({ student, onClose, onSave }) {
   const isEdit = Boolean(student);
 
@@ -28,7 +17,7 @@ export default function StudentFormModal({ student, onClose, onSave }) {
     campusId: student?.campusId ?? student?.id ?? "",
     email: student?.email ?? "",
     course: student?.course ?? courses[0],
-    semester: student?.semester ?? semesters[0].value,
+    batch: student?.batch ?? "",
   });
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -43,7 +32,7 @@ export default function StudentFormModal({ student, onClose, onSave }) {
       id: form.campusId.trim(),
       email: form.email.trim(),
       course: form.course,
-      semester: form.semester,
+      batch: form.batch.trim(),
     });
   };
 
@@ -96,14 +85,14 @@ export default function StudentFormModal({ student, onClose, onSave }) {
       </div>
 
       <div className="modal__field">
-        <label htmlFor="student-semester">Semester</label>
-        <select id="student-semester" value={form.semester} onChange={set("semester")}>
-          {semesters.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+        <label htmlFor="student-batch">Batch</label>
+        <input
+          id="student-batch"
+          type="text"
+          placeholder="e.g. Batch 2024 or 2024-2028"
+          value={form.batch}
+          onChange={set("batch")}
+        />
       </div>
 
       <div className="modal__actions">

@@ -4,7 +4,7 @@ import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import DisposeConfirmModal from "../components/failed-inventory/DisposeConfirmModal.jsx";
 import MoveToInventoryModal from "../components/failed-inventory/MoveToInventoryModal.jsx";
-import { CATEGORIES as categories, FAILED_REASONS as failReasons } from "../components/utils/constants.js";
+import { CATEGORIES as categories, FAILED_REASONS as failReasons, normalizeCategory, isCategoryMatch } from "../components/utils/constants.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
@@ -44,10 +44,21 @@ export default function FailedInventory() {
   const [disposeItem, setDisposeItem] = useState(null);
   const [restoreItem, setRestoreItem] = useState(null);
 
+  const categoryOptions = useMemo(() => {
+    const set = new Set();
+    categories.forEach((c) => {
+      if (c && c !== "All Categories") set.add(c);
+    });
+    (rows || []).forEach((r) => {
+      if (r.category) set.add(normalizeCategory(r.category));
+    });
+    return ["All Categories", ...Array.from(set)];
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = (rows || []).filter((r) => {
-      const matchesCategory = category === "All Categories" || r.category === category;
+      const matchesCategory = isCategoryMatch(r.category, category);
       const matchesReason = reason === "All Reasons" || r.reason === reason;
       const matchesQuery =
         !q ||
@@ -119,13 +130,13 @@ export default function FailedInventory() {
       toast.error("Item not found");
       return;
     }
-    
+
     let successCount = 0;
     for (const item of matchingItems) {
       const res = await markFailedDisposed(item.id || item.refNo);
       if (res.success) successCount++;
     }
-    
+
     if (successCount > 0) {
       toast.success(`Marked ${successCount} item(s) as disposed`);
     } else {
@@ -205,7 +216,7 @@ export default function FailedInventory() {
                 setPage(1);
               }}
             >
-              {categories.map((c) => (
+              {categoryOptions.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

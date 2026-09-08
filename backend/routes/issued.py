@@ -423,28 +423,14 @@ def exchange_item(issue_id):
             }
         }), 400
     
-    data = request.get_json()
-    if not data:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'INVALID_REQUEST',
-                'message': 'Request body is required'
-            }
-        }), 400
-    
+    data = request.get_json() or {}
     return_date = data.get('return_date', datetime.date.today().isoformat())
-    new_batch_no = data.get('new_batch_no') or data.get('newBatchNo')
+    provided_batch = data.get('new_batch_no') or data.get('newBatchNo')
+    reason_input = data.get('reason') or data.get('exchange_reason') or (provided_batch if provided_batch in ['Defective', 'Damaged', 'Expired', 'Failed in Patient', 'Other'] else 'Defective implant/abutment')
     
-    if not new_batch_no:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'VALIDATION_ERROR',
-                'message': 'new_batch_no is required for vendor exchange'
-            }
-        }), 400
-    
+    # New lot number is entered on status completion, not prefilled with old lot_no
+    actual_new_lot = provided_batch if (provided_batch and provided_batch not in ['Defective', 'Damaged', 'Expired', 'Failed in Patient', 'Other']) else None
+
     current_user = request.current_user
     
     try:
@@ -457,19 +443,18 @@ def exchange_item(issue_id):
         # ⭐ Create vendor return record
         from models.vendor_return import VendorReturn
         
-        # Determine actual new_lot_no vs reason
-        reason_val = new_batch_no if (new_batch_no and new_batch_no in ['Defective', 'Damaged', 'Expired', 'Failed in Patient', 'Other']) else 'Defective implant/abutment'
-        actual_new_lot = new_batch_no if (new_batch_no and new_batch_no not in ['Defective', 'Damaged', 'Expired', 'Failed in Patient', 'Other']) else issued_item.lot_no
-
         vendor_return = VendorReturn.create({
             'type': 'exchange',
             'issue_id': issue_id,
             'unit_id': unit.unit_id if unit else issued_item.unit_id,
             'ref_no': issued_item.ref_no,
+            'product_name': issued_item.product_name,
+            'old_batch_no': issued_item.lot_no,
             'old_lot_no': issued_item.lot_no,
+            'new_batch_no': actual_new_lot,
             'new_lot_no': actual_new_lot,
             'quantity': issued_item.quantity,
-            'reason': f"Vendor exchange - {reason_val}",
+            'reason': f"Vendor exchange - {reason_input}",
             'return_date': return_date,
             'created_by': current_user.name if current_user else 'Admin'
         })

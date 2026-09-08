@@ -54,6 +54,7 @@ def create_failed_item():
     
     inventory_id = data.get('inventory_id') or data.get('unit_id') or data.get('refNo') or data.get('ref_no')
     failure_reason = data.get('failure_reason') or data.get('reason')
+    move_qty = int(data.get('quantity', 1))
     
     if not inventory_id or not failure_reason:
         missing = []
@@ -67,9 +68,10 @@ def create_failed_item():
             }
         }), 400
     
-    # Check if inventory unit or item exists
     from models.inventory_unit import InventoryUnit
     from models.product import Product
+    from database.db import Database
+    db = Database()
 
     inventory_item = None
     unit = InventoryUnit.find_by_id(inventory_id)
@@ -84,10 +86,53 @@ def create_failed_item():
             'size': product.get_size() if product else '',
             'lot_no': product.lot_no if product else '',
             'quantity': unit.quantity,
+            'expiry_date': product.expiry_date if product else None,
             'is_returnable': product.get_is_returnable() if product else True,
         })
     else:
-        inventory_item = Inventory.find_by_id(inventory_id) or Inventory.find_by_ref_no(inventory_id)
+        units = InventoryUnit.find_by_ref_no(inventory_id)
+        if not units:
+            res_units = db.execute_query(
+                "SELECT * FROM inventory_units WHERE unit_id LIKE %s OR ref_no LIKE %s LIMIT 10",
+                (f"{inventory_id}%", f"{inventory_id}%")
+            )
+            if res_units:
+                units = [InventoryUnit(r) for r in res_units]
+
+        if units:
+            unit = units[0]
+            product = Product.find_by_ref_no(unit.ref_no)
+            inventory_item = Inventory({
+                'id': unit.unit_id,
+                'ref_no': unit.ref_no,
+                'product_name': product.get_product_name() if product else unit.ref_no,
+                'category': product.get_category() if product else 'General',
+                'company_name': product.company_name if product else '',
+                'size': product.get_size() if product else '',
+                'lot_no': product.lot_no if product else '',
+                'quantity': sum(u.quantity for u in units),
+                'expiry_date': product.expiry_date if product else None,
+                'is_returnable': product.get_is_returnable() if product else True,
+            })
+        else:
+            inventory_item = Inventory.find_by_id(inventory_id) or Inventory.find_by_ref_no(inventory_id)
+
+    # Fallback to payload data if item record not found in inventory tables
+    if not inventory_item and (data.get('product_name') or data.get('productName') or data.get('ref_no') or data.get('refNo')):
+        ref = data.get('ref_no') or data.get('refNo') or inventory_id
+        name = data.get('product_name') or data.get('productName') or ref
+        inventory_item = Inventory({
+            'id': inventory_id,
+            'ref_no': ref,
+            'product_name': name,
+            'category': data.get('category') or 'General',
+            'company_name': data.get('company_name') or data.get('companyName') or '',
+            'size': data.get('size') or '',
+            'lot_no': data.get('lot_no') or data.get('lotNo') or '',
+            'quantity': move_qty,
+            'expiry_date': data.get('expiry_date') or data.get('expiryDate'),
+            'is_returnable': True,
+        })
 
     if not inventory_item:
         return jsonify({
@@ -111,7 +156,6 @@ def create_failed_item():
     
     current_user = request.current_user
     
-    # Create failed inventory entry
     failed_data = {
         'ref_no': inventory_item.ref_no,
         'product_name': inventory_item.product_name,
@@ -119,22 +163,20 @@ def create_failed_item():
         'company_name': inventory_item.company_name,
         'size': inventory_item.size,
         'lot_no': inventory_item.lot_no,
-        'quantity': data.get('quantity', inventory_item.quantity),
-        'expiry_date': inventory_item.expiry_date,
+        'quantity': move_qty,
         'failure_reason': failure_reason,
-        'unit_id': inventory_id,
-        'original_inventory_id': inventory_item.id or inventory_id,
+        'unit_id': unit.unit_id if unit else inventory_id,
+        'original_inventory_id': unit.unit_id if unit else inventory_id,
         'moved_by': current_user.name if current_user else 'Admin'
     }
     
     failed_item = FailedInventory.create(failed_data)
     
-    # Log the action
     AuditLog.create(
         action='MOVE_TO_FAILED',
         entity_type='FAILED_INVENTORY',
         entity_id=failed_item.id,
-        details=f"Moved {inventory_item.product_name} ({inventory_item.ref_no}) to failed inventory. Reason: {data['failure_reason']}",
+        details=f"Moved {move_qty} unit(s) of {inventory_item.product_name} ({inventory_item.ref_no}) to failed inventory. Reason: {failure_reason}",
         user_id=current_user.id if current_user else None,
         user_name=current_user.name if current_user else 'Admin'
     )

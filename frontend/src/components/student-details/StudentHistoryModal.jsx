@@ -23,9 +23,17 @@ export default function StudentHistoryModal({ student, onClose }) {
     });
   }, [issuedItems, student]);
 
-  const pendingCount = history.filter(
-    (i) => i.status === "Active" || i.status?.toLowerCase() === "pending"
-  ).length;
+  const pendingCount = history.filter((i) => {
+    const isReturned = i.status?.toLowerCase() === "returned";
+    const isCondemned = i.status?.toLowerCase() === "condemned";
+    const isExchanged = i.status?.toLowerCase() === "vendor_exchange";
+    const isImplantAbutment = Boolean(
+      i.isImplantAbutment || i.is_implant_abutment ||
+      i.category?.toLowerCase() === "implant" || i.category?.toLowerCase() === "abutment"
+    );
+    const isActive = !isReturned && !isCondemned && !isExchanged;
+    return isActive && !isImplantAbutment;
+  }).length;
 
   return (
     <Modal title="Student Details & History" onClose={onClose} width={720}>
@@ -66,8 +74,13 @@ export default function StudentHistoryModal({ student, onClose }) {
                 </tr>
               ) : (
                 history.map((row) => {
-                  const isReturned = row.status === "Returned";
-                  const isCondemned = row.status === "Condemned";
+                  const isReturned = row.status?.toLowerCase() === "returned";
+                  const isCondemned = row.status?.toLowerCase() === "condemned";
+                  const isExchanged = row.status?.toLowerCase() === "vendor_exchange";
+                  const isImplantAbutment = Boolean(
+                    row.isImplantAbutment || row.is_implant_abutment ||
+                    row.category?.toLowerCase() === "implant" || row.category?.toLowerCase() === "abutment"
+                  );
 
                   return (
                     <tr key={row.issueId || row.id} style={{ borderBottom: "1px solid var(--line)", color: "var(--ink)" }}>
@@ -92,6 +105,14 @@ export default function StudentHistoryModal({ student, onClose }) {
                           <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "rgba(239, 68, 68, 0.18)", color: "#F87171", display: "inline-block" }}>
                             🗑️ Condemned
                           </span>
+                        ) : isExchanged ? (
+                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "rgba(139, 92, 246, 0.18)", color: "#A78BFA", display: "inline-block" }}>
+                            🔄 Vendor Exchange
+                          </span>
+                        ) : isImplantAbutment ? (
+                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "rgba(37, 99, 235, 0.18)", color: "#60A5FA", display: "inline-block" }}>
+                            📦 Issued (Placed)
+                          </span>
                         ) : (
                           <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "rgba(245, 158, 11, 0.18)", color: "#FBBF24", display: "inline-block" }}>
                             ⚠️ PENDING
@@ -99,7 +120,7 @@ export default function StudentHistoryModal({ student, onClose }) {
                         )}
                       </td>
                       <td style={{ padding: "10px 12px" }}>
-                        {isReturned || isCondemned
+                        {isReturned || isCondemned || isExchanged
                           ? formatDate(row.returnDate || row.returnedDate || row.updatedAt || row.date)
                           : "-"}
                       </td>

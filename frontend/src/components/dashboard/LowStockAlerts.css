@@ -1,8 +1,8 @@
 .alerts-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 10px 14px;
+  gap: 12px;
+  padding: 6px 12px;
   overflow: hidden;
 }
 
@@ -17,13 +17,14 @@
 .alerts-card__head h2 {
   font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--ink);
   margin: 0;
 }
 
 .alerts-card__empty {
-  font-size: 12.5px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--ink-soft);
   margin: 0;
 }
@@ -38,7 +39,7 @@
 .alerts-card__track {
   display: flex;
   width: max-content;
-  gap: 16px;
+  gap: 12px;
   animation: alerts-marquee 500s linear infinite;
 }
 
@@ -52,7 +53,7 @@
   padding: 0;
   display: flex;
   flex-direction: row;
-  gap: 12px;
+  gap: 10px;
 }
 
 .alerts-card__list li {
@@ -62,7 +63,7 @@
   background: #FDF6E7;
   border: 1px solid #F5E4BA;
   border-radius: var(--radius-sm);
-  padding: 7px 10px;
+  padding: 3px 8px;
   white-space: nowrap;
 }
 
@@ -73,13 +74,14 @@
 
 .alerts-card__list p {
   margin: 0;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 700;
   color: var(--ink);
 }
 
 .alerts-card__list span {
-  font-size: 11px;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--ink-soft);
 }
 
@@ -91,9 +93,9 @@
 .alerts-card__pill {
   background: #E7A02B;
   color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 2px 8px;
   border-radius: 999px;
   flex-shrink: 0;
 }

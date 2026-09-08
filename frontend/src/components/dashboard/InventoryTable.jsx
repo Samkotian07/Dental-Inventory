@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Search, Maximize2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { CATEGORIES as categories } from "../utils/constants.js";
+import { CATEGORIES as categories, normalizeCategory, isCategoryMatch } from "../utils/constants.js";
 import Pagination from "../Pagination.jsx";
 import "./InventoryTable.css";
 
@@ -12,7 +12,7 @@ function Rows({ items }) {
     return (
       <tr>
         <td colSpan={6} className="inv-table__empty">
-          No items match your search or filter.
+          No products match your search or filter.
         </td>
       </tr>
     );
@@ -22,7 +22,7 @@ function Rows({ items }) {
     <tr key={item.refNo || item.id}>
       <td>
         <span className={`inv-table__tag inv-table__tag--${(item.category || "general").toLowerCase()}`}>
-          {item.category || "General"}
+          {normalizeCategory(item.category)}
         </span>
       </td>
       <td>{item.company}</td>
@@ -61,9 +61,20 @@ export default function InventoryTable({ items = [], activeCategory, onCategoryC
     return Object.values(groups);
   }, [items]);
 
+  const categoryOptions = useMemo(() => {
+    const set = new Set();
+    categories.forEach((c) => {
+      if (c && c !== "All Categories") set.add(c);
+    });
+    (items || []).forEach((r) => {
+      if (r.category) set.add(normalizeCategory(r.category));
+    });
+    return ["All Categories", ...Array.from(set)];
+  }, [items]);
+
   const filtered = useMemo(() => {
     return groupedStock.filter((item) => {
-      const matchesCategory = activeCategory === "All Categories" || item.category === activeCategory;
+      const matchesCategory = isCategoryMatch(item.category, activeCategory);
       const q = query.trim().toLowerCase();
       const matchesQuery =
         !q ||
@@ -81,7 +92,7 @@ export default function InventoryTable({ items = [], activeCategory, onCategoryC
     (currentFullViewPage - 1) * FULL_VIEW_PAGE_SIZE,
     currentFullViewPage * FULL_VIEW_PAGE_SIZE
   );
-  const visible = filtered.slice(0, 9);
+  const visible = filtered.slice(0, 8);
 
   const controls = (
     <div className="inv-table__controls">
@@ -132,7 +143,7 @@ export default function InventoryTable({ items = [], activeCategory, onCategoryC
     <>
       <section className="card inv-table">
         <div className="card__head">
-          <h2>Today's Inventory</h2>
+          <h2>Today's Products</h2>
           {controls}
           <button
             className="inv-table__expand"
@@ -151,7 +162,7 @@ export default function InventoryTable({ items = [], activeCategory, onCategoryC
 
         {filtered.length > 0 && (
           <button className="inv-table__more" onClick={() => navigate("/stock")}>
-            View all {filtered.length} items
+            View all {filtered.length} products
           </button>
         )}
       </section>
@@ -160,7 +171,7 @@ export default function InventoryTable({ items = [], activeCategory, onCategoryC
         <div className="inv-modal" role="dialog" aria-modal="true" aria-label="Full inventory table">
           <div className="inv-modal__panel">
             <div className="inv-modal__head">
-              <h2>Today's Inventory — full view</h2>
+              <h2>Today's Products — full view</h2>
               <button onClick={() => setExpanded(false)} aria-label="Close">
                 <X size={18} />
               </button>

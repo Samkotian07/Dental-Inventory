@@ -166,9 +166,13 @@ export default function StudentDetails() {
       const isReturned = i.status?.toLowerCase() === "returned";
       const isCondemned = i.status?.toLowerCase() === "condemned";
       const isExchanged = i.status?.toLowerCase() === "vendor_exchange";
-      return (matchId || matchName) && !isReturned && !isCondemned && !isExchanged;
+      const isImplantAbutment = Boolean(
+        i.isImplantAbutment || i.is_implant_abutment ||
+        i.category?.toLowerCase() === "implant" || i.category?.toLowerCase() === "abutment"
+      );
+      return (matchId || matchName) && !isReturned && !isCondemned && !isExchanged && !isImplantAbutment;
     }).length;
-    return Math.max(Number(row.pendingReturnCount || 0), activeCount);
+    return activeCount;
   };
 
   const canWrite = user?.role !== 'readonly';

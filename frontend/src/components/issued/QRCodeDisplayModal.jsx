@@ -106,10 +106,10 @@ function QRCodeSticker({ unitId, refNo, productName, location, returnDate }) {
   return (
     <div className="qr-sticker-wrapper">
       <div className="qr-sticker" ref={stickerRef}>
-        <div className="qr-sticker-title">CaviTrack</div>
+        <div className="qr-sticker-title">Dental Inventry</div>
         <div className="qr-sticker-qr">
           <QRCode
-            value={`/unit-history/${unitId}`}
+            value={`${window.location.origin}/unit-history/${encodeURIComponent(unitId || refNo || "")}`}
             size={120}
             level="H"
             includeMargin={true}

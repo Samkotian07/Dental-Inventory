@@ -19,7 +19,7 @@ function parseCsv(text) {
   const campusIdx = header.indexOf("campusid");
   const emailIdx = header.indexOf("email");
   const courseIdx = header.indexOf("course");
-  const semIdx = header.indexOf("semester");
+  const batchIdx = header.indexOf("batch");
   const addedIdx = header.indexOf("added");
 
   return lines.slice(1).map((line) => {
@@ -29,7 +29,7 @@ function parseCsv(text) {
       campusId: cells[campusIdx] ?? "",
       email: cells[emailIdx] ?? "",
       course: cells[courseIdx] ?? "",
-      semester: cells[semIdx] ?? "",
+      batch: cells[batchIdx] ?? "",
       added: cells[addedIdx] ?? "",
     };
   });
@@ -75,7 +75,7 @@ export default function BulkImportPanel({ onImport }) {
               campusId: normalized.campusid || "",
               email: normalized.email || "",
               course: normalized.course || "",
-              semester: normalized.semester || "",
+              batch: normalized.batch || "",
               added: normalized.added || "",
             };
           })
@@ -85,7 +85,7 @@ export default function BulkImportPanel({ onImport }) {
       if (rows.length === 0) {
         setFeedback({
           type: "error",
-          text: "No valid rows found. Expected columns: name, campusId, course, semester.",
+          text: "No valid rows found. Expected columns: name, campusId, course, batch.",
         });
         return;
       }
@@ -100,7 +100,7 @@ export default function BulkImportPanel({ onImport }) {
 
   // Download Excel Template (headers only)
   const downloadTemplate = () => {
-    const headers = ["Campus ID", "Name", "Email", "Course", "Semester", "Added"];
+    const headers = ["Campus ID", "Name", "Email", "Course", "Batch", "Added"];
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([headers]);

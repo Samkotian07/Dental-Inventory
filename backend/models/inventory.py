@@ -3,23 +3,23 @@ from datetime import datetime
 
 class Inventory:
     def __init__(self, data):
-        self.id = data.get('id')
-        self.ref_no = data.get('ref_no')
-        self.product_name = data.get('product_name')
+        self.id = data.get('id') or data.get('unitId') or data.get('unit_id')
+        self.ref_no = data.get('ref_no') or data.get('refNo')
+        self.product_name = data.get('product_name') or data.get('productName') or data.get('product')
         self.category = data.get('category')
-        self.company_name = data.get('company_name')
+        self.company_name = data.get('company_name') or data.get('companyName') or data.get('company')
         self.size = data.get('size')
-        self.lot_no = data.get('lot_no')
+        self.lot_no = data.get('lot_no') or data.get('lotNo')
         self.quantity = data.get('quantity', 0)
-        self.expiry_date = data.get('expiry_date')
-        self.low_stock_threshold = data.get('low_stock_threshold', 10)
+        self.expiry_date = data.get('expiry_date') or data.get('expiryDate')
+        self.low_stock_threshold = data.get('low_stock_threshold') or data.get('lowStockThreshold', 10)
         self.status = data.get('status', 'active')
-        self.is_returnable = data.get('is_returnable', True)
-        self.document_type = data.get('document_type')
-        self.document_number = data.get('document_number')
-        self.created_by = data.get('created_by')
-        self.created_at = data.get('created_at')
-        self.updated_at = data.get('updated_at')
+        self.is_returnable = data.get('is_returnable') if 'is_returnable' in data else data.get('isReturnable', True)
+        self.document_type = data.get('document_type') or data.get('documentType')
+        self.document_number = data.get('document_number') or data.get('documentNumber')
+        self.created_by = data.get('created_by') or data.get('createdBy')
+        self.created_at = data.get('created_at') or data.get('createdAt')
+        self.updated_at = data.get('updated_at') or data.get('updatedAt')
 
     @staticmethod
     def get_db():
@@ -31,13 +31,9 @@ class Inventory:
             from models.inventory_unit import InventoryUnit
             units = InventoryUnit.find_all()
             return [cls(u.to_dict()) for u in units]
-        except Exception:
-            try:
-                db = cls.get_db()
-                results = db.execute_query("SELECT * FROM inventory ORDER BY created_at DESC")
-                return [cls(row) for row in results]
-            except Exception:
-                return []
+        except Exception as e:
+            print(f"Inventory.find_all error: {e}")
+            return []
 
     @classmethod
     def find_by_id(cls, item_id):
@@ -45,18 +41,33 @@ class Inventory:
             return None
         try:
             from models.inventory_unit import InventoryUnit
+            from models.product import Product
+
             unit = InventoryUnit.find_by_id(item_id)
             if unit:
                 return cls(unit.to_dict())
-        except Exception:
-            pass
 
-        try:
-            db = cls.get_db()
-            result = db.execute_query("SELECT * FROM inventory WHERE id = %s", (item_id,))
-            return cls(result[0]) if result else None
-        except Exception:
-            return None
+            units = InventoryUnit.find_by_ref_no(item_id)
+            if units:
+                return cls(units[0].to_dict())
+
+            product = Product.find_by_ref_no(item_id)
+            if product:
+                return cls({
+                    'id': product.ref_no,
+                    'ref_no': product.ref_no,
+                    'product_name': product.get_product_name(),
+                    'category': product.get_category(),
+                    'company_name': product.company_name,
+                    'size': product.get_size(),
+                    'lot_no': product.lot_no,
+                    'quantity': 0,
+                    'expiry_date': product.expiry_date,
+                    'is_returnable': product.get_is_returnable(),
+                })
+        except Exception as e:
+            print(f"Inventory.find_by_id error: {e}")
+        return None
 
     @classmethod
     def find_by_ref_no(cls, ref_no):
@@ -64,18 +75,33 @@ class Inventory:
             return None
         try:
             from models.inventory_unit import InventoryUnit
+            from models.product import Product
+
             units = InventoryUnit.find_by_ref_no(ref_no)
             if units:
                 return cls(units[0].to_dict())
-        except Exception:
-            pass
 
-        try:
-            db = cls.get_db()
-            result = db.execute_query("SELECT * FROM inventory WHERE ref_no = %s", (ref_no,))
-            return cls(result[0]) if result else None
-        except Exception:
-            return None
+            unit = InventoryUnit.find_by_id(ref_no)
+            if unit:
+                return cls(unit.to_dict())
+
+            product = Product.find_by_ref_no(ref_no)
+            if product:
+                return cls({
+                    'id': product.ref_no,
+                    'ref_no': product.ref_no,
+                    'product_name': product.get_product_name(),
+                    'category': product.get_category(),
+                    'company_name': product.company_name,
+                    'size': product.get_size(),
+                    'lot_no': product.lot_no,
+                    'quantity': 0,
+                    'expiry_date': product.expiry_date,
+                    'is_returnable': product.get_is_returnable(),
+                })
+        except Exception as e:
+            print(f"Inventory.find_by_ref_no error: {e}")
+        return None
 
     @classmethod
     def find_low_stock(cls):
@@ -87,31 +113,29 @@ class Inventory:
 
     @classmethod
     def create(cls, data):
-        # Create product if needed and inventory unit
         try:
             from models.product import Product
             from models.inventory_unit import InventoryUnit
             
-            ref_no = data.get('ref_no') or f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            ref_no = data.get('ref_no') or data.get('refNo') or f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
             
-            # Check/Create Product
             product = Product.find_by_ref_no(ref_no)
-            if not product and data.get('product_name'):
+            if not product and (data.get('product_name') or data.get('productName')):
                 prod_data = {
                     'ref_no': ref_no,
-                    'product_name': data.get('product_name'),
+                    'product_name': data.get('product_name') or data.get('productName'),
                     'category': data.get('category'),
-                    'company_name': data.get('company_name'),
+                    'company_name': data.get('company_name') or data.get('companyName'),
                     'size': data.get('size'),
-                    'lot_no': data.get('lot_no'),
-                    'expiry_date': data.get('expiry_date'),
+                    'lot_no': data.get('lot_no') or data.get('lotNo'),
+                    'expiry_date': data.get('expiry_date') or data.get('expiryDate'),
                     'low_stock_threshold': data.get('low_stock_threshold', 10),
                     'is_returnable': data.get('is_returnable', True),
                 }
                 product = Product.create(prod_data)
 
             unit = InventoryUnit.create({
-                'id': data.get('id'),
+                'unit_id': data.get('id') or data.get('unit_id'),
                 'ref_no': ref_no,
                 'quantity': data.get('quantity', 1),
                 'status': data.get('status', 'active'),
@@ -119,23 +143,8 @@ class Inventory:
             })
             return cls.find_by_id(unit.unit_id)
         except Exception as e:
-            print(f"Inventory.create fallback error: {e}")
-            try:
-                db = cls.get_db()
-                ref_no = data.get('ref_no') or f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                item_id = data.get('id') or ref_no
-                db.execute_query("""
-                    INSERT INTO inventory (id, ref_no, product_name, category, company_name, size, lot_no, quantity, expiry_date, low_stock_threshold, is_returnable, document_type, document_number, created_by)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    item_id, ref_no, data.get('product_name', 'Item'), data.get('category', 'General'),
-                    data.get('company_name'), data.get('size'), data.get('lot_no'), data.get('quantity', 1),
-                    data.get('expiry_date'), data.get('low_stock_threshold', 10), data.get('is_returnable', True),
-                    data.get('document_type'), data.get('document_number'), data.get('created_by')
-                ))
-                return cls.find_by_id(item_id)
-            except Exception:
-                return None
+            print(f"Inventory.create error: {e}")
+            return None
 
     def update(self, data):
         try:
@@ -148,29 +157,9 @@ class Inventory:
                 if product:
                     product.update(data)
                 return Inventory.find_by_id(self.id)
-        except Exception:
-            pass
-
-        try:
-            db = self.get_db()
-            updates = []
-            params = []
-            allowed_fields = [
-                'product_name', 'category', 'company_name', 'size', 'lot_no',
-                'quantity', 'expiry_date', 'low_stock_threshold', 'status',
-                'is_returnable', 'document_type', 'document_number'
-            ]
-            for field in allowed_fields:
-                if field in data:
-                    updates.append(f"{field} = %s")
-                    params.append(data[field])
-            if updates:
-                query = f"UPDATE inventory SET {', '.join(updates)} WHERE id = %s"
-                params.append(self.id)
-                db.execute_query(query, tuple(params))
-            return Inventory.find_by_id(self.id)
-        except Exception:
-            return self
+        except Exception as e:
+            print(f"Inventory.update error: {e}")
+        return self
 
     def update_quantity(self, quantity_change, user_name):
         try:
@@ -181,18 +170,9 @@ class Inventory:
                 unit.update({'quantity': new_qty})
                 self.quantity = new_qty
                 return self
-        except Exception:
-            pass
-
-        try:
-            db = self.get_db()
-            new_qty = self.quantity + quantity_change
-            db.execute_query("UPDATE inventory SET quantity = %s WHERE id = %s", (new_qty, self.id))
-            self.quantity = new_qty
-            return self
-        except Exception:
-            self.quantity += quantity_change
-            return self
+        except Exception as e:
+            print(f"Inventory.update_quantity error: {e}")
+        return self
 
     def delete(self):
         try:
@@ -201,15 +181,9 @@ class Inventory:
             if unit:
                 unit.delete()
                 return True
-        except Exception:
-            pass
-
-        try:
-            db = self.get_db()
-            db.execute_query("DELETE FROM inventory WHERE id = %s", (self.id,))
-            return True
-        except Exception:
-            return True
+        except Exception as e:
+            print(f"Inventory.delete error: {e}")
+        return True
 
     def to_dict(self):
         def fmt_date(val):

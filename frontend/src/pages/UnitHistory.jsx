@@ -117,54 +117,69 @@ export default function UnitHistory() {
 
     let isMounted = true;
     setLoading(true);
-    fetch(`http://127.0.0.1:5000/api/inventory/public-history/${encodeURIComponent(unitId)}`)
-      .then(res => res.json())
-      .then(data => {
-        if (!isMounted) return;
-        if (data.success && data.product) {
-          const prod = data.product;
-          setApiUnit({
-            id: prod.id || unitId,
-            unitId: prod.id || unitId,
-            refNo: prod.ref_no || prod.refNo || unitId,
-            product: prod.product_name || prod.productName || prod.ref_no,
-            productName: prod.product_name || prod.productName || prod.ref_no,
-            company: prod.company_name || prod.company || prod.companyName || "Vendor",
-            companyName: prod.company_name || prod.company || prod.companyName || "Vendor",
-            category: prod.category || "General",
-            lotNo: prod.lot_no || prod.lotNo || "—",
-            freshLocation: prod.fresh_location || prod.freshLocation || "—",
-            isReturned: Boolean(prod.is_returned),
-            status: prod.status || "active",
-            quantity: prod.quantity || 1,
-          });
-          const historyList = (data.history || []).map((c, idx) => ({
-            id: c.issue_id || `cycle-${idx}`,
-            issueId: c.issue_id || `cycle-${idx}`,
-            student: c.student,
-            studentName: c.student,
-            studentId: c.studentId,
-            issueDate: c.issued,
-            date: c.issued,
-            returnDate: c.returned === 'NULL' ? null : c.returned,
-            status: c.rawStatus === 'returned' ? 'Returned' : c.rawStatus === 'condemned' ? 'Condemned' : 'Active',
-          }));
-          setApiHistory(historyList);
-        } else {
-          setApiUnit(null);
-          setApiHistory([]);
+    const host = window.location.hostname || "localhost";
+    const apiUrls = [
+      `http://${host}:5000/api/inventory/public-history/${encodeURIComponent(unitId)}`,
+      `http://127.0.0.1:5000/api/inventory/public-history/${encodeURIComponent(unitId)}`,
+      `http://localhost:5000/api/inventory/public-history/${encodeURIComponent(unitId)}`
+    ];
+
+    const fetchPublicData = async () => {
+      let successData = null;
+      for (const url of apiUrls) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              successData = data;
+              break;
+            }
+          }
+        } catch {
+          // ignore & try next URL
         }
-      })
-      .catch(err => {
-        console.error("Public history fetch error:", err);
-        if (isMounted) {
-          setApiUnit(null);
-          setApiHistory([]);
-        }
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
+      }
+
+      if (!isMounted) return;
+
+      if (successData && successData.product) {
+        const prod = successData.product;
+        setApiUnit({
+          id: prod.id || unitId,
+          unitId: prod.id || unitId,
+          refNo: prod.ref_no || prod.refNo || unitId,
+          product: prod.product_name || prod.productName || prod.ref_no,
+          productName: prod.product_name || prod.productName || prod.ref_no,
+          company: prod.company_name || prod.company || prod.companyName || "Vendor",
+          companyName: prod.company_name || prod.company || prod.companyName || "Vendor",
+          category: prod.category || "General",
+          lotNo: prod.lot_no || prod.lotNo || "—",
+          freshLocation: prod.fresh_location || prod.freshLocation || "—",
+          isReturned: Boolean(prod.is_returned),
+          status: prod.status || "active",
+          quantity: prod.quantity || 1,
+        });
+        const historyList = (successData.history || []).map((c, idx) => ({
+          id: c.issue_id || `cycle-${idx}`,
+          issueId: c.issue_id || `cycle-${idx}`,
+          student: c.student,
+          studentName: c.student,
+          studentId: c.studentId,
+          issueDate: c.issued,
+          date: c.issued,
+          returnDate: c.returned === 'NULL' ? null : c.returned,
+          status: c.rawStatus === 'returned' ? 'Returned' : c.rawStatus === 'condemned' ? 'Condemned' : 'Active',
+        }));
+        setApiHistory(historyList);
+      } else {
+        setApiUnit(null);
+        setApiHistory([]);
+      }
+      setLoading(false);
+    };
+
+    fetchPublicData();
 
     return () => {
       isMounted = false;

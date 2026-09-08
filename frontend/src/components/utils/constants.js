@@ -1,4 +1,48 @@
-export const CATEGORIES = ["All Categories", "NP Implants", "RP Implants", "Universal Bases", "Healing Abutments", "Impression Copings", "Implant Replicas", "Snappy Abutments", "Esthetic Abutments", "Temporary Abutments", "Instruments & Tools", "Membrane"];
+export const CATEGORIES = [
+  "All Categories",
+  "Implant",
+  "Abutment",
+  "Prosthetic",
+  "General",
+  "NP Implants",
+  "RP Implants",
+  "Universal Bases",
+  "Healing Abutments",
+  "Impression Copings",
+  "Implant Replicas",
+  "Snappy Abutments",
+  "Esthetic Abutments",
+  "Temporary Abutments",
+  "Instruments & Tools",
+  "Membrane"
+];
+
+export function normalizeCategory(cat) {
+  if (!cat) return "General";
+  const str = String(cat).trim();
+  const lower = str.toLowerCase();
+  if (lower === "prosthetc" || lower === "prosthetic") return "Prosthetic";
+  if (lower === "implant" || lower.includes("implant")) return "Implant";
+  if (lower === "abutment" || lower.includes("abutment")) return "Abutment";
+  if (!str) return "General";
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+export function isCategoryMatch(itemCat, selectedCat) {
+  if (!selectedCat || selectedCat === "All Categories") return true;
+  const rawItem = (itemCat || "General").trim().toLowerCase();
+  const rawSelected = selectedCat.trim().toLowerCase();
+
+  if (rawItem === rawSelected) return true;
+
+  const normItem = normalizeCategory(itemCat).toLowerCase();
+  const normSelected = normalizeCategory(selectedCat).toLowerCase();
+
+  if (normItem === normSelected) return true;
+  if (rawItem.includes(normSelected) || normSelected.includes(rawItem)) return true;
+
+  return false;
+}
 
 export const FAILED_REASONS = ["Damaged", "Expired", "Quality Failed", "Returned", "Other"];
 

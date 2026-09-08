@@ -107,7 +107,7 @@ export default function PublicProductHistory() {
         <div className="public-history__header">
           <div className="public-history__logo-badge">Y</div>
           <div className="public-history__header-titles">
-            <h2>CaviTrack — DENTAL INVENTORY</h2>
+            <h2>Dental Inventry — DENTAL INVENTORY</h2>
             <p>Product Lifecycle & Issuance Verification</p>
           </div>
         </div>

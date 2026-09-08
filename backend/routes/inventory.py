@@ -410,43 +410,67 @@ def update_inventory_unit(unit_id):
 @token_required
 @readonly_required
 def toggle_unit_status(unit_id):
-    """Toggle inventory unit status"""
-    unit = None
-    try:
-        unit = InventoryUnit.find_by_id(unit_id)
-    except Exception:
-        pass
-
-    if not unit:
-        unit = Inventory.find_by_id(unit_id)
-
-    if not unit:
+    """Toggle inventory unit status or set explicit status for unit/ref_no"""
+    data = request.get_json(silent=True) or {}
+    requested_status = data.get('status')
+    
+    from models.inventory_unit import InventoryUnit
+    
+    # Try finding unit by exact unit_id
+    unit = InventoryUnit.find_by_id(unit_id)
+    if unit:
+        new_status = requested_status if requested_status in ['active', 'inactive'] else ('inactive' if unit.status == 'active' else 'active')
+        updated_unit = unit.update({'status': new_status})
+        
+        current_user = request.current_user
+        AuditLog.create(
+            action='UPDATE',
+            entity_type='INVENTORY',
+            entity_id=unit_id,
+            details=f"Set unit status to {new_status}: {unit_id}",
+            user_id=current_user.id if current_user else None,
+            user_name=current_user.name if current_user else 'Admin'
+        )
         return jsonify({
-            'success': False,
-            'error': {
-                'code': 'NOT_FOUND',
-                'message': 'Unit not found'
-            }
-        }), 404
-    
-    new_status = 'inactive' if getattr(unit, 'status', 'active') == 'active' else 'active'
-    updated_unit = unit.update({'status': new_status})
-    
-    current_user = request.current_user
-    AuditLog.create(
-        action='UPDATE',
-        entity_type='INVENTORY',
-        entity_id=unit_id,
-        details=f"Toggled unit status to {new_status}: {unit_id}",
-        user_id=current_user.id if current_user else None,
-        user_name=current_user.name if current_user else 'Admin'
-    )
-    
+            'success': True,
+            'data': updated_unit.to_dict(),
+            'message': f'Unit status changed to {new_status}'
+        }), 200
+
+    # If not found by unit_id, check if unit_id is a ref_no
+    units = InventoryUnit.find_by_ref_no(unit_id)
+    if units:
+        if requested_status in ['active', 'inactive']:
+            new_status = requested_status
+        else:
+            any_active = any(u.status == 'active' for u in units)
+            new_status = 'inactive' if any_active else 'active'
+
+        for u in units:
+            u.update({'status': new_status})
+
+        current_user = request.current_user
+        AuditLog.create(
+            action='UPDATE',
+            entity_type='INVENTORY',
+            entity_id=unit_id,
+            details=f"Set status to {new_status} for all units of ref_no: {unit_id}",
+            user_id=current_user.id if current_user else None,
+            user_name=current_user.name if current_user else 'Admin'
+        )
+        return jsonify({
+            'success': True,
+            'data': [u.to_dict() for u in units],
+            'message': f'All units for {unit_id} changed to {new_status}'
+        }), 200
+
     return jsonify({
-        'success': True,
-        'data': updated_unit.to_dict(),
-        'message': f'Unit status changed to {new_status}'
-    }), 200
+        'success': False,
+        'error': {
+            'code': 'NOT_FOUND',
+            'message': f'Unit or product with ID/ref_no {unit_id} not found'
+        }
+    }), 404
 
 
 @inventory_bp.route('/<unit_id>', methods=['DELETE'])

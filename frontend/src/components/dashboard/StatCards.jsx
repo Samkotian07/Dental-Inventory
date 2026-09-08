@@ -19,10 +19,12 @@ export default function StatCards({ stats }) {
         return (
           <article className="stat-card" key={key}>
             <span className={`stat-card__icon stat-card__icon--${tone}`}>
-              <Icon size={18} strokeWidth={2.2} />
+              <Icon size={19} strokeWidth={2.2} />
             </span>
-            <strong>{s.value}</strong>
-            <span className="stat-card__label">{label}</span>
+            <div className="stat-card__info">
+              <strong>{s.value}</strong>
+              <span className="stat-card__label">{label}</span>
+            </div>
           </article>
         );
       })}

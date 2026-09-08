@@ -85,11 +85,9 @@ export default function StockHandle() {
     const result = await toggleStockStatus(unitId);
     if (result.success) {
       toast.success(`Unit ${unitId} status updated`);
-      // ⭐ Refresh stock from backend
-      await fetchStock();
-      // Update foundItem if needed
+      const updatedStock = await fetchStock();
       if (foundItem && foundItem.refNo === refNo) {
-        const updatedUnit = stock.find(s => s.id === unitId);
+        const updatedUnit = (updatedStock || []).find(s => s.id === unitId);
         if (updatedUnit) {
           const updatedUnits = foundItem.units.map(u => 
             u.id === unitId ? { ...u, status: updatedUnit.status } : u
@@ -108,26 +106,16 @@ export default function StockHandle() {
 
   // ⭐ Toggle all units
   const handleToggleAllUnits = async (refNo, currentStatus) => {
-    const newStatus = currentStatus === "active" ? "inactive" : "active";
-    const productUnits = stock.filter(r => r.refNo === refNo);
-    let successCount = 0;
-    
-    for (const unit of productUnits) {
-      const result = await toggleStockStatus(unit.id);
-      if (result.success) successCount++;
-    }
-    
-    // ⭐ Refresh stock from backend
-    await fetchStock();
-    
-    if (successCount === productUnits.length) {
-      toast.success(`All ${successCount} units set to ${newStatus}`);
+    const targetStatus = currentStatus === "inactive" ? "active" : "inactive";
+    const result = await toggleStockStatus(refNo, targetStatus);
+    if (result.success) {
+      toast.success(`All units for ${refNo} set to ${targetStatus}`);
+      await fetchStock();
+      if (foundItem && foundItem.refNo === refNo) {
+        setFoundItem({ ...foundItem, status: targetStatus });
+      }
     } else {
-      toast.warning(`Updated ${successCount} of ${productUnits.length} units`);
-    }
-    
-    if (foundItem && foundItem.refNo === refNo) {
-      setFoundItem({ ...foundItem, status: newStatus });
+      toast.error(result.message || "Failed to update status");
     }
   };
 

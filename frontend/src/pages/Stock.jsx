@@ -5,10 +5,10 @@ import Pagination from "../components/Pagination.jsx";
 import ItemDetailsModal from "../components/stock/ItemDetailsModal.jsx";
 import EditItemModal from "../components/stock/EditItemModal.jsx";
 import DeleteItemModal from "../components/stock/DeleteItemModal.jsx";
-import { CATEGORIES as categories } from "../components/utils/constants.js";
+import { CATEGORIES as categories, normalizeCategory, isCategoryMatch } from "../components/utils/constants.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { toast } from "sonner";
@@ -45,10 +45,20 @@ function isExpiringSoon(iso) {
 }
 
 export default function Stock() {
+  const navigate = useNavigate();
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const canWrite = user?.role !== 'readonly';
-  const { stock: rows, updateStockItem, deleteStockItem, moveStockToFailed, toggleStockStatus, getInventoryId } = useInventory();
+  const isAdmin = user?.role === 'admin';
+
+  const {
+    stock: rows,
+    updateStockItem,
+    deleteStockItem,
+    moveStockToFailed,
+    toggleStockStatus,
+    getInventoryId,
+  } = useInventory();
 
   const [query, setQuery] = useState("");
   const [searchParams] = useSearchParams();
@@ -61,18 +71,33 @@ export default function Stock() {
   const [editItem, setEditItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
 
-  // ⭐ FIXED: Keep both - searchParams and grouping
   useEffect(() => {
     setQuery(searchParams.get("search") || "");
     setPage(1);
   }, [searchParams]);
 
+  const categoryOptions = useMemo(() => {
+    const set = new Set();
+    categories.forEach((c) => {
+      if (c && c !== "All Categories") set.add(c);
+    });
+    (rows || []).forEach((r) => {
+      if (r.category) set.add(normalizeCategory(r.category));
+    });
+    return ["All Categories", ...Array.from(set)];
+  }, [rows]);
+
   // ⭐ Group by base ref_no and count returned units
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    let q = query.trim().toLowerCase();
+    if (q.includes("/unit-history/")) {
+      q = q.split("/unit-history/").pop().split("?")[0].split("#")[0];
+    } else if (q.includes("/scan/")) {
+      q = q.split("/scan/").pop().split("?")[0].split("#")[0];
+    }
 
     let filteredItems = (rows || []).filter((r) => {
-      const matchesCategory = category === "All Categories" || r.category === category;
+      const matchesCategory = isCategoryMatch(r.category, category);
       const matchesQuery =
         !q ||
         (r.product || "").toLowerCase().includes(q) ||
@@ -179,27 +204,57 @@ export default function Stock() {
       return;
     }
 
+    const qtyRequested = options?.quantity ?? 1;
+
     if (options?.moveToFailed) {
+      let remainingToMove = qtyRequested;
       let successCount = 0;
+
       for (const unit of productUnits) {
-        const result = await moveStockToFailed(unit.id, options.reason);
-        if (result.success) successCount++;
+        if (remainingToMove <= 0) break;
+        const unitQty = Number(unit.quantity ?? unit.qty ?? 1);
+        const moveQty = Math.min(unitQty, remainingToMove);
+
+        const result = await moveStockToFailed(unit.id, options.reason, moveQty, unit);
+        if (result.success) {
+          successCount += moveQty;
+          remainingToMove -= moveQty;
+        }
       }
-      if (successCount === productUnits.length) {
-        toast.success(`All ${successCount} unit(s) moved to Failed Inventory`);
+
+      if (successCount > 0) {
+        toast.success(`Moved ${successCount} unit(s) to Failed Inventory`);
       } else {
-        toast.warning(`Moved ${successCount} of ${productUnits.length} unit(s) to Failed`);
+        toast.error("Failed to move item(s) to Failed Inventory");
       }
     } else {
+      let remainingToDelete = qtyRequested;
       let successCount = 0;
+
       for (const unit of productUnits) {
-        const result = await deleteStockItem(unit.id);
-        if (result.success) successCount++;
+        if (remainingToDelete <= 0) break;
+        const unitQty = Number(unit.quantity ?? unit.qty ?? 1);
+
+        if (unitQty > remainingToDelete) {
+          const newQty = unitQty - remainingToDelete;
+          const result = await updateStockItem(unit.id, { quantity: newQty });
+          if (result.success) {
+            successCount += remainingToDelete;
+            remainingToDelete = 0;
+          }
+        } else {
+          const result = await deleteStockItem(unit.id);
+          if (result.success) {
+            successCount += unitQty;
+            remainingToDelete -= unitQty;
+          }
+        }
       }
-      if (successCount === productUnits.length) {
-        toast.success(`All ${successCount} unit(s) deleted`);
+
+      if (successCount > 0) {
+        toast.success(`Deleted ${successCount} unit(s) from stock`);
       } else {
-        toast.warning(`Deleted ${successCount} of ${productUnits.length} unit(s)`);
+        toast.error("Failed to delete stock items");
       }
     }
     setDeleteItem(null);
@@ -249,6 +304,19 @@ export default function Stock() {
                   setQuery(e.target.value);
                   setPage(1);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && query.trim()) {
+                    let val = query.trim();
+                    if (val.includes("/unit-history/")) {
+                      val = val.split("/unit-history/").pop().split("?")[0].split("#")[0];
+                    } else if (val.includes("/scan/")) {
+                      val = val.split("/scan/").pop().split("?")[0].split("#")[0];
+                    }
+                    if (val) {
+                      navigate(`/unit-history/${encodeURIComponent(val)}`);
+                    }
+                  }
+                }}
               />
             </div>
 
@@ -259,7 +327,7 @@ export default function Stock() {
                 setPage(1);
               }}
             >
-              {categories.map((c) => (
+              {categoryOptions.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

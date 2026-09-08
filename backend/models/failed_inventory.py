@@ -46,8 +46,9 @@ class FailedInventory:
             next_num = res[0]['next_id'] if res and res[0] and 'next_id' in res[0] else 1
             failed_id = f"FAIL-{str(next_num).zfill(3)}"
         
-        raw_unit_id = data.get('unit_id') or data.get('original_inventory_id')
+        raw_unit_id = data.get('unit_id') or data.get('original_inventory_id') or data.get('inventory_id')
         ref_no = data.get('ref_no')
+        quantity_to_move = int(data.get('quantity', 1))
 
         from models.inventory_unit import InventoryUnit
         valid_unit = None
@@ -63,42 +64,47 @@ class FailedInventory:
             if units:
                 valid_unit = units[0]
 
-        target_unit_id = valid_unit.unit_id if valid_unit else None
+        if not valid_unit:
+            target_search = raw_unit_id or ref_no
+            if target_search:
+                res = db.execute_query(
+                    "SELECT * FROM inventory_units WHERE unit_id LIKE %s OR ref_no LIKE %s LIMIT 1",
+                    (f"{target_search}%", f"{target_search}%")
+                )
+                if res:
+                    valid_unit = InventoryUnit(res[0])
+
+        target_unit_id = valid_unit.unit_id if valid_unit else raw_unit_id
+        final_ref_no = ref_no or (valid_unit.ref_no if valid_unit else raw_unit_id)
 
         db.execute_query("""
-            INSERT INTO failed_inventory (id, ref_no, product_name, category, company_name, size, lot_no, quantity, expiry_date, failure_reason, original_inventory_id, unit_id, moved_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO failed_inventory (id, unit_id, ref_no, product_name, category, company_name, size, lot_no, quantity, failure_reason, status, moved_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             failed_id,
-            ref_no or (valid_unit.ref_no if valid_unit else raw_unit_id),
+            target_unit_id,
+            final_ref_no,
             data.get('product_name'),
             data.get('category'),
             data.get('company_name'),
             data.get('size'),
             data.get('lot_no'),
-            data.get('quantity'),
-            data.get('expiry_date'),
-            data.get('failure_reason'),
-            target_unit_id,
-            target_unit_id,
-            data.get('moved_by')
+            quantity_to_move,
+            data.get('failure_reason') or data.get('reason'),
+            'pending',
+            data.get('moved_by', 'Admin')
         ))
         
-        # Update original inventory/unit status to inactive
-        if target_unit_id:
+        # Update original inventory unit quantity/status
+        if valid_unit:
             try:
-                from models.inventory_unit import InventoryUnit
-                unit = InventoryUnit.find_by_id(target_unit_id)
-                if unit:
-                    unit.update({'status': 'inactive'})
+                current_qty = int(valid_unit.quantity or 1)
+                if current_qty > quantity_to_move:
+                    valid_unit.update({'quantity': current_qty - quantity_to_move})
                 else:
-                    inventory = Inventory.find_by_id(target_unit_id)
-                    if inventory:
-                        inventory.update({'status': 'inactive'})
-            except Exception:
-                inventory = Inventory.find_by_id(target_unit_id)
-                if inventory:
-                    inventory.update({'status': 'inactive'})
+                    valid_unit.update({'status': 'inactive', 'quantity': 0})
+            except Exception as e:
+                print(f"Error updating unit quantity/status: {e}")
         
         return cls.find_by_id(failed_id)
 

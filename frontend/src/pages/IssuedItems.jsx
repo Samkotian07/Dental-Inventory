@@ -15,7 +15,7 @@ import IssueItemModal from "../components/issued/IssueItemModal.jsx";
 import QRCodeDisplayModal from "../components/issued/QRCodeDisplayModal.jsx";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { useData } from "../context/DataContext.jsx";
 import { toast } from "sonner";
@@ -50,6 +50,7 @@ function formatDate(isoOrDate) {
 }
 
 export default function IssuedItems() {
+  const navigate = useNavigate();
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const canWrite = user?.role !== 'readonly';
@@ -87,7 +88,13 @@ export default function IssuedItems() {
   );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    let q = query.trim().toLowerCase();
+    if (q.includes("/unit-history/")) {
+      q = q.split("/unit-history/").pop().split("?")[0].split("#")[0];
+    } else if (q.includes("/scan/")) {
+      q = q.split("/scan/").pop().split("?")[0].split("#")[0];
+    }
+
     let list = (issuedItems || []).filter((r) => {
       const matchesStatus = status === "All Status" || r.status === status;
       const matchesQuery =
@@ -275,6 +282,19 @@ export default function IssuedItems() {
                   setQuery(e.target.value);
                   setPage(1);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && query.trim()) {
+                    let val = query.trim();
+                    if (val.includes("/unit-history/")) {
+                      val = val.split("/unit-history/").pop().split("?")[0].split("#")[0];
+                    } else if (val.includes("/scan/")) {
+                      val = val.split("/scan/").pop().split("?")[0].split("#")[0];
+                    }
+                    if (val) {
+                      navigate(`/unit-history/${encodeURIComponent(val)}`);
+                    }
+                  }
+                }}
               />
             </div>
 
@@ -285,10 +305,11 @@ export default function IssuedItems() {
                 setPage(1);
               }}
             >
-              <option>Active</option>
-              <option>Returned</option>
-              <option>Condemned</option>
-              <option>All Status</option>
+              <option value="Active">Active</option>
+              <option value="Vendor Exchange">Vendor Exchange</option>
+              <option value="Returned">Returned</option>
+              <option value="Condemned">Condemned</option>
+              <option value="All Status">All Status</option>
             </select>
           </div>
 
@@ -354,11 +375,17 @@ export default function IssuedItems() {
                     <td>{row.qty ?? row.quantity}</td>
                     <td>{row.date || row.issuedDate || row.issueDate}</td>
                     <td>
-                      <span
-                        className={`status-pill status-pill--${row.status.toLowerCase()}`}
-                      >
-                        {row.status}
-                      </span>
+                      {row.status?.toLowerCase() === "vendor_exchange" ? (
+                        <span className="status-pill" style={{ background: "rgba(139, 92, 246, 0.18)", color: "#A78BFA", fontWeight: "600" }}>
+                          🔄 Vendor Exchange
+                        </span>
+                      ) : row.status?.toLowerCase() === "returned" ? (
+                        <span className="status-pill status-pill--returned">✅ Returned</span>
+                      ) : row.status?.toLowerCase() === "condemned" ? (
+                        <span className="status-pill status-pill--condemned">🗑️ Condemned</span>
+                      ) : (
+                        <span className="status-pill status-pill--active">Active</span>
+                      )}
                     </td>
                     <td>
                       <div className="issued__row-actions">
@@ -370,7 +397,7 @@ export default function IssuedItems() {
                         >
                           <Eye size={16} strokeWidth={2} />
                         </button>
-                        {canWrite && row.status === "Active" && (
+                        {canWrite && (row.status?.toLowerCase() === "active" || row.status?.toLowerCase() === "issued" || !row.status) && (
                           <button
                             className="issued__icon-btn"
                             onClick={() => setReturnItem(row)}
