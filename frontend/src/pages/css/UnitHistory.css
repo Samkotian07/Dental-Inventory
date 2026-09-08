@@ -105,19 +105,19 @@
 .unit-info-id {
   font-size: 18px;
   font-weight: 700;
-  color: #111827;
+  color: var(--ink);
   margin: 0;
   font-family: monospace;
 }
 
 .unit-info-product {
   font-size: 14px;
-  color: #4B5563;
+  color: var(--ink-soft);
   margin: 2px 0 0;
 }
 
 .unit-info-ref {
-  color: #9CA3AF;
+  color: var(--ink-soft);
   font-size: 13px;
   margin-left: 6px;
 }
@@ -177,12 +177,12 @@
   gap: 12px;
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #F3F4F6;
+  border-top: 1px solid var(--line);
 }
 
 .unit-info-detail span {
   font-size: 11px;
-  color: #9CA3AF;
+  color: var(--ink-soft);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -192,7 +192,7 @@
 .unit-info-detail p {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--ink);
   margin: 2px 0 0;
 }
 
@@ -264,21 +264,21 @@
 .timeline-line {
   width: 2px;
   flex: 1;
-  background: #E5E7EB;
+  background: var(--line);
   margin: 4px 0;
 }
 
 .timeline-content {
   flex: 1;
-  background: #F9FAFB;
+  background: var(--accent-soft);
   border-radius: 8px;
   padding: 12px 16px;
-  border: 1px solid #F3F4F6;
+  border: 1px solid var(--line);
 }
 
 .timeline-item-latest .timeline-content {
-  border-color: #E5E7EB;
-  background: #F8FAFC;
+  border-color: var(--line);
+  background: var(--accent-soft);
 }
 
 .timeline-header {
@@ -292,14 +292,14 @@
 .timeline-cycle {
   font-size: 12px;
   font-weight: 600;
-  color: #6B7280;
+  color: var(--ink-soft);
 }
 
 .timeline-latest-badge {
   font-size: 10px;
   font-weight: 600;
   color: #2563EB;
-  background: #EFF6FF;
+  background: rgba(37, 99, 235, 0.18);
   padding: 2px 10px;
   border-radius: 12px;
 }
@@ -315,11 +315,11 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #374151;
+  color: var(--ink);
 }
 
 .timeline-student-id {
-  color: #9CA3AF;
+  color: var(--ink-soft);
   font-size: 12px;
 }
 
@@ -328,7 +328,7 @@
   flex-wrap: wrap;
   gap: 12px;
   font-size: 12px;
-  color: #6B7280;
+  color: var(--ink-soft);
 }
 
 .timeline-date {
@@ -347,12 +347,12 @@
 
 .timeline-time {
   font-size: 11px;
-  color: #9CA3AF;
+  color: var(--ink-soft);
 }
 
 .timeline-condition {
   font-size: 12px;
-  color: #6B7280;
+  color: var(--ink-soft);
   margin-top: 2px;
 }
 
@@ -364,24 +364,24 @@
   justify-content: center;
   padding: 40px 20px;
   text-align: center;
-  color: #9CA3AF;
+  color: var(--ink-soft);
 }
 
 .unit-history-empty-state p {
   margin: 8px 0 0;
   font-size: 14px;
-  color: #6B7280;
+  color: var(--ink);
 }
 
 .unit-history-empty-sub {
   font-size: 13px;
-  color: #9CA3AF;
+  color: var(--ink-soft);
 }
 
 .unit-history-loading {
   padding: 40px;
   text-align: center;
-  color: #9CA3AF;
+  color: var(--ink-soft);
 }
 
 /* Stats */

@@ -572,7 +572,7 @@ export default function UnitHistory() {
           <div className="modal__field">
             <label htmlFor="student-search-input">Search Student</label>
             <div style={{ position: "relative" }}>
-              <Search size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "#6B7280" }} />
+              <Search size={16} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--ink-soft)" }} />
               <input
                 id="student-search-input"
                 type="text"
@@ -591,11 +591,20 @@ export default function UnitHistory() {
               value={selectedStudentId}
               onChange={(e) => setSelectedStudentId(e.target.value)}
               size={Math.min(Math.max(filteredStudents.length + 1, 3), 6)}
-              style={{ marginTop: "4px" }}
+              style={{
+                marginTop: "4px",
+                width: "100%",
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                color: "var(--ink)",
+                fontSize: "13.5px",
+              }}
             >
-              <option value="">-- Select Student --</option>
+              <option value="" style={{ background: "var(--surface)", color: "var(--ink)" }}>-- Select Student --</option>
               {filteredStudents.map((s) => (
-                <option key={s.id || s._id} value={s.id || s._id}>
+                <option key={s.id || s._id} value={s.id || s._id} style={{ background: "var(--surface)", color: "var(--ink)", padding: "4px 8px" }}>
                   {s.name} ({s.campusId || s.id}) {s.course ? `— ${s.course}` : ""} {s.batch ? `[${s.batch}]` : ""}
                 </option>
               ))}
@@ -654,10 +663,19 @@ export default function UnitHistory() {
               id="return-condition-select"
               value={returnCondition}
               onChange={(e) => setReturnCondition(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                color: "var(--ink)",
+                fontSize: "14px",
+              }}
             >
-              <option value="Good">Good (Usable for Restock)</option>
-              <option value="Damaged">Damaged</option>
-              <option value="Condemned">Condemned</option>
+              <option value="Good" style={{ background: "var(--surface)", color: "var(--ink)" }}>Good (Usable for Restock)</option>
+              <option value="Damaged" style={{ background: "var(--surface)", color: "var(--ink)" }}>Damaged</option>
+              <option value="Condemned" style={{ background: "var(--surface)", color: "var(--ink)" }}>Condemned</option>
             </select>
           </div>
 
