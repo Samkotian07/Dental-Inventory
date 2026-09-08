@@ -165,16 +165,16 @@ def update_user(user_id):
             }), 400
         data['email'] = email
 
-    # Prevent logged-in admin from demoting themselves
+    # Prevent demoting any Admin user
     if 'role' in data:
         if data['role'] not in ['admin', 'staff', 'readonly']:
             data['role'] = 'staff'
-        if request.current_user.id == user_id and data['role'] != 'admin':
+        if user.role == 'admin' and data['role'] != 'admin':
             return jsonify({
                 'success': False,
                 'error': {
-                    'code': 'CANNOT_DEMOTE_SELF',
-                    'message': 'You cannot remove your own admin role'
+                    'code': 'CANNOT_DEMOTE_ADMIN',
+                    'message': 'Admin accounts cannot be demoted. Admin role remains admin.'
                 }
             }), 400
 

@@ -139,3 +139,14 @@ button {
   scrollbar-color: #27272A #121215;
   scrollbar-width: thin;
 }
+
+/* Global Dark Mode Native Controls & Dropdown Options */
+:root.dark {
+  color-scheme: dark;
+}
+
+:root.dark select option {
+  background-color: #121215 !important;
+  color: #F4F4F5 !important;
+}
+

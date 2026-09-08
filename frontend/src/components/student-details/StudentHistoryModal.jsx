@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import Modal from "./Modal.jsx";
 import { useInventory } from "../../context/InventoryContext.jsx";
-import { toRomanSemester } from "../../utils/formatters.js";
 
 function formatDate(iso) {
   if (!iso) return "-";
@@ -31,10 +30,10 @@ export default function StudentHistoryModal({ student, onClose }) {
   return (
     <Modal title="Student Details & History" onClose={onClose} width={720}>
       <div style={{ marginBottom: "16px" }}>
-        <h3 style={{ margin: "0 0 6px", fontSize: "16px", color: "#1F2937" }}>
+        <h3 style={{ margin: "0 0 6px", fontSize: "16px", color: "var(--ink)" }}>
           Student: <strong>{student.name}</strong> ({student.campusId || student.id})
         </h3>
-        <p style={{ margin: 0, fontSize: "13px", color: "#6B7280" }}>
+        <p style={{ margin: 0, fontSize: "13px", color: "var(--ink-soft)" }}>
           Course: {student.course || "—"} | 
           Batch: {student.batch || "—"} | 
           Email: {student.email || "—"}
@@ -42,14 +41,14 @@ export default function StudentHistoryModal({ student, onClose }) {
       </div>
 
       <div style={{ marginTop: "12px" }}>
-        <h4 style={{ margin: "0 0 12px", fontSize: "14px", color: "#374151" }}>
+        <h4 style={{ margin: "0 0 12px", fontSize: "14px", color: "var(--ink)" }}>
           📋 Complete History:
         </h4>
 
-        <div style={{ overflowX: "auto", border: "1px solid #E5E7EB", borderRadius: "8px" }}>
+        <div style={{ overflowX: "auto", border: "1px solid var(--line)", borderRadius: "8px" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
             <thead>
-              <tr style={{ background: "#F9FAFB", borderBottom: "1px solid #E5E7EB" }}>
+              <tr style={{ background: "var(--panel)", borderBottom: "1px solid var(--line)", color: "var(--ink-soft)" }}>
                 <th style={{ padding: "10px 12px", textAlign: "left" }}>Issue ID</th>
                 <th style={{ padding: "10px 12px", textAlign: "left" }}>Ref No</th>
                 <th style={{ padding: "10px 12px", textAlign: "left" }}>Product</th>
@@ -61,7 +60,7 @@ export default function StudentHistoryModal({ student, onClose }) {
             <tbody>
               {history.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: "24px", textAlign: "center", color: "#9CA3AF" }}>
+                  <td colSpan={6} style={{ padding: "24px", textAlign: "center", color: "var(--ink-soft)" }}>
                     No issue history found for this student.
                   </td>
                 </tr>
@@ -69,10 +68,9 @@ export default function StudentHistoryModal({ student, onClose }) {
                 history.map((row) => {
                   const isReturned = row.status === "Returned";
                   const isCondemned = row.status === "Condemned";
-                  const isPending = !isReturned && !isCondemned;
 
                   return (
-                    <tr key={row.issueId || row.id} style={{ borderBottom: "1px solid #F3F4F6" }}>
+                    <tr key={row.issueId || row.id} style={{ borderBottom: "1px solid var(--line)", color: "var(--ink)" }}>
                       <td style={{ padding: "10px 12px", fontFamily: "monospace", fontWeight: "600" }}>
                         {row.issueId || row.id}
                       </td>
@@ -87,15 +85,15 @@ export default function StudentHistoryModal({ student, onClose }) {
                       </td>
                       <td style={{ padding: "10px 12px", textAlign: "center" }}>
                         {isReturned ? (
-                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "#D1FAE5", color: "#059669", display: "inline-block" }}>
+                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "rgba(16, 185, 129, 0.18)", color: "#34D399", display: "inline-block" }}>
                             ✅ Returned
                           </span>
                         ) : isCondemned ? (
-                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "#FEE2E2", color: "#DC2626", display: "inline-block" }}>
+                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "rgba(239, 68, 68, 0.18)", color: "#F87171", display: "inline-block" }}>
                             🗑️ Condemned
                           </span>
                         ) : (
-                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "#FEF3C7", color: "#D97706", display: "inline-block" }}>
+                          <span style={{ padding: "3px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "600", background: "rgba(245, 158, 11, 0.18)", color: "#FBBF24", display: "inline-block" }}>
                             ⚠️ PENDING
                           </span>
                         )}
@@ -113,7 +111,7 @@ export default function StudentHistoryModal({ student, onClose }) {
           </table>
         </div>
 
-        <div style={{ marginTop: "16px", padding: "10px 14px", background: pendingCount > 0 ? "#FFFBEB" : "#F3F4F6", borderRadius: "6px", border: pendingCount > 0 ? "1px solid #F59E0B" : "1px solid #E5E7EB", color: pendingCount > 0 ? "#92400E" : "#4B5563", fontWeight: "600", fontSize: "13px" }}>
+        <div style={{ marginTop: "16px", padding: "10px 14px", background: "var(--accent-soft)", borderRadius: "6px", border: "1px solid var(--line)", color: "var(--ink)", fontWeight: "600", fontSize: "13px" }}>
           ⚠️ Pending Returns: {pendingCount} {pendingCount === 1 ? "item" : "items"}
         </div>
       </div>

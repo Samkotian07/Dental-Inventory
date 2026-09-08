@@ -26,16 +26,17 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: white;
-  border: 1px solid #E5E7EB;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 12px;
   transition: border-color 0.2s;
+  color: var(--ink-soft);
 }
 
 .archive-students__search:focus-within {
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .archive-students__search input {
@@ -43,27 +44,28 @@
   outline: none;
   font-size: 14px;
   background: transparent;
+  color: var(--ink);
   min-width: 200px;
 }
 
 .archive-students__search svg {
-  color: #9CA3AF;
+  color: var(--ink-soft);
 }
 
 .archive-students__select {
   padding: 8px 12px;
   border-radius: 8px;
-  border: 1px solid #E5E7EB;
-  background: white;
+  border: 1px solid var(--line);
+  background: var(--surface);
   font-size: 14px;
-  color: #374151;
+  color: var(--ink);
   min-width: 140px;
   cursor: pointer;
 }
 
 .archive-students__select:focus {
   outline: none;
-  border-color: #2563EB;
+  border-color: var(--accent-deep);
 }
 
 .archive-students__actions {
@@ -113,23 +115,24 @@
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: #EFF6FF;
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
   border-radius: 8px;
   margin-bottom: 16px;
   font-size: 14px;
-  color: #1E40AF;
+  color: var(--ink);
 }
 
 .archive-students__info svg {
-  color: #2563EB;
+  color: var(--accent-deep);
   flex-shrink: 0;
 }
 
 /* Table */
 .archive-students__card {
-  background: white;
+  background: var(--surface);
   border-radius: 12px;
-  border: 1px solid #E5E7EB;
+  border: 1px solid var(--line);
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
@@ -145,15 +148,15 @@
 }
 
 .archive-students__table thead {
-  background: #F9FAFB;
+  background: var(--panel);
 }
 
 .archive-students__table th {
   text-align: left;
   padding: 12px 16px;
   font-weight: 600;
-  color: #6B7280;
-  border-bottom: 1px solid #E5E7EB;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--line);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -161,27 +164,28 @@
 
 .archive-students__table td {
   padding: 12px 16px;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--line);
   vertical-align: middle;
+  color: var(--ink);
 }
 
 .archive-students__table tr:hover td {
-  background: #F9FAFB;
+  background: var(--accent-soft);
 }
 
 .archive-students__row--dues {
-  background: #FEF2F2;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .archive-students__row--dues:hover td {
-  background: #FEE2E2;
+  background: rgba(239, 68, 68, 0.15);
 }
 
 .archive-students__checkbox-btn {
   background: none;
   border: none;
   cursor: pointer;
-  color: #9CA3AF;
+  color: var(--ink-soft);
   padding: 4px;
   border-radius: 4px;
   display: flex;
@@ -191,8 +195,8 @@
 }
 
 .archive-students__checkbox-btn:hover:not(:disabled) {
-  background: #F3F4F6;
-  color: #2563EB;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
 }
 
 .archive-students__checkbox-btn:disabled {
@@ -201,18 +205,18 @@
 }
 
 .archive-students__checkbox-btn .is-checked {
-  color: #2563EB;
+  color: var(--accent-deep);
 }
 
 .archive-students__mono {
   font-family: monospace;
   font-size: 13px;
-  color: #4B5563;
+  color: var(--ink-soft);
 }
 
 .archive-students__strong {
   font-weight: 600;
-  color: #111827;
+  color: var(--ink);
 }
 
 .archive-students__batch-tag {
@@ -264,8 +268,33 @@
 .archive-students__empty {
   padding: 40px 20px;
   text-align: center;
-  color: #9CA3AF;
+  color: var(--ink-soft);
   font-size: 14px;
+}
+
+/* Dark Mode Overrides */
+:root.dark .archive-students__batch-tag {
+  background: #1E293B;
+  color: #60A5FA;
+}
+
+:root.dark .archive-students__dues-badge {
+  background: rgba(239, 68, 68, 0.18);
+  color: #F87171;
+}
+
+:root.dark .archive-students__no-dues {
+  color: #34D399;
+}
+
+:root.dark .archive-students__status-badge.active {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34D399;
+}
+
+:root.dark .archive-students__status-badge.archived {
+  background: #27272A;
+  color: #A1A1AA;
 }
 
 /* Responsive */

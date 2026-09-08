@@ -163,7 +163,7 @@ export default function StaffManager() {
             actions={(item) => (
               <div className="staff-actions">
                 <button
-                  onClick={() => setEditTarget({ ...item })}
+                  onClick={() => setEditTarget({ ...item, isOriginalAdmin: item.role === "admin" })}
                   className="staff-action-btn staff-action-edit"
                   title="Edit"
                 >
@@ -265,15 +265,26 @@ export default function StaffManager() {
             </div>
             <div className="modal__field">
               <label htmlFor="edit-staff-role">Role</label>
-              <select
-                id="edit-staff-role"
-                value={editTarget.role}
-                onChange={(e) => setEditTarget({ ...editTarget, role: e.target.value })}
-              >
-                <option value="admin">Admin</option>
-                <option value="staff">Staff</option>
-                <option value="readonly">Read Only</option>
-              </select>
+              {editTarget.isOriginalAdmin ? (
+                <>
+                  <select id="edit-staff-role" value="admin" disabled style={{ opacity: 0.7, cursor: "not-allowed" }}>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <small style={{ color: "var(--ink-soft)", fontSize: "12px", marginTop: "4px", display: "block" }}>
+                    🔒 Admin role is permanent and cannot be changed.
+                  </small>
+                </>
+              ) : (
+                <select
+                  id="edit-staff-role"
+                  value={editTarget.role}
+                  onChange={(e) => setEditTarget({ ...editTarget, role: e.target.value })}
+                >
+                  <option value="admin">Admin</option>
+                  <option value="staff">Staff</option>
+                  <option value="readonly">Read Only</option>
+                </select>
+              )}
             </div>
             <div className="modal__actions">
               <button className="modal__btn" onClick={() => setEditTarget(null)}>Cancel</button>

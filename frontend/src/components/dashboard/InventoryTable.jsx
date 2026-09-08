@@ -29,7 +29,7 @@ function Rows({ items }) {
       <td>{item.product}</td>
       <td>{item.size || "Standard"}</td>
       <td className="inv-table__ref">{item.refNo || item.id}</td>
-      <td style={{ fontWeight: 700, color: "#111827" }}>{item.quantity ?? item.totalQty ?? 0}</td>
+      <td style={{ fontWeight: 700, color: "var(--ink)" }}>{item.quantity ?? item.totalQty ?? 0}</td>
     </tr>
   ));
 }
