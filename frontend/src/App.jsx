@@ -84,15 +84,7 @@ export default function App() {
         {/* ⭐ Reports Route - All users */}
         <Route path="/reports" element={<Reports />} />
 
-        {/* Admin Only Routes */}
-        <Route
-          path="/settings"
-          element={
-            <AdminRoute>
-              <Settings />
-            </AdminRoute>
-          }
-        />
+        <Route path="/settings" element={<Settings />} />
         <Route
           path="/archive-students"
           element={

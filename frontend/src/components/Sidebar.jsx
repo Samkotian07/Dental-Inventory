@@ -30,13 +30,13 @@ const navItems = [
   { label: "Track Returns", to: "/track-exchange", icon: Repeat },
   { label: "Stock Insertion", to: "/stock-insertion", icon: PackagePlus, writeOnly: true },
   { label: "Stock Handle", to: "/stock-handle", icon: PackageMinus, writeOnly: true },
+  { label: "Settings", to: "/settings", icon: Settings },
 ];
 
 const adminOnlyItems = [
   { label: "Stock Settings", to: "/low-stock-settings", icon: AlertCircle },
   { label: "Archive Students", to: "/archive-students", icon: Archive },
   { label: "Staff Manager", to: "/staff-manager", icon: UserCog },
-  { label: "Settings", to: "/settings", icon: Settings },
   { label: "Audit Log", to: "/audit-log", icon: ScrollText },
 ];
 
