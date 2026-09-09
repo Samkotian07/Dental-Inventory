@@ -142,6 +142,7 @@
 
 .modal__btn:hover {
   border-color: var(--accent-deep);
+  color: var(--ink);
 }
 
 .modal__btn--primary {
@@ -159,15 +160,16 @@
   cursor: not-allowed;
 }
 
-.modal__btn--danger {
+.modal__btn.modal__btn--danger {
   background: var(--danger);
   border-color: var(--danger);
-  color: #fff;
+  color: #fff !important;
 }
 
-.modal__btn--danger:hover {
+.modal__btn.modal__btn--danger:hover {
   background: #C8442E;
   border-color: #C8442E;
+  color: #fff !important;
 }
 
 @media (max-width: 1024px) {

@@ -216,15 +216,16 @@
   border-color: #1D4ED8;
 }
 
-.modal__btn--danger {
+.modal__btn.modal__btn--danger {
   background: #DC2626;
   border-color: #DC2626;
-  color: white;
+  color: white !important;
 }
 
-.modal__btn--danger:hover:not(:disabled) {
+.modal__btn.modal__btn--danger:hover:not(:disabled) {
   background: #B91C1C;
   border-color: #B91C1C;
+  color: white !important;
 }
 
 .modal__btn:disabled {

@@ -165,7 +165,7 @@ export default function StudentDetails() {
       const matchName = (i.studentName || i.student || "").toLowerCase() === sName;
       const isReturned = i.status?.toLowerCase() === "returned";
       const isCondemned = i.status?.toLowerCase() === "condemned";
-      const isExchanged = i.status?.toLowerCase() === "vendor_exchange";
+      const isExchanged = i.status?.toLowerCase() === "vendor exchange";
       const isImplantAbutment = Boolean(
         i.isImplantAbutment || i.is_implant_abutment ||
         i.category?.toLowerCase() === "implant" || i.category?.toLowerCase() === "abutment"

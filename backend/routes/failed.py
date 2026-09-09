@@ -52,7 +52,7 @@ def create_failed_item():
             }
         }), 400
     
-    inventory_id = data.get('inventory_id') or data.get('unit_id') or data.get('refNo') or data.get('ref_no')
+    inventory_id = data.get('inventory_id') or data.get('unit_id') or data.get('id') or data.get('refNo') or data.get('ref_no')
     failure_reason = data.get('failure_reason') or data.get('reason')
     move_qty = int(data.get('quantity', 1))
     

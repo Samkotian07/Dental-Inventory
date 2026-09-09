@@ -26,7 +26,7 @@ export default function StudentHistoryModal({ student, onClose }) {
   const pendingCount = history.filter((i) => {
     const isReturned = i.status?.toLowerCase() === "returned";
     const isCondemned = i.status?.toLowerCase() === "condemned";
-    const isExchanged = i.status?.toLowerCase() === "vendor_exchange";
+    const isExchanged = i.status?.toLowerCase() === "vendor exchange";
     const isImplantAbutment = Boolean(
       i.isImplantAbutment || i.is_implant_abutment ||
       i.category?.toLowerCase() === "implant" || i.category?.toLowerCase() === "abutment"
@@ -76,7 +76,7 @@ export default function StudentHistoryModal({ student, onClose }) {
                 history.map((row) => {
                   const isReturned = row.status?.toLowerCase() === "returned";
                   const isCondemned = row.status?.toLowerCase() === "condemned";
-                  const isExchanged = row.status?.toLowerCase() === "vendor_exchange";
+                  const isExchanged = row.status?.toLowerCase() === "vendor exchange";
                   const isImplantAbutment = Boolean(
                     row.isImplantAbutment || row.is_implant_abutment ||
                     row.category?.toLowerCase() === "implant" || row.category?.toLowerCase() === "abutment"

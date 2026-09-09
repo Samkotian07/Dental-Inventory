@@ -44,7 +44,7 @@ export function isCategoryMatch(itemCat, selectedCat) {
   return false;
 }
 
-export const FAILED_REASONS = ["Damaged", "Expired", "Quality Failed", "Returned", "Other"];
+export const FAILED_REASONS = ["Damaged", "Expired", "Quality Failed", "Other"];
 
 export const EXCHANGE_STATUSES = ['pending', 'completed', 'rejected'];
 

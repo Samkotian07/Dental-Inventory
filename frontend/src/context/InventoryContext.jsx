@@ -16,7 +16,8 @@ const getAuthHeaders = () => {
 // ⭐ NORMALIZE STOCK - Each unit is separate
 function normalizeStock(item) {
   return {
-    id: item.id || item.ref_no || item.refNo,
+    id: item.unit_id || item.id || item.ref_no || item.refNo,
+    unitId: item.unit_id || item.id || item.ref_no || item.refNo,
     refNo: item.ref_no || item.refNo || item.id,
     product: item.product_name || item.product || item.productName || "Product",
     productName: item.product_name || item.product || item.productName || "Product",
@@ -441,12 +442,14 @@ export function InventoryProvider({ children }) {
       const payload = {
         inventory_id: itemId,
         unit_id: itemId,
+        id: itemId,
         ref_no: itemDetails.refNo || itemDetails.ref_no || itemId,
         product_name: itemDetails.product || itemDetails.productName || itemDetails.product_name,
         category: itemDetails.category,
         company_name: itemDetails.company || itemDetails.companyName || itemDetails.company_name,
         size: itemDetails.size,
         lot_no: itemDetails.lotNo || itemDetails.lot_no,
+        expiry_date: itemDetails.expiry || itemDetails.expiryDate || itemDetails.expiry_date,
         failure_reason: reason,
         reason: reason,
         quantity: Number(quantity) || 1,

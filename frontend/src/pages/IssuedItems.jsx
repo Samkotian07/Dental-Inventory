@@ -375,7 +375,7 @@ export default function IssuedItems() {
                     <td>{row.qty ?? row.quantity}</td>
                     <td>{row.date || row.issuedDate || row.issueDate}</td>
                     <td>
-                      {row.status?.toLowerCase() === "vendor_exchange" ? (
+                      {row.status?.toLowerCase() === "vendor exchange" ? (
                         <span className="status-pill" style={{ background: "rgba(139, 92, 246, 0.18)", color: "#A78BFA", fontWeight: "600" }}>
                           🔄 Vendor Exchange
                         </span>
