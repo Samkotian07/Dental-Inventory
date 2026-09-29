@@ -58,7 +58,7 @@ export default function StudentDetails() {
 
   const availableBatches = useMemo(() => {
     const set = new Set();
-    (students || []).forEach((student) => {
+    (students || []).filter(s => s.status !== 'archived').forEach((student) => {
       if (student.batch) {
         set.add(student.batch);
       }
@@ -88,6 +88,15 @@ export default function StudentDetails() {
         const va = a[sort.key] ?? "";
         const vb = b[sort.key] ?? "";
         return String(va).localeCompare(String(vb)) * sort.dir;
+      });
+    } else {
+      // Default order: active students first (newest first),
+      // archived students pinned to the bottom (newest-archived first).
+      list = [...list].sort((a, b) => {
+        const aArchived = a.status === 'archived';
+        const bArchived = b.status === 'archived';
+        if (aArchived !== bArchived) return aArchived ? 1 : -1;
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
       });
     }
 

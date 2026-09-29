@@ -14,13 +14,18 @@ function formatDisplayDate(iso) {
 
 export default function IssueItemModal({ onClose, onConfirm }) {
   const { students } = useData();
-  const { stock = [], issuedItems = [], getUnitHistory } = useInventory();
-  
+  const { stock = [], issuedItems = [], getUnitHistory, getLotsForRef } = useInventory();
+
   const [studentId, setStudentId] = useState("");
   const [itemId, setItemId] = useState("");
   const [qty, setQty] = useState(1);
   const [stockSource, setStockSource] = useState("all");
   const [selectedUnitId, setSelectedUnitId] = useState(null);
+
+  // Lot selection
+  const [availableLots, setAvailableLots] = useState([]);
+  const [selectedLotId, setSelectedLotId] = useState("");
+  const [lotsLoading, setLotsLoading] = useState(false);
 
   // Group stock by ref_no
   const groupedStock = useMemo(() => {
@@ -96,7 +101,9 @@ export default function IssueItemModal({ onClose, onConfirm }) {
     ? returnedUnits.length 
     : (selectedItem?.totalQuantity || 0);
     
-  const canSubmit = studentId && itemId && qty > 0 && qty <= maxQty;
+  const canSubmit = studentId && itemId && qty > 0 && qty <= maxQty &&
+    // For fresh/all stock, a lot must be selected
+    (stockSource === "returned" || selectedLotId !== "");
 
   // ⭐ Check if product is non-returnable (implant/abutment)
   const isNonReturnable = selectedItem?.isReturnable === false;
@@ -155,6 +162,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
     onConfirm({
       studentId,
       refNo: selectedItem.refNo,
+      lotId: selectedLotId || null,
       qty: isImplantAbutment ? 1 : unitIds.length,
       unitIds: isImplantAbutment ? [] : unitIds,
       lotNo: selectedItem.lotNo,
@@ -165,9 +173,20 @@ export default function IssueItemModal({ onClose, onConfirm }) {
   };
 
   const handleItemChange = (e) => {
-    setItemId(e.target.value);
+    const newRefNo = e.target.value;
+    setItemId(newRefNo);
     setQty(1);
     setSelectedUnitId(null);
+    setSelectedLotId("");
+    setAvailableLots([]);
+
+    if (newRefNo) {
+      setLotsLoading(true);
+      getLotsForRef(newRefNo).then((lots) => {
+        setAvailableLots(lots || []);
+        setLotsLoading(false);
+      }).catch(() => setLotsLoading(false));
+    }
   };
 
   const selectUnit = (unitId) => {
@@ -186,7 +205,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           onChange={(e) => setStudentId(e.target.value)}
         >
           <option value="">Select student...</option>
-          {students.map((s) => (
+          {(students || []).filter(s => s.status !== 'archived').map((s) => (
             <option key={s.id} value={s.id}>
               {s.name} ({s.id})
             </option>
@@ -215,8 +234,34 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           </small>
         )}
       </div>
+      {/* Lot Selection — shown after product is picked (non-returned stock) */}
+      {itemId && stockSource !== "returned" && (
+        <div className="modal__field">
+          <label htmlFor="issue-lot">Lot</label>
+          {lotsLoading ? (
+            <small style={{ color: "#6B7280" }}>Loading lots…</small>
+          ) : availableLots.length === 0 ? (
+            <small style={{ color: "#DC2626", display: "block", marginTop: "4px" }}>
+              ⚠️ No open lots available for this product. Receive stock first.
+            </small>
+          ) : (
+            <select
+              id="issue-lot"
+              value={selectedLotId}
+              onChange={(e) => setSelectedLotId(e.target.value)}
+            >
+              <option value="">-- Select Lot --</option>
+              {availableLots.map((lot) => (
+                <option key={lot.lotId} value={lot.lotId}>
+                  Lot {lot.lotNo} · Qty {lot.qtyAvailable} avail
+                  {lot.expiryDate ? ` · Exp ${lot.expiryDate}` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
 
-      {/* Stock Source Toggle */}
       {itemId && (
         <div className="modal__field">
           <label>Stock Source</label>

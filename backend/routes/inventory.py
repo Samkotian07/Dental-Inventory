@@ -173,7 +173,6 @@ def get_available_lots(ref_no):
 
 @inventory_bp.route('/receive', methods=['POST'])
 @token_required
-@admin_required
 def receive_stock():
     data = request.get_json() or {}
     ref_no = data.get('ref_no')
@@ -217,7 +216,6 @@ def receive_stock():
 
 @inventory_bp.route('/bulk-receive', methods=['POST'])
 @token_required
-@admin_required
 def bulk_receive_stock():
     rows = request.get_json() or []
     if not isinstance(rows, list):

@@ -33,7 +33,7 @@ function formatDisplayDate(iso) {
 
 export default function FailedInventory() {
   const onMenuClick = useMenuClick();
-  const { failed: rows, restoreFailedToStock, markFailedDisposed } = useInventory();
+  const { failed: rows, restoreFailed, disposeFailed } = useInventory();
 
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All Categories");
@@ -133,7 +133,7 @@ export default function FailedInventory() {
 
     let successCount = 0;
     for (const item of matchingItems) {
-      const res = await markFailedDisposed(item.id || item.refNo);
+      const res = await disposeFailed(item.failId || item.id);
       if (res.success) successCount++;
     }
 
@@ -154,13 +154,7 @@ export default function FailedInventory() {
 
     let successCount = 0;
     for (const item of matchingItems) {
-      const res = await restoreFailedToStock(item.id || item.refNo, {
-        product_name: item.product,
-        category: item.category,
-        company_name: item.company,
-        lot_no: item.lotNo,
-        quantity: item.qty || 1,
-      });
+      const res = await restoreFailed(item.failId || item.id);
       if (res.success) successCount++;
     }
 

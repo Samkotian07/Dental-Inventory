@@ -75,9 +75,11 @@ export default function UnitHistory() {
   const isAdmin = user?.role === 'admin';
 
   const filteredStudents = useMemo(() => {
-    if (!studentSearch.trim()) return students || [];
+    // Never show archived students in the issue dropdown
+    const active = (students || []).filter(s => s.status !== 'archived');
+    if (!studentSearch.trim()) return active;
     const q = studentSearch.toLowerCase();
-    return (students || []).filter(s =>
+    return active.filter(s =>
       (s.name || "").toLowerCase().includes(q) ||
       (s.campusId || s.id || "").toLowerCase().includes(q) ||
       (s.course || "").toLowerCase().includes(q) ||

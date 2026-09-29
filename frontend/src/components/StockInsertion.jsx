@@ -171,7 +171,7 @@ export default function StockInsertion() {
     invoiceNumber: "",
     creditNoteNumber: "",
     refNo: "",
-    category: CATEGORIES[0],
+    category: "",
     companyName: "",
     productName: "",
     size: "",
@@ -426,10 +426,16 @@ export default function StockInsertion() {
 
               <div className="si-new-field">
                 <label className="si-new-label">Category *</label>
-                <Input list="categories-list" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Select or enter category..." className="si-new-input" />
-                <datalist id="categories-list">
-                  {CATEGORIES.map((c) => <option key={c} value={c} />)}
-                </datalist>
+                <select
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  className="si-new-input"
+                >
+                  <option value="">-- Select Category --</option>
+                  {CATEGORIES.filter(c => c !== "All Categories").map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
 
               <Input label="Company Name *" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} className="si-new-input" />
