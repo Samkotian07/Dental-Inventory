@@ -1,9 +1,11 @@
 from flask import Blueprint, request, jsonify
 from models.user import User
 from models.audit_log import AuditLog
+from models.session import Session
 from utils.validators import validate_login_data
 from middleware.rate_limiter import rate_limit
 import datetime
+from datetime import datetime, timedelta
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -75,6 +77,16 @@ def login():
         'email': user.email,
         'role': user.role
     })
+
+    expires_at = datetime.utcnow() + timedelta(days=7)
+    Session.create(
+        user_id=user.id,
+        token=token,
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get('User-Agent'),
+        expires_at=expires_at
+    )
+    Session.enforce_max_sessions(user.id, max_sessions=3)
     
     # ⭐ LOG THE LOGIN ACTION
     AuditLog.create(
@@ -155,6 +167,7 @@ def logout():
         
         if token:
             User.blacklist_token(token, request.current_user.id)
+            Session.revoke_all_by_user(request.current_user.id)
         
         # ⭐ LOG THE LOGOUT ACTION
         AuditLog.create(

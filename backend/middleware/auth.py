@@ -1,6 +1,8 @@
 from functools import wraps
 from flask import request, jsonify
 from models.user import User
+from models.session import Session
+import hashlib
 
 def token_required(f):
     """Decorator to require authentication token"""
@@ -32,6 +34,14 @@ def token_required(f):
                     'message': 'Invalid or expired token'
                 }
             }), 401
+
+        token_hash = Session.hash_token(token)
+        session = Session.find_by_token_hash(token_hash)
+        if session and session.revoked_at is None:
+            Session.get_db().execute_query(
+                "UPDATE sessions SET last_seen_at = NOW() WHERE session_id = %s",
+                (session.session_id,)
+            )
         
         # Get user from database
         user = User.find_by_id(payload['user_id'])

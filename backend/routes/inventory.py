@@ -1,513 +1,168 @@
 from flask import Blueprint, request, jsonify
-from middleware.auth import token_required, admin_required, readonly_required
-from models.inventory import Inventory
+from middleware.auth import token_required
+from models.stock_lot import StockLot
+from models.issued_unit import IssuedUnit
+from models.issue import Issue
 from models.product import Product
-from models.inventory_unit import InventoryUnit
-from models.issued_item import IssuedItem
-from models.audit_log import AuditLog
-import datetime
+
 
 inventory_bp = Blueprint('inventory', __name__, url_prefix='/api/inventory')
 
 
-# ⭐⭐⭐ PUBLIC ENDPOINT - NO AUTH REQUIRED ⭐⭐⭐
-@inventory_bp.route('/public-history/<ref_no>', methods=['GET'])
-def get_public_product_history(ref_no):
-    """Public endpoint to get product details and full cycle history by ref_no (No auth required for QR scans)"""
-    try:
-        print(f"🔍 QR SCAN: Looking for ref_no: {ref_no}")
-        
-        # Try multiple ways to find the item
-        unit = InventoryUnit.find_by_id(ref_no)
-        if unit:
-            product = Product.find_by_ref_no(unit.ref_no)
-            item = Inventory({
-                'id': unit.unit_id,
-                'ref_no': unit.ref_no,
-                'product_name': product.get_product_name() if product else unit.ref_no,
-                'category': product.get_category() if product else 'General',
-                'company_name': product.company_name if product else '',
-                'size': product.get_size() if product else '',
-                'lot_no': product.lot_no if product else '',
-                'quantity': unit.quantity,
-                'fresh_location': product.fresh_location if product else '',
-                'is_returned': unit.is_returned_from_student,
-                'status': unit.status,
-            })
-
-        if not item:
-            item = Inventory.find_by_ref_no(ref_no)
-        if not item:
-            item = Inventory.find_by_id(ref_no)
-        if not item:
-            db = Inventory.get_db()
-            results = db.execute_query(
-                "SELECT * FROM inventory WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(id) = LOWER(%s) LIMIT 1",
-                (ref_no, ref_no)
-            )
-            if results:
-                item = Inventory(results[0])
-        
-        if not item:
-            print(f"❌ Item NOT FOUND for: {ref_no}")
-            return jsonify({
-                'success': False,
-                'message': f'Product with reference {ref_no} not found'
-            }), 404
-
-        db = Inventory.get_db()
-        inv_id = item.id if item else ref_no
-        
-        # Get issued history - include all units with this ref_no
-        sql = """
-            SELECT * FROM issued_items 
-            WHERE LOWER(ref_no) = LOWER(%s) OR LOWER(unit_id) = LOWER(%s)
-            ORDER BY created_at ASC
-        """
-        results = db.execute_query(sql, (ref_no, str(inv_id)))
-        issued_list = [IssuedItem(row).to_dict() for row in results]
-        
-        print(f"   ✅ Found {len(issued_list)} issued records for {ref_no}")
-
-        # Build product dict
-        product_dict = item.to_dict()
-
-        # ⭐ Build cycle history with unit tracking
-        cycles = []
-        for idx, iss in enumerate(issued_list, 1):
-            status_str = str(iss.get('status') or '').lower()
-            if status_str == 'returned':
-                status_label = '✅ Complete'
-            elif status_str == 'condemned':
-                status_label = '❌ Condemned'
-            else:
-                status_label = '🔄 Current'
-
-            # ⭐ CRITICAL: Get the unit_id
-            inventory_id = iss.get('unitId') or iss.get('unit_id') or iss.get('inventoryId') or iss.get('inventory_id') or '—'
-
-            cycles.append({
-                'cycle': idx,
-                'student': iss.get('studentName') or iss.get('student') or 'Student',
-                'studentId': iss.get('studentId') or '',
-                'unitId': inventory_id,  # ⭐ ADDED: Individual unit ID
-                'issued': iss.get('issueDate') or iss.get('createdAt') or '—',
-                'returned': iss.get('returnDate') if status_str in ['returned', 'condemned'] else 'NULL',
-                'status': status_label,
-                'rawStatus': status_str
-            })
-
-        print(f"✅ QR SCAN SUCCESS: {len(cycles)} cycles found for {ref_no}")
-
-        return jsonify({
-            'success': True,
-            'product': product_dict,
-            'history': cycles,
-            'summary': f"Summary: {len(cycles)} {'cycle' if len(cycles) == 1 else 'cycles'}"
-        }), 200
-        
-    except Exception as e:
-        print(f"❌ Error in get_public_product_history: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'message': f"Error loading history for {ref_no}"
-        }), 500
+def _status_label(raw_status):
+    """Map DB status to display label."""
+    s = (raw_status or '').lower()
+    if s in ('returned_good', 'returned_damaged'):
+        return 'Returned'
+    if s == 'condemned':
+        return 'Condemned'
+    if s == 'used_in_patient':
+        return 'Used in Patient'
+    if s in ('awaiting_vendor', 'exchanged', 'credited'):
+        return 'Vendor Exchange'
+    if s == 'issued':
+        return 'Active'
+    return 'Unknown'
 
 
-# ⭐⭐⭐ NEW: Endpoint for individual unit history ⭐⭐⭐
-@inventory_bp.route('/unit-history/<unit_id>', methods=['GET'])
-def get_unit_history(unit_id):
-    """Public endpoint to get history for a SPECIFIC UNIT (by unit_id)"""
-    try:
-        print(f"🔍 UNIT HISTORY: Looking for unit_id: {unit_id}")
-        
-        # Find the specific unit
-        item = Inventory.find_by_id(unit_id)
-        if not item:
-            print(f"❌ Unit NOT FOUND for: {unit_id}")
-            return jsonify({
-                'success': False,
-                'message': f'Unit with ID {unit_id} not found'
-            }), 404
+# ---------- Unit History (per ref_no OR per unit_serial) ----------
 
-        db = Inventory.get_db()
-        
-        # Get history for THIS SPECIFIC UNIT only
-        sql = """
-            SELECT * FROM issued_items 
-            WHERE unit_id = %s
-            ORDER BY created_at ASC
-        """
-        results = db.execute_query(sql, (unit_id,))
-        issued_list = [IssuedItem(row).to_dict() for row in results]
-        
-        print(f"   ✅ Found {len(issued_list)} records for unit {unit_id}")
+@inventory_bp.route('/unit-history/<identifier>', methods=['GET'])
+@token_required
+def get_unit_history(identifier):
+    """Return history for a specific unit_serial or all units of a ref_no."""
+    db = StockLot.get_db()
 
-        # Build product dict
-        product_dict = item.to_dict()
-        product_dict['unitId'] = unit_id
+    # Try as unit_serial first
+    unit = IssuedUnit.find_by_serial(identifier)
+    product = None
+    rows = []
 
-        # Build cycle history
-        cycles = []
-        for idx, iss in enumerate(issued_list, 1):
-            status_str = str(iss.get('status') or '').lower()
-            if status_str == 'returned':
-                status_label = '✅ Complete'
-            elif status_str == 'condemned':
-                status_label = '❌ Condemned'
-            else:
-                status_label = '🔄 Current'
+    if unit:
+        product = Product.find_by_ref_no(unit.ref_no)
+        rows = db.execute_query("""
+            SELECT u.unit_serial, u.status AS rawStatus,
+                   e.student_id, e.student_name AS student,
+                   e.issue_date AS issued, u.returned_date AS returned,
+                   u.return_condition, u.lot_no, u.ref_no, u.product_name
+            FROM issued_units u
+            JOIN issue_events e ON e.issue_id = u.issue_id
+            WHERE u.unit_serial = %s
+            ORDER BY e.issue_date ASC
+        """, (identifier,))
+    else:
+        # Try as ref_no
+        product = Product.find_by_ref_no(identifier)
+        if not product:
+            return jsonify({'success': False, 'message': f'{identifier} not found'}), 404
+        rows = db.execute_query("""
+            SELECT u.unit_serial, u.status AS rawStatus,
+                   e.student_id, e.student_name AS student,
+                   e.issue_date AS issued, u.returned_date AS returned,
+                   u.return_condition, u.lot_no, u.ref_no, u.product_name
+            FROM issued_units u
+            JOIN issue_events e ON e.issue_id = u.issue_id
+            WHERE u.ref_no = %s
+            ORDER BY e.issue_date ASC
+        """, (identifier,))
 
-            cycles.append({
-                'cycle': idx,
-                'student': iss.get('studentName') or iss.get('student') or 'Student',
-                'studentId': iss.get('studentId') or '',
-                'issued': iss.get('issueDate') or iss.get('createdAt') or '—',
-                'returned': iss.get('returnDate') if status_str in ['returned', 'condemned'] else 'NULL',
-                'status': status_label,
-                'rawStatus': status_str
-            })
+    cycles = []
+    for i, r in enumerate(rows, 1):
+        raw = (r.get('rawStatus') or '').lower()
+        cycles.append({
+            'cycle': i,
+            'student': r.get('student') or 'Student',
+            'studentId': r.get('student_id') or '',
+            'unitId': r.get('unit_serial') or '—',
+            'issued': r.get('issued').isoformat() if hasattr(r.get('issued'), 'isoformat') else r.get('issued'),
+            'returned': r.get('returned').isoformat() if hasattr(r.get('returned'), 'isoformat') else (r.get('returned') or 'NULL'),
+            'status': _status_label(raw),
+            'rawStatus': raw,
+        })
 
-        # Build summary
-        total = len(cycles)
-        returned = sum(1 for c in cycles if c['rawStatus'] == 'returned')
-        condemned = sum(1 for c in cycles if c['rawStatus'] == 'condemned')
-        current = sum(1 for c in cycles if c['rawStatus'] not in ['returned', 'condemned'])
-
-        summary = f"Summary: {total} cycles → {returned} returned → {condemned} condemned → {current} current"
-
-        return jsonify({
-            'success': True,
-            'product': product_dict,
-            'history': cycles,
-            'summary': summary
-        }), 200
-        
-    except Exception as e:
-        print(f"❌ Error in get_unit_history: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'message': f"Error loading history for unit {unit_id}"
-        }), 500
+    return jsonify({
+        'success': True,
+        'product': product.to_dict() if product else {},
+        'history': cycles,
+        'summary': f"Summary: {len(cycles)} cycles",
+    }), 200
 
 
-# ============ PRODUCT ENDPOINTS ============
+# ---------- Products list ----------
 
 @inventory_bp.route('/products', methods=['GET'])
 @token_required
 def get_products():
-    """Get all products"""
-    try:
-        products = Product.find_all()
-    except Exception as e:
-        print(f"Product fetch fallback to Inventory: {e}")
-        products = Inventory.find_all()
-    return jsonify({
-        'success': True,
-        'data': [p.to_dict() for p in products]
-    }), 200
+    products = Product.find_all()
+    return jsonify({'success': True, 'data': [p.to_dict() for p in products]}), 200
 
 
-@inventory_bp.route('/products', methods=['POST'])
-@token_required
-@readonly_required
-def create_product():
-    """Create a new product"""
-    data = request.get_json()
-    if not data:
-        return jsonify({
-            'success': False,
-            'error': {'code': 'INVALID_REQUEST', 'message': 'Request body is required'}
-        }), 400
-
-    required = ['ref_no', 'product_name']
-    missing = [f for f in required if not data.get(f)]
-    if missing:
-        return jsonify({
-            'success': False,
-            'error': {'code': 'VALIDATION_ERROR', 'message': f'Missing required fields: {", ".join(missing)}'}
-        }), 400
-
-    try:
-        product = Product.create(data)
-    except Exception as e:
-        print(f"Product create fallback to Inventory: {e}")
-        product = Inventory.create(data)
-
-    return jsonify({'success': True, 'data': product.to_dict()}), 201
-
-
-# ============ INVENTORY UNIT ENDPOINTS ============
+# ---------- Stock list (from view) ----------
 
 @inventory_bp.route('/', methods=['GET'])
 @token_required
 def get_inventory():
-    """Get all inventory units"""
-    try:
-        units = InventoryUnit.find_all()
-        products = Product.find_all()
-        product_map = {p.ref_no: p.to_dict() for p in products}
-        return jsonify({
-            'success': True,
-            'data': [u.to_dict(product_map) for u in units]
-        }), 200
-    except Exception as e:
-        print(f"InventoryUnit fetch error: {e}")
-        try:
-            units = Inventory.find_all()
-            return jsonify({
-                'success': True,
-                'data': [u.to_dict() for u in units]
-            }), 200
-        except Exception as inner_e:
-            print(f"Inventory fetch fallback error: {inner_e}")
-            return jsonify({
-                'success': True,
-                'data': []
-            }), 200
+    db = StockLot.get_db()
+    rows = db.execute_query("SELECT * FROM v_available_stock ORDER BY product_name")
+    data = []
+    for r in rows:
+        data.append({
+            'refNo': r.get('ref_no'),
+            'groupCode': r.get('group_code'),
+            'product': r.get('product_name'),
+            'productName': r.get('product_name'),
+            'category': r.get('category'),
+            'company': r.get('company_name'),
+            'companyName': r.get('company_name'),
+            'isReturnable': bool(r.get('is_returnable')),
+            'freshLocation': r.get('fresh_location'),
+            'returnedLocation': r.get('returned_location'),
+            'lowStockThreshold': r.get('low_stock_threshold'),
+            'freshStock': int(r.get('fresh_stock') or 0),
+            'returnedStock': int(r.get('returned_stock') or 0),
+            'totalAvailable': int(r.get('total_available') or 0),
+            'quantity': int(r.get('total_available') or 0),
+            'issuedCount': int(r.get('issued_count') or 0),
+            'failedCount': int(r.get('failed_count') or 0),
+            'stockStatus': r.get('stock_status'),
+        })
+    return jsonify({'success': True, 'data': data}), 200
 
+
+# ---------- Low stock ----------
 
 @inventory_bp.route('/low-stock', methods=['GET'])
 @token_required
 def get_low_stock():
-    """Get low stock items"""
-    items = Inventory.find_low_stock()
-    return jsonify({
-        'success': True,
-        'data': [item.to_dict() for item in items]
-    }), 200
+    db = StockLot.get_db()
+    rows = db.execute_query("SELECT * FROM v_low_stock ORDER BY product_name")
+    return jsonify({'success': True, 'data': rows}), 200
 
 
-@inventory_bp.route('/<unit_id>', methods=['GET'])
+# ---------- Single lot ----------
+
+@inventory_bp.route('/lot/<lot_id>', methods=['GET'])
 @token_required
-def get_inventory_unit(unit_id):
-    """Get inventory unit by ID"""
-    unit = None
-    try:
-        unit = InventoryUnit.find_by_id(unit_id)
-    except Exception:
-        pass
-
-    if not unit:
-        unit = Inventory.find_by_id(unit_id)
-
-    if not unit:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'NOT_FOUND',
-                'message': 'Unit not found'
-            }
-        }), 404
-    
-    return jsonify({
-        'success': True,
-        'data': unit.to_dict()
-    }), 200
+def get_lot(lot_id):
+    lot = StockLot.find_by_lot_id(lot_id)
+    if not lot:
+        return jsonify({'success': False, 'message': 'Lot not found'}), 404
+    return jsonify({'success': True, 'data': lot.to_dict()}), 200
 
 
-@inventory_bp.route('/', methods=['POST'])
+# ---------- Lots by ref ----------
+
+@inventory_bp.route('/lots/<ref_no>', methods=['GET'])
 @token_required
-@readonly_required
-def create_inventory_unit():
-    """Create a new inventory unit"""
-    data = request.get_json()
-    
-    if not data:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'INVALID_REQUEST',
-                'message': 'Request body is required'
-            }
-        }), 400
-    
-    current_user = request.current_user
-    data['created_by'] = current_user.name if current_user else 'Admin'
-    
-    try:
-        unit = InventoryUnit.create(data)
-    except Exception as e:
-        print(f"InventoryUnit create fallback: {e}")
-        unit = Inventory.create(data)
-    
-    # Log action
-    AuditLog.create(
-        action='CREATE',
-        entity_type='INVENTORY',
-        entity_id=getattr(unit, 'id', '—'),
-        details=f"Created inventory unit/item: {getattr(unit, 'ref_no', '')}",
-        user_id=current_user.id if current_user else None,
-        user_name=current_user.name if current_user else 'Admin'
-    )
-    
-    return jsonify({
-        'success': True,
-        'data': unit.to_dict(),
-        'message': 'Inventory unit created successfully'
-    }), 201
+def get_lots_by_ref(ref_no):
+    lots = StockLot.find_by_ref_no(ref_no)
+    return jsonify({'success': True, 'data': [l.to_dict() for l in lots]}), 200
 
 
-@inventory_bp.route('/<unit_id>', methods=['PUT'])
+# ---------- Available lots by ref (for issue modal) ----------
+
+@inventory_bp.route('/available-lots/<ref_no>', methods=['GET'])
 @token_required
-@readonly_required
-def update_inventory_unit(unit_id):
-    """Update an inventory unit"""
-    unit = None
-    try:
-        unit = InventoryUnit.find_by_id(unit_id)
-    except Exception:
-        pass
-
-    if not unit:
-        unit = Inventory.find_by_id(unit_id)
-
-    if not unit:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'NOT_FOUND',
-                'message': 'Unit not found'
-            }
-        }), 404
-    
-    data = request.get_json()
-    if not data:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'INVALID_REQUEST',
-                'message': 'Request body is required'
-            }
-        }), 400
-    
-    updated_unit = unit.update(data)
-    
-    current_user = request.current_user
-    AuditLog.create(
-        action='UPDATE',
-        entity_type='INVENTORY',
-        entity_id=unit_id,
-        details=f"Updated inventory unit: {unit_id}",
-        user_id=current_user.id if current_user else None,
-        user_name=current_user.name if current_user else 'Admin'
-    )
-    
-    return jsonify({
-        'success': True,
-        'data': updated_unit.to_dict(),
-        'message': 'Inventory unit updated successfully'
-    }), 200
-
-
-@inventory_bp.route('/<unit_id>/status', methods=['PUT'])
-@token_required
-@readonly_required
-def toggle_unit_status(unit_id):
-    """Toggle inventory unit status or set explicit status for unit/ref_no"""
-    data = request.get_json(silent=True) or {}
-    requested_status = data.get('status')
-    
-    from models.inventory_unit import InventoryUnit
-    
-    # Try finding unit by exact unit_id
-    unit = InventoryUnit.find_by_id(unit_id)
-    if unit:
-        new_status = requested_status if requested_status in ['active', 'inactive'] else ('inactive' if unit.status == 'active' else 'active')
-        updated_unit = unit.update({'status': new_status})
-        
-        current_user = request.current_user
-        AuditLog.create(
-            action='UPDATE',
-            entity_type='INVENTORY',
-            entity_id=unit_id,
-            details=f"Set unit status to {new_status}: {unit_id}",
-            user_id=current_user.id if current_user else None,
-            user_name=current_user.name if current_user else 'Admin'
-        )
-        return jsonify({
-            'success': True,
-            'data': updated_unit.to_dict(),
-            'message': f'Unit status changed to {new_status}'
-        }), 200
-
-    # If not found by unit_id, check if unit_id is a ref_no
-    units = InventoryUnit.find_by_ref_no(unit_id)
-    if units:
-        if requested_status in ['active', 'inactive']:
-            new_status = requested_status
-        else:
-            any_active = any(u.status == 'active' for u in units)
-            new_status = 'inactive' if any_active else 'active'
-
-        for u in units:
-            u.update({'status': new_status})
-
-        current_user = request.current_user
-        AuditLog.create(
-            action='UPDATE',
-            entity_type='INVENTORY',
-            entity_id=unit_id,
-            details=f"Set status to {new_status} for all units of ref_no: {unit_id}",
-            user_id=current_user.id if current_user else None,
-            user_name=current_user.name if current_user else 'Admin'
-        )
-        return jsonify({
-            'success': True,
-            'data': [u.to_dict() for u in units],
-            'message': f'All units for {unit_id} changed to {new_status}'
-        }), 200
-
-    return jsonify({
-        'success': False,
-        'error': {
-            'code': 'NOT_FOUND',
-            'message': f'Unit or product with ID/ref_no {unit_id} not found'
-        }
-    }), 404
-
-
-@inventory_bp.route('/<unit_id>', methods=['DELETE'])
-@token_required
-@readonly_required
-def delete_inventory_unit(unit_id):
-    """Delete an inventory unit"""
-    unit = None
-    try:
-        unit = InventoryUnit.find_by_id(unit_id)
-    except Exception:
-        pass
-
-    if not unit:
-        unit = Inventory.find_by_id(unit_id)
-
-    if not unit:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'NOT_FOUND',
-                'message': 'Unit not found'
-            }
-        }), 404
-
-    current_user = request.current_user
-    unit.delete()
-    AuditLog.create(
-        action='DELETE',
-        entity_type='INVENTORY',
-        entity_id=unit_id,
-        details=f"Deleted unit: {unit_id}",
-        user_id=current_user.id if current_user else None,
-        user_name=current_user.name if current_user else 'Admin'
-    )
-
-    return jsonify({
-        'success': True,
-        'message': 'Unit deleted successfully'
-    }), 200
+def get_available_lots(ref_no):
+    lots = StockLot.find_available_by_ref_no(ref_no)
+    return jsonify({'success': True, 'data': [l.to_dict() for l in lots]}), 200

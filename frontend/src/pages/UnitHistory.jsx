@@ -119,9 +119,9 @@ export default function UnitHistory() {
     setLoading(true);
     const host = window.location.hostname || "localhost";
     const apiUrls = [
-      `http://${host}:5000/api/inventory/public-history/${encodeURIComponent(unitId)}`,
-      `http://127.0.0.1:5000/api/inventory/public-history/${encodeURIComponent(unitId)}`,
-      `http://localhost:5000/api/inventory/public-history/${encodeURIComponent(unitId)}`
+      `http://${host}:5000/api/inventory/unit-history/${encodeURIComponent(unitId)}`,
+      `http://127.0.0.1:5000/api/inventory/unit-history/${encodeURIComponent(unitId)}`,
+      `http://localhost:5000/api/inventory/unit-history/${encodeURIComponent(unitId)}`
     ];
 
     const fetchPublicData = async () => {

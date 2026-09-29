@@ -274,3 +274,21 @@ def bulk_import_students():
         'data': imported,
         'message': f'Imported {len(imported)} students successfully'
     }), 201
+
+
+@students_bp.route('/<campus_id>/pending-count', methods=['GET'])
+@token_required
+def get_pending_count(campus_id):
+    """Live pending return count for a student."""
+    student = Student.find_by_id(campus_id)
+    if not student:
+        return jsonify({'success': False, 'message': 'Student not found'}), 404
+    count = Student.get_pending_return_count(campus_id)
+    return jsonify({
+        'success': True,
+        'data': {
+            'campusId': campus_id,
+            'pendingReturnCount': count,
+            'hasPendingReturns': count > 0
+        }
+    }), 200

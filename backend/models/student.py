@@ -2,14 +2,38 @@ from database.db import Database
 import datetime
 
 class Student:
+    # ------------------------------------------------------------------
+    # Normalise a raw data dict so both camelCase and snake_case keys
+    # work interchangeably.  Any new field added here will be tolerant
+    # for ALL callers (single-create, bulk-import, future endpoints).
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _normalize(data):
+        """Return a snake_case copy of *data*, merging any camelCase aliases."""
+        d = dict(data)  # shallow copy – don't mutate caller's dict
+
+        # campus_id
+        if 'campusId' in d and 'campus_id' not in d:
+            d['campus_id'] = d['campusId']
+        # added_date
+        if 'addedDate' in d and 'added_date' not in d:
+            d['added_date'] = d['addedDate']
+        if 'added' in d and 'added_date' not in d:
+            d['added_date'] = d['added']
+        # has_pending_returns
+        if 'hasPendingReturns' in d and 'has_pending_returns' not in d:
+            d['has_pending_returns'] = d['hasPendingReturns']
+        # pending_return_count
+        if 'pendingReturnCount' in d and 'pending_return_count' not in d:
+            d['pending_return_count'] = d['pendingReturnCount']
+
+        return d
     def __init__(self, data):
         self.campus_id = data.get('campus_id')
         self.name = data.get('name')
         self.email = data.get('email')
         self.course = data.get('course')
         self.batch = data.get('batch')
-        self.has_pending_returns = data.get('has_pending_returns', False)  # ⭐ Renamed
-        self.pending_return_count = data.get('pending_return_count', 0)    # ⭐ Renamed
         self.status = data.get('status', 'active')
         self.added_date = data.get('added_date')
         self.created_at = data.get('created_at')
@@ -63,25 +87,26 @@ class Student:
     @classmethod
     def create(cls, data):
         db = cls.get_db()
-        
+
+        # Accept both camelCase and snake_case from any caller
+        data = cls._normalize(data)
+
         campus_id = data.get('campus_id') or data.get('id')
         if not campus_id:
             res = db.execute_query("SELECT COUNT(*) as cnt FROM students")
             next_num = (res[0]['cnt'] if res else 0) + 1
             campus_id = f"STU-{str(next_num + 1000).zfill(3)}"
-        
-        added_date = data.get('added_date') or data.get('added') or datetime.date.today().isoformat()
+
+        added_date = data.get('added_date') or datetime.date.today().isoformat()
         
         db.execute_query("""
-            INSERT INTO students (campus_id, name, email, course, batch, has_pending_returns, pending_return_count, status, added_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO students (campus_id, name, email, course, batch, status, added_date)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE 
                 name = VALUES(name),
                 email = VALUES(email),
                 course = VALUES(course),
                 batch = VALUES(batch),
-                has_pending_returns = VALUES(has_pending_returns),
-                pending_return_count = VALUES(pending_return_count),
                 status = VALUES(status)
         """, (
             campus_id,
@@ -89,8 +114,6 @@ class Student:
             data.get('email'),
             data.get('course'),
             data.get('batch'),
-            data.get('has_pending_returns', False),
-            data.get('pending_return_count', 0),
             data.get('status', 'active'),
             added_date
         ))
@@ -101,7 +124,7 @@ class Student:
         updates = []
         params = []
         
-        allowed_fields = ['name', 'email', 'course', 'batch', 'has_pending_returns', 'pending_return_count', 'status']
+        allowed_fields = ['name', 'email', 'course', 'batch', 'status']
         for field in allowed_fields:
             if field in data:
                 updates.append(f"{field} = %s")
@@ -119,87 +142,67 @@ class Student:
     
     def archive(self, archived_by=None):
         """Archive a student (set status to archived)"""
-        if self.has_pending_returns:
-            raise ValueError(f"Student {self.campus_id} has {self.pending_return_count} pending returns and cannot be archived")
+        pending = Student.get_pending_return_count(self.campus_id)
+        if pending > 0:
+            raise ValueError(f"Student {self.campus_id} has {pending} pending returns and cannot be archived")
         return self.update({'status': 'archived'})
     
     def delete(self):
         db = self.get_db()
-        try:
-            db.execute_query("UPDATE issued_items SET student_id = NULL WHERE student_id = %s", (self.campus_id,))
-        except Exception:
-            pass
+        # Block delete if student has active tool issues
+        pending = Student.get_pending_return_count(self.campus_id)
+        if pending > 0:
+            raise ValueError(f"Student {self.campus_id} has {pending} pending returnable items")
         db.execute_query("DELETE FROM students WHERE campus_id = %s", (self.campus_id,))
         return True
     
     @classmethod
-    def update_pending_returns(cls, student_id):
-        """Update pending return count for a student based on active issues"""
+    def get_pending_return_count(cls, student_id):
+        """Compute live count of open tool/returnable issues."""
+        if not student_id:
+            return 0
         db = cls.get_db()
-        
-        # Count active returnable issues (excluding implants/abutments)
-        result = db.execute_query("""
-            SELECT COUNT(*) as count FROM issued_items 
-            WHERE student_id = %s 
-            AND (is_implant_abutment = 0 OR is_implant_abutment IS NULL)
-            AND (LOWER(status) = 'active' OR LOWER(status) = 'issued' OR status IS NULL OR status = '')
+        rows = db.execute_query("""
+            SELECT COUNT(*) AS cnt
+            FROM issued_units u
+            JOIN issue_events e ON e.issue_id = u.issue_id
+            WHERE e.student_id = %s
+              AND u.is_implant_abutment = 0
+              AND u.status IN ('issued', 'awaiting_vendor')
         """, (student_id,))
-        count = result[0]['count'] if result else 0
-        has_pending = count > 0
-        
-        # Update student record
-        db.execute_query("""
-            UPDATE students 
-            SET has_pending_returns = %s, pending_return_count = %s
-            WHERE campus_id = %s
-        """, (has_pending, count, student_id))
-        
-        return {'has_pending_returns': has_pending, 'pending_return_count': count}
+        return rows[0]['cnt'] if rows else 0
+
+    @classmethod
+    def update_pending_returns(cls, student_id):
+        """Backward-compat shim: return live count (no DB write)."""
+        return {
+            'pending_return_count': cls.get_pending_return_count(student_id)
+        }
 
     @classmethod
     def sync_all_pending_returns(cls):
-        """Sync pending return status for all students"""
-        db = cls.get_db()
-        students = db.execute_query("SELECT campus_id FROM students")
-        for s in (students or []):
-            cls.update_pending_returns(s['campus_id'])
+        """No-op: counts are now computed live."""
         return True
     
     @classmethod
     def archive_batch(cls, batch, archived_by=None):
-        """Archive all students in a batch (without pending returns)"""
         db = cls.get_db()
-        
-        # Get students with pending returns
-        pending_students = db.execute_query(
-            "SELECT campus_id FROM students WHERE batch = %s AND has_pending_returns = TRUE AND status = 'active'",
-            (batch,)
-        )
-        pending_count = len(pending_students)
-        
-        # Archive students without pending returns
-        result = db.execute_query(
-            "UPDATE students SET status = 'archived' WHERE batch = %s AND has_pending_returns = FALSE AND status = 'active'",
-            (batch,)
-        )
-        archived_count = db.get_affected_rows() or 0
-        
-        # Log the archive
-        db.execute_query("""
-            INSERT INTO batch_archive_log (batch_name, students_archived, students_with_dues, archived_by, remarks)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (
-            batch,
-            archived_count,
-            pending_count,
-            archived_by or 'System',
-            f"Archived {archived_count} students. {pending_count} students have pending returns and were not archived."
-        ))
-        
-        return {
-            'archived_count': archived_count,
-            'students_with_pending_returns': pending_count
-        }
+        conn = db.get_connection()
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.callproc('archive_batch', (batch, archived_by or 'System'))
+            conn.commit()
+            result = {}
+            for r in cursor.stored_results():
+                row = r.fetchone()
+                if row:
+                    result = row
+            return {
+                'archived_count': result.get('archived_count', 0),
+                'students_with_pending_returns': result.get('students_with_pending_returns', 0)
+            }
+        finally:
+            cursor.close()
     
     def to_dict(self):
         created_val = self.created_at.isoformat() if hasattr(self.created_at, 'isoformat') else (str(self.created_at) if self.created_at else None)
@@ -212,8 +215,6 @@ class Student:
             'email': self.email,
             'course': self.course,
             'batch': self.batch,
-            'hasPendingReturns': bool(self.has_pending_returns),
-            'pendingReturnCount': int(self.pending_return_count or 0),
             'status': self.status,
             'addedDate': str(self.added_date) if self.added_date else None,
             'createdAt': created_val,

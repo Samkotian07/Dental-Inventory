@@ -1,303 +1,269 @@
 from flask import Blueprint, request, jsonify
-from middleware.auth import token_required, admin_required, readonly_required
+from middleware.auth import token_required, admin_required
 from models.vendor_return import VendorReturn
-from models.inventory import Inventory
+from models.credit_note import CreditNote
+from models.stock_lot import StockLot
+from models.product import Product
 from models.audit_log import AuditLog
-import datetime
-
+from datetime import date
 
 returns_bp = Blueprint('returns', __name__, url_prefix='/api/returns')
+
+
+# ---------- Helpers ----------
+
+def _call_procedure(proc_name, in_params, out_param_count):
+    db = VendorReturn.get_db()
+    conn = db.get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.callproc(proc_name, in_params)
+        conn.commit()
+        results = []
+        for r in cursor.stored_results():
+            results.extend(r.fetchall() or [])
+        out_values = []
+        if out_param_count:
+            placeholders = ", ".join(
+                [f"@_{proc_name}_{i}" for i in range(len(in_params), len(in_params) + out_param_count)]
+            )
+            out_cursor = conn.cursor(dictionary=True)
+            out_cursor.execute(f"SELECT {placeholders}")
+            row = out_cursor.fetchone()
+            out_cursor.close()
+            if row:
+                out_values = list(row.values())
+        return results, out_values
+    finally:
+        cursor.close()
+
+
+# ---------- Read endpoints ----------
 
 @returns_bp.route('/', methods=['GET'])
 @token_required
 def get_returns():
-    """Get all vendor returns"""
     items = VendorReturn.find_all()
-    return jsonify({
-        'success': True,
-        'data': [item.to_dict() for item in items]
-    }), 200
+    return jsonify({'success': True, 'data': [r.to_dict() for r in items]}), 200
+
 
 @returns_bp.route('/<return_id>', methods=['GET'])
 @token_required
 def get_return(return_id):
-    """Get vendor return by ID"""
-    item = VendorReturn.find_by_id(return_id)
-    if not item:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'NOT_FOUND',
-                'message': 'Return record not found'
-            }
-        }), 404
-    
-    return jsonify({
-        'success': True,
-        'data': item.to_dict()
-    }), 200
+    obj = VendorReturn.find_by_id(return_id)
+    if not obj:
+        return jsonify({'success': False, 'message': 'Return not found'}), 404
+    return jsonify({'success': True, 'data': obj.to_dict()}), 200
 
-@returns_bp.route('/', methods=['POST'])
+
+# ---------- Create overstock return (credit note path) ----------
+
+@returns_bp.route('/overstock', methods=['POST'])
 @token_required
-@readonly_required
-def create_return():
-    """Create a new vendor return"""
+def create_overstock_return():
+    data = request.get_json() or {}
+    lot_id = data.get('lot_id')
+    qty = data.get('quantity')
+    vendor_id = data.get('vendor_id')
+    reason = data.get('reason') or 'Overstock'
+    return_date = data.get('return_date') or date.today().isoformat()
+
+    if not lot_id or not qty or not vendor_id:
+        return jsonify({'success': False, 'message': 'lot_id, quantity, vendor_id required'}), 400
+
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
     try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': {
-                    'code': 'INVALID_REQUEST',
-                    'message': 'Request body is required'
-                }
-            }), 400
-        
-        return_type = data.get('type')
-        inventory_id = data.get('inventory_id') or data.get('unit_id') or data.get('refNo') or data.get('ref_no')
-        
-        if not return_type or not inventory_id:
-            missing = []
-            if not return_type: missing.append('type')
-            if not inventory_id: missing.append('inventory_id')
-            return jsonify({
-                'success': False,
-                'error': {
-                    'code': 'VALIDATION_ERROR',
-                    'message': f'Missing required fields: {", ".join(missing)}'
-                }
-            }), 400
-        
-        if return_type not in ['exchange', 'creditNote']:
-            return jsonify({
-                'success': False,
-                'error': {
-                    'code': 'VALIDATION_ERROR',
-                    'message': 'Type must be exchange or creditNote'
-                }
-            }), 400
-        
-        # Check if inventory unit or item exists
-        from models.inventory_unit import InventoryUnit
-        from models.product import Product
-
-        inventory_item = None
-        unit = InventoryUnit.find_by_id(inventory_id)
-        if unit:
-            product = Product.find_by_ref_no(unit.ref_no)
-            # ⭐ FIXED: Use get_product_name() instead of product.product_name
-            product_name = product.get_product_name() if product else unit.ref_no
-            inventory_item = Inventory({
-                'id': unit.unit_id,
-                'ref_no': unit.ref_no,
-                'product_name': product_name,
-                'category': product.get_category() if product else 'General',
-                'company_name': product.company_name if product else '',
-                'size': product.get_size() if product else '',
-                'lot_no': product.lot_no if product else '',
-                'quantity': unit.quantity,
-                'is_returnable': product.get_is_returnable() if product else True,
-            })
-        else:
-            inventory_item = Inventory.find_by_id(inventory_id) or Inventory.find_by_ref_no(inventory_id)
-
-        if not inventory_item and data.get('ref_no'):
-            product = Product.find_by_ref_no(data['ref_no'])
-            if product:
-                inventory_item = Inventory({
-                    'id': data.get('ref_no'),
-                    'ref_no': product.ref_no,
-                    'product_name': product.get_product_name(),
-                    'category': product.get_category(),
-                    'company_name': product.company_name,
-                    'size': product.get_size(),
-                    'lot_no': product.lot_no,
-                    'quantity': 1,
-                    'is_returnable': product.get_is_returnable(),
-                })
-
-        if not inventory_item and (data.get('product_name') or data.get('product')):
-            prod_name = data.get('product_name') or data.get('product')
-            inventory_item = Inventory({
-                'id': inventory_id,
-                'ref_no': data.get('ref_no') or inventory_id,
-                'product_name': prod_name,
-                'category': 'General',
-                'company_name': '',
-                'size': '',
-                'lot_no': '',
-                'quantity': 1,
-                'is_returnable': True,
-            })
-
-        if not inventory_item:
-            return jsonify({
-                'success': False,
-                'error': {
-                    'code': 'INVENTORY_NOT_FOUND',
-                    'message': 'Inventory item not found'
-                }
-            }), 404
-        
-        current_user = request.current_user
-        
-        return_data = {
-            'type': return_type,
-            'unit_id': inventory_id,
-            'inventory_id': inventory_id,
-            'ref_no': inventory_item.ref_no,
-            'product_name': inventory_item.product_name,
-            'old_batch_no': inventory_item.lot_no,
-            'new_batch_no': data.get('new_batch_no'),
-            'quantity': data.get('quantity', 1),
-            'reason': data.get('reason'),
-            'return_date': data.get('return_date', datetime.date.today().isoformat()),
-            'credit_note': data.get('credit_note'),
-            'created_by': current_user.name if current_user else 'Admin'
-        }
-        
-        vendor_return = VendorReturn.create(return_data)
-        
-        AuditLog.create(
-            action='CREATE_RETURN',
-            entity_type='VENDOR_RETURN',
-            entity_id=vendor_return.return_id,
-            details=f"Created {return_type} return for {inventory_item.product_name} ({inventory_item.ref_no})",
-            user_id=current_user.id if current_user else None,
-            user_name=current_user.name if current_user else 'Admin'
+        _, outs = _call_procedure(
+            'sp_send_overstock_to_vendor',
+            (lot_id, int(qty), int(vendor_id), return_date, reason, user_name),
+            1
         )
-        
-        return jsonify({
-            'success': True,
-            'data': vendor_return.to_dict(),
-            'message': 'Vendor return created successfully'
-        }), 201
+        return_id = outs[0]
     except Exception as e:
-        print(f"❌ Error in create_return: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'SERVER_ERROR',
-                'message': str(e)
-            }
-        }), 500
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    AuditLog.create(
+        action='CREATE_OVERSTOCK_RETURN',
+        entity_type='VENDOR_RETURN',
+        entity_id=return_id,
+        details=f'Created overstock return {return_id} for lot {lot_id}, qty {qty}',
+        user_id=user.id if user else None,
+        user_name=user_name,
+    )
+
+    obj = VendorReturn.find_by_id(return_id)
+    return jsonify({'success': True, 'data': obj.to_dict()}), 201
+
+
+# ---------- Complete a vendor return ----------
+
+@returns_bp.route('/<return_id>/complete', methods=['POST'])
+@token_required
+def complete_return(return_id):
+    data = request.get_json() or {}
+    new_lot_no = data.get('new_lot_no')
+    new_qty = data.get('new_qty')
+    credit_note_no = data.get('credit_note_no')
+    credit_amount = data.get('credit_amount')
+
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
+    try:
+        _call_procedure(
+            'sp_complete_vendor_return',
+            (return_id, new_lot_no, new_qty, credit_note_no, credit_amount, user_name),
+            0
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    AuditLog.create(
+        action='COMPLETE_RETURN',
+        entity_type='VENDOR_RETURN',
+        entity_id=return_id,
+        details=f'Completed return {return_id}',
+        user_id=user.id if user else None,
+        user_name=user_name,
+    )
+
+    obj = VendorReturn.find_by_id(return_id)
+    return jsonify({'success': True, 'data': obj.to_dict()}), 200
+
+
+# ---------- Update status (in_progress only — no completion) ----------
 
 @returns_bp.route('/<return_id>/status', methods=['PUT'])
 @token_required
-@readonly_required
-def update_return_status(return_id):
-    """Update vendor return status"""
-    vendor_return = VendorReturn.find_by_id(return_id)
-    if not vendor_return:
+def update_status(return_id):
+    data = request.get_json() or {}
+    new_status = (data.get('status') or '').strip().lower().replace(' ', '_')
+
+    # Only allow in_progress via this route.
+    # Use /complete for completion.
+    allowed = {'pending', 'in_progress'}
+    if new_status not in allowed:
         return jsonify({
             'success': False,
-            'error': {
-                'code': 'NOT_FOUND',
-                'message': 'Return record not found'
-            }
-        }), 404
-    
-    data = request.get_json()
-    if not data or not data.get('status'):
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'VALIDATION_ERROR',
-                'message': 'Status is required'
-            }
+            'message': f'Only {allowed} allowed here. Use /complete endpoint for completion.'
         }), 400
-    
-    raw_status = str(data.get('status', '')).strip().lower().replace(' ', '_')
-    status_map = {
-        'pending': 'pending',
-        'in_progress': 'in_progress',
-        'inprogress': 'in_progress',
-        'completed': 'completed',
-        'rejected': 'rejected'
-    }
-    status = status_map.get(raw_status)
-    if not status:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'VALIDATION_ERROR',
-                'message': 'Invalid status. Must be pending, in_progress, completed, or rejected'
-            }
-        }), 400
-    
-    current_user = request.current_user
-    
-    provided_credit_note = data.get('credit_note') or data.get('creditNote')
-    credit_note = provided_credit_note if provided_credit_note else (vendor_return.credit_note if status == 'completed' else None)
-    
-    new_batch_no = data.get('new_batch_no') or data.get('newBatchNo')
-    if status == 'completed' and vendor_return.type == 'exchange':
-        if not new_batch_no and not vendor_return.new_batch_no:
-            return jsonify({
-                'success': False,
-                'error': {
-                    'code': 'VALIDATION_ERROR',
-                    'message': 'new_batch_no is required for exchange completion'
-                }
-            }), 400
-    
-    is_credit_note_used = data.get('is_credit_note_used') if 'is_credit_note_used' in data else (data.get('isCreditNoteUsed') if 'isCreditNoteUsed' in data else None)
-    replacement_unit_id = data.get('replacement_unit_id') or data.get('replacementUnitId')
-    
-    updated_return = vendor_return.update_status(
-        status, 
-        credit_note_number=credit_note, 
-        new_batch_no=new_batch_no,
-        is_credit_note_used=is_credit_note_used,
-        replacement_unit_id=replacement_unit_id
+
+    obj = VendorReturn.find_by_id(return_id)
+    if not obj:
+        return jsonify({'success': False, 'message': 'Return not found'}), 404
+
+    db = VendorReturn.get_db()
+    db.execute_query(
+        "UPDATE vendor_returns SET status = %s WHERE return_id = %s",
+        (new_status, return_id)
     )
-    
+
+    user = getattr(request, 'current_user', None)
     AuditLog.create(
         action='UPDATE_RETURN_STATUS',
         entity_type='VENDOR_RETURN',
         entity_id=return_id,
-        details=f"Updated return status to {status} for {vendor_return.product_name}",
-        user_id=current_user.id if current_user else None,
-        user_name=current_user.name if current_user else 'Admin'
+        details=f'Status changed to {new_status}',
+        user_id=user.id if user else None,
+        user_name=user.name if user else 'Admin',
     )
-    
-    return jsonify({
-        'success': True,
-        'data': updated_return.to_dict(),
-        'message': f'Return status updated to {status}'
-    }), 200
+
+    updated = VendorReturn.find_by_id(return_id)
+    return jsonify({'success': True, 'data': updated.to_dict()}), 200
+
+
+# ---------- Soft delete credit note ----------
+
+@returns_bp.route('/credit-notes/<credit_note_id>/delete', methods=['POST'])
+@token_required
+@admin_required
+def soft_delete_credit_note(credit_note_id):
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
+    try:
+        _call_procedure(
+            'sp_soft_delete_credit_note',
+            (credit_note_id, user_name),
+            0
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    AuditLog.create(
+        action='SOFT_DELETE_CREDIT_NOTE',
+        entity_type='CREDIT_NOTE',
+        entity_id=credit_note_id,
+        details=f'Soft-deleted credit note {credit_note_id}',
+        user_id=user.id if user else None,
+        user_name=user_name,
+    )
+
+    return jsonify({'success': True}), 200
+
+
+# ---------- Apply credit note ----------
+
+@returns_bp.route('/credit-notes/<credit_note_id>/apply', methods=['POST'])
+@token_required
+def apply_credit_note(credit_note_id):
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
+    try:
+        _call_procedure(
+            'sp_apply_credit_note',
+            (credit_note_id, user_name),
+            0
+        )
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+    AuditLog.create(
+        action='APPLY_CREDIT_NOTE',
+        entity_type='CREDIT_NOTE',
+        entity_id=credit_note_id,
+        details=f'Applied credit note {credit_note_id}',
+        user_id=user.id if user else None,
+        user_name=user_name,
+    )
+
+    return jsonify({'success': True}), 200
+
+
+# ---------- Credit notes list ----------
+
+@returns_bp.route('/credit-notes', methods=['GET'])
+@token_required
+def list_credit_notes():
+    include_deleted = request.args.get('include_deleted') == 'true'
+    items = CreditNote.find_all(include_deleted=include_deleted)
+    return jsonify({'success': True, 'data': [c.to_dict() for c in items]}), 200
+
+
+# ---------- Hard delete a vendor return record (admin only, rare) ----------
 
 @returns_bp.route('/<return_id>', methods=['DELETE'])
 @token_required
-@readonly_required
+@admin_required
 def delete_return(return_id):
-    """Delete / remove a credit note or vendor return record"""
-    vendor_return = VendorReturn.find_by_id(return_id)
-    if not vendor_return:
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'NOT_FOUND',
-                'message': 'Return record not found'
-            }
-        }), 404
+    obj = VendorReturn.find_by_id(return_id)
+    if not obj:
+        return jsonify({'success': False, 'message': 'Return not found'}), 404
 
-    current_user = request.current_user
-    vendor_return.delete()
+    db = VendorReturn.get_db()
+    db.execute_query("DELETE FROM vendor_returns WHERE return_id = %s", (return_id,))
 
+    user = getattr(request, 'current_user', None)
     AuditLog.create(
         action='DELETE_RETURN',
         entity_type='VENDOR_RETURN',
         entity_id=return_id,
-        details=f"Deleted return/credit note for {vendor_return.product_name} ({vendor_return.ref_no})",
-        user_id=current_user.id if current_user else None,
-        user_name=current_user.name if current_user else 'Admin'
+        details=f'Deleted vendor return {return_id}',
+        user_id=user.id if user else None,
+        user_name=user.name if user else 'Admin',
     )
 
-    return jsonify({
-        'success': True,
-        'message': 'Return record deleted successfully'
-    }), 200
+    return jsonify({'success': True}), 200

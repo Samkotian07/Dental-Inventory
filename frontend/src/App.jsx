@@ -17,7 +17,6 @@ import Settings from "./components/Settings.jsx";
 import StockInsertion from "./components/StockInsertion.jsx";
 import StockHandle from "./components/StockHandle.jsx";
 
-import PublicProductHistory from "./pages/PublicProductHistory.jsx";
 import UnitHistory from "./pages/UnitHistory.jsx";
 
 import ArchiveStudents from "./pages/ArchiveStudents.jsx";
@@ -58,9 +57,6 @@ export default function App() {
     <Routes>
       {/* Public Routes */}
       <Route path="/login" element={<Login />} />
-      <Route path="/product-history/:refNo" element={<PublicProductHistory />} />
-      <Route path="/scan/:refNo" element={<PublicProductHistory />} />
-
       {/* Protected Routes with Layout */}
       <Route
         element={
