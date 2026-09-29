@@ -4,6 +4,8 @@ from models.stock_lot import StockLot
 from models.issued_unit import IssuedUnit
 from models.issue import Issue
 from models.product import Product
+from datetime import datetime
+from middleware.auth import admin_required
 
 
 inventory_bp = Blueprint('inventory', __name__, url_prefix='/api/inventory')
@@ -166,3 +168,189 @@ def get_lots_by_ref(ref_no):
 def get_available_lots(ref_no):
     lots = StockLot.find_available_by_ref_no(ref_no)
     return jsonify({'success': True, 'data': [l.to_dict() for l in lots]}), 200
+
+# ---------- Receive single stock ----------
+
+@inventory_bp.route('/receive', methods=['POST'])
+@token_required
+@admin_required
+def receive_stock():
+    data = request.get_json() or {}
+    ref_no = data.get('ref_no')
+    lot_no = data.get('lot_no')
+    qty = data.get('quantity')
+    invoice_no = data.get('invoice_no')
+    credit_note_no = data.get('credit_note_no')
+    expiry = data.get('expiry_date') or None
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
+    if not ref_no or not lot_no or not qty:
+        return jsonify({'success': False, 'message': 'ref_no, lot_no, quantity required'}), 400
+
+    # Check product exists; if not, create
+    product = Product.find_by_ref_no(ref_no)
+    if not product:
+        created = _auto_create_product(data)
+        if not created:
+            return jsonify({'success': False, 'message': f'Product {ref_no} not found and could not be created'}), 400
+
+    db = StockLot.get_db()
+    conn = db.get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.callproc('sp_receive_stock', (
+            ref_no, lot_no, int(qty),
+            invoice_no or None, credit_note_no or None,
+            expiry, user_name
+        ))
+        conn.commit()
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    finally:
+        cursor.close()
+
+    return jsonify({'success': True, 'message': f'Received {qty} of {ref_no}'}), 201
+
+
+# ---------- Bulk receive ----------
+
+@inventory_bp.route('/bulk-receive', methods=['POST'])
+@token_required
+@admin_required
+def bulk_receive_stock():
+    rows = request.get_json() or []
+    if not isinstance(rows, list):
+        return jsonify({'success': False, 'message': 'Expected a JSON array'}), 400
+
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
+    db = StockLot.get_db()
+    conn = db.get_connection()
+    cursor = conn.cursor()
+
+    imported = 0
+    errors = []
+
+    for i, row in enumerate(rows):
+        ref_no = row.get('ref_no') or row.get('refNo')
+        lot_no = row.get('lot_no') or row.get('lotNo')
+        qty = row.get('quantity')
+        invoice_no = row.get('invoice_no') or row.get('invoiceNumber')
+        credit_note_no = row.get('credit_note_no') or row.get('creditNoteNumber')
+        expiry = row.get('expiry_date') or row.get('expiryDate') or None
+
+        if not ref_no or not lot_no or not qty:
+            errors.append({'row': i + 1, 'error': 'Missing ref_no / lot_no / quantity'})
+            continue
+
+        # Ensure product exists
+        product = Product.find_by_ref_no(ref_no)
+        if not product:
+            created = _auto_create_product({
+                'ref_no': ref_no,
+                'product_name': row.get('product_name') or row.get('productName'),
+                'category': row.get('category'),
+                'size': row.get('size'),
+                'company_name': row.get('company_name') or row.get('companyName'),
+            })
+            if not created:
+                errors.append({'row': i + 1, 'error': f'Product {ref_no} could not be created'})
+                continue
+
+        try:
+            cursor.callproc('sp_receive_stock', (
+                ref_no, lot_no, int(qty),
+                invoice_no or None, credit_note_no or None,
+                expiry, user_name
+            ))
+            conn.commit()
+            imported += 1
+        except Exception as e:
+            errors.append({'row': i + 1, 'error': str(e)})
+
+    cursor.close()
+    return jsonify({
+        'success': True,
+        'imported': imported,
+        'failed': len(errors),
+        'errors': errors
+    }), 201
+
+
+# ---------- Helper to auto-create product ----------
+
+def _auto_create_product(data):
+    """Create product_groups + products row if missing."""
+    ref_no = data.get('ref_no')
+    product_name = data.get('product_name')
+    category = data.get('category') or 'prosthetic'
+    size = data.get('size') or ''
+    company_name = data.get('company_name') or 'Unknown'
+
+    if not ref_no or not product_name:
+        return False
+
+    db = StockLot.get_db()
+
+    # Find or create vendor
+    vendors = db.execute_query(
+        "SELECT vendor_id FROM vendors WHERE vendor_name = %s",
+        (company_name,)
+    )
+    if vendors:
+        vendor_id = vendors[0]['vendor_id']
+    else:
+        db.execute_query(
+            "INSERT INTO vendors (vendor_name, vendor_code) VALUES (%s, %s)",
+            (company_name, company_name[:20].upper().replace(' ', '-'))
+        )
+        vendors = db.execute_query(
+            "SELECT vendor_id FROM vendors WHERE vendor_name = %s",
+            (company_name,)
+        )
+        vendor_id = vendors[0]['vendor_id'] if vendors else None
+
+    if not vendor_id:
+        return False
+
+    # Find or create product_group
+    group_code = f"{category[:3].upper()}-{ref_no}"[:45]
+    groups = db.execute_query(
+        "SELECT group_id FROM product_groups WHERE group_code = %s",
+        (group_code,)
+    )
+    if groups:
+        group_id = groups[0]['group_id']
+    else:
+        db.execute_query("""
+            INSERT INTO product_groups
+              (group_code, product_name, category, size, is_returnable)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (
+            group_code, product_name, category, size,
+            0 if category in ('implant', 'abutment') else 1
+        ))
+        groups = db.execute_query(
+            "SELECT group_id FROM product_groups WHERE group_code = %s",
+            (group_code,)
+        )
+        group_id = groups[0]['group_id'] if groups else None
+
+    if not group_id:
+        return False
+
+    # Create product
+    try:
+        db.execute_query("""
+            INSERT INTO products
+              (ref_no, group_id, vendor_id, is_active)
+            VALUES (%s, %s, %s, 1)
+        """, (ref_no, group_id, vendor_id))
+    except Exception as e:
+        # Already exists — fine
+        if 'Duplicate' not in str(e) and 'duplicate' not in str(e):
+            return False
+
+    return True

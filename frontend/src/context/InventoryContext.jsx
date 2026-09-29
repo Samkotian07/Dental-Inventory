@@ -506,6 +506,47 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  const receiveStock = async (data) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/receive`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await fetchStock();
+        return { success: true, message: json.message };
+      }
+      return { success: false, message: json.message || "Failed" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const bulkReceiveStock = async (rows) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/bulk-receive`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(rows),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await fetchStock();
+        return {
+          success: true,
+          imported: json.imported,
+          failed: json.failed,
+          errors: json.errors || [],
+        };
+      }
+      return { success: false, message: json.message || "Failed" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
   // ---------- CONTEXT VALUE ----------
 
   const value = {
@@ -533,6 +574,8 @@ export function InventoryProvider({ children }) {
     completeVendorReturn,
     sendOverstockToVendor,
     deleteReturn,
+    receiveStock,
+    bulkReceiveStock,
   };
 
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;

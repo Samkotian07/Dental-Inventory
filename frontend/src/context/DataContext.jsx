@@ -122,15 +122,27 @@ export function DataProvider({ children }) {
 
   const bulkImportStudents = async (studentsData) => {
     try {
+      // Normalize camelCase → snake_case so the backend Student.create()
+      // receives the canonical field names regardless of where the data
+      // came from (Excel parser always produces camelCase).
+      const normalized = studentsData.map((s) => ({
+        campus_id:   s.campusId   || s.campus_id   || s.id || '',
+        name:        s.name       || '',
+        email:       s.email      || '',
+        course:      s.course     || '',
+        batch:       s.batch      || '',
+        added_date:  s.added      || s.added_date  || '',
+      }));
+
       const response = await fetch(`${API_URL}/students/bulk`, {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify(studentsData)
+        body: JSON.stringify(normalized)
       });
       const data = await response.json();
       if (data.success) {
         setStudents(prev => [...prev, ...data.data]);
-        return { success: true, count: data.data.length };
+        return { success: true, count: data.data.length, errors: data.errors || [] };
       }
       return { success: false, message: data.error?.message };
     } catch (error) {

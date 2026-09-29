@@ -37,6 +37,11 @@ class Database:
         self.connection = None
         self.cursor = None
 
+    def get_connection(self):
+        """Return a live MySQL connection from the pool. Creates one if needed."""
+        self._connect()
+        return self.connection
+
     def _connect(self):
         """Get a connection from pool or direct fallback"""
         if self.connection and self.connection.is_connected():

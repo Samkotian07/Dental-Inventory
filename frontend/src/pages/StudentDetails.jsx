@@ -131,7 +131,19 @@ export default function StudentDetails() {
   const handleBulkImport = async (importedData) => {
     const result = await bulkImportStudents(importedData);
     if (result.success) {
-      toast.success(`Imported ${result.count} students successfully!`);
+      if (result.count === 0) {
+        toast.error(
+          result.errors?.length
+            ? `No students imported. ${result.errors.length} row(s) failed — check Campus IDs for duplicates or invalid values.`
+            : "No students imported. Make sure your file has valid Campus IDs and names."
+        );
+      } else if (result.errors?.length > 0) {
+        toast.warning(
+          `Imported ${result.count} student(s). ${result.errors.length} row(s) failed — check for duplicate Campus IDs.`
+        );
+      } else {
+        toast.success(`Imported ${result.count} student(s) successfully!`);
+      }
       setPage(1);
     } else {
       toast.error(result.message || "Failed to import students");

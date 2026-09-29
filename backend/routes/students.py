@@ -128,6 +128,48 @@ def archive_student(campus_id):
         }), 400
 
 
+@students_bp.route('/bulk', methods=['POST'])
+@token_required
+def bulk_import_students():
+    """Bulk import students – accepts a JSON array of student objects.
+    Tolerates both camelCase and snake_case field names (normalised by
+    Student._normalize before DB insert).
+    Returns imported rows AND any per-row errors so the frontend can
+    show a meaningful partial-failure message.
+    """
+    data = request.get_json()
+
+    if not data or not isinstance(data, list):
+        return jsonify({
+            'success': False,
+            'error': {
+                'code': 'VALIDATION_ERROR',
+                'message': 'Array of students is required'
+            }
+        }), 400
+
+    imported = []
+    errors = []
+    for student_data in data:
+        name = student_data.get('name') or student_data.get('Name') or ''
+        if not name:
+            continue  # skip blank rows silently
+        try:
+            student = Student.create(student_data)
+            imported.append(student.to_dict())
+        except Exception as e:
+            campus_id = student_data.get('campusId') or student_data.get('campus_id') or ''
+            print(f"❌ Bulk import row failed | campus_id={campus_id!r} name={name!r} | {e}")
+            errors.append({'name': name, 'campusId': campus_id, 'error': str(e)})
+
+    return jsonify({
+        'success': True,
+        'data': imported,
+        'errors': errors,
+        'message': f'Imported {len(imported)} students successfully'
+    }), 201
+
+
 @students_bp.route('/<campus_id>', methods=['GET'])
 @token_required
 def get_student(campus_id):
@@ -248,32 +290,6 @@ def delete_student(campus_id):
         }), 500
 
 
-@students_bp.route('/bulk', methods=['POST'])
-@token_required
-def bulk_import_students():
-    """Bulk import students"""
-    data = request.get_json()
-    
-    if not data or not isinstance(data, list):
-        return jsonify({
-            'success': False,
-            'error': {
-                'code': 'VALIDATION_ERROR',
-                'message': 'Array of students is required'
-            }
-        }), 400
-    
-    imported = []
-    for student_data in data:
-        if student_data.get('name'):
-            student = Student.create(student_data)
-            imported.append(student.to_dict())
-    
-    return jsonify({
-        'success': True,
-        'data': imported,
-        'message': f'Imported {len(imported)} students successfully'
-    }), 201
 
 
 @students_bp.route('/<campus_id>/pending-count', methods=['GET'])

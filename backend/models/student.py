@@ -28,6 +28,7 @@ class Student:
             d['pending_return_count'] = d['pendingReturnCount']
 
         return d
+
     def __init__(self, data):
         self.campus_id = data.get('campus_id')
         self.name = data.get('name')

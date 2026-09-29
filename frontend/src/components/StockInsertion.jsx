@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { PlusCircle, Upload, Check, Download, FileText, FileCheck, MapPin, ChevronDown } from "lucide-react";
+import { PlusCircle, Upload, Check, Download, FileText, FileCheck, MapPin, ChevronDown, XCircle } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useInventory } from "../context/InventoryContext.jsx";
 import Button from "./common/Button";
@@ -8,11 +8,11 @@ import Badge from "./common/Badge";
 import Modal from "./common/Modal";
 import DashboardHeader from "./dashboard/DashboardHeader.jsx";
 import { CATEGORIES } from "./utils/constants";
-import { generateId } from "./utils/helpers";
 import { toast } from "sonner";
 import { useMenuClick } from "./Layout.jsx";
 import "./StockInsertion.css";
 
+// ---------- Credit Note Dropdown ----------
 function BeautifiedCreditNoteDropdown({ value, onChange, onSelect, availableReturns }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
@@ -152,22 +152,25 @@ function BeautifiedCreditNoteDropdown({ value, onChange, onSelect, availableRetu
   );
 }
 
+// ---------- Main Component ----------
 export default function StockInsertion() {
   const onMenuClick = useMenuClick();
-  const { addStockItem, returns, updateReturnStatus } = useInventory();
+  const { receiveStock, bulkReceiveStock, returns } = useInventory();
   const [csvPreview, setCsvPreview] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCreditNoteField, setShowCreditNoteField] = useState(false);
   const fileInputRef = useRef(null);
 
-  // ⭐ Get available credit notes (not yet used)
-  const availableCreditNotes = (returns || [])
-    .filter((r) => r.creditNote && !r.creditNoteUsed && !r.is_credit_note_used && !r.isCreditNoteUsed)
-    .map((r) => r.creditNote);
+  // Available credit notes: return rows with a creditNote value
+  const availableReturns = (returns || []).filter(
+    (r) => r.creditNote || r.credit_note || r.creditNoteNumber
+  );
 
-  const [form, setForm] = useState({
+  const emptyForm = {
     invoiceNumber: "",
     creditNoteNumber: "",
+    refNo: "",
     category: CATEGORIES[0],
     companyName: "",
     productName: "",
@@ -177,127 +180,86 @@ export default function StockInsertion() {
     expiryDate: "",
     freshLocation: "",
     returnedLocation: "",
-  });
+  };
 
-  // ⭐ Handle Credit Note selection - auto-fill product details
+  const [form, setForm] = useState(emptyForm);
+
   const handleCreditNoteSelect = (creditNoteNumber) => {
-    const matching = (returns || []).find((r) => r.creditNote === creditNoteNumber);
+    const matching = availableReturns.find(
+      (r) => (r.creditNote || r.credit_note || r.creditNoteNumber) === creditNoteNumber
+    );
     if (matching) {
       setForm((prev) => ({
         ...prev,
-        creditNoteNumber: creditNoteNumber,
+        creditNoteNumber,
         productName: matching.productName || matching.product || prev.productName,
         companyName: matching.companyName || matching.company || prev.companyName,
         category: matching.category || prev.category,
         lotNo: matching.oldBatchNo || matching.batchNo || prev.lotNo,
       }));
-      toast.info(`Auto-filled from credit note: ${matching.productName}`);
+      toast.info(`Auto-filled from credit note: ${matching.productName || matching.product || ""}`);
     } else {
-      setForm((prev) => ({ ...prev, creditNoteNumber: creditNoteNumber }));
+      setForm((prev) => ({ ...prev, creditNoteNumber }));
     }
   };
 
-  // ⭐ Create individual units for each quantity
+  // ---------- Single Add ----------
   const handleNewSubmit = async () => {
-    if (
-      !form.invoiceNumber ||
-      !form.companyName ||
-      !form.productName ||
-      !form.lotNo ||
-      !form.quantity ||
-      !form.expiryDate
-    ) {
-      toast.error("Please fill all required fields (Invoice Number, Company, Product, Lot No, Quantity, Expiry)");
+    const required = ["refNo", "invoiceNumber", "companyName", "productName", "lotNo", "quantity", "expiryDate"];
+    const missing = required.filter((k) => !form[k]);
+    if (missing.length > 0) {
+      toast.error(`Missing required: ${missing.join(", ")}`);
       return;
     }
 
-    let vendorReturn = null;
-    if (form.creditNoteNumber) {
-      vendorReturn = (returns || []).find((r) => r.creditNote === form.creditNoteNumber);
-      if (!vendorReturn) {
-        toast.error("Credit note not found in vendor returns");
-        return;
-      }
-      if (vendorReturn.creditNoteUsed || vendorReturn.is_credit_note_used || vendorReturn.isCreditNoteUsed) {
-        toast.error("This credit note has already been used");
-        return;
-      }
-    }
-
-    const totalQty = Number(form.quantity);
-
-    const itemData = {
-      documentNumber: form.invoiceNumber,
-      invoiceNumber: form.invoiceNumber,
-      creditNoteNumber: form.creditNoteNumber || "",
-      category: form.category,
-      companyName: form.companyName,
-      productName: form.productName,
-      size: form.size,
-      lotNo: form.lotNo,
-      expiryDate: form.expiryDate,
-      refNo: generateId("INV"),
-      documentType: form.creditNoteNumber ? "creditNote" : "invoice",
-      invoiceNo: form.invoiceNumber,
-      creditNoteNo: form.creditNoteNumber || "",
-      freshLocation: form.freshLocation,
-      returnedLocation: form.returnedLocation,
-      qty: totalQty,
-      quantity: totalQty,
-      product: form.productName,
-      company: form.companyName,
-      expiry: form.expiryDate,
-      status: "active",
+    setIsSubmitting(true);
+    const result = await receiveStock({
+      ref_no: form.refNo,
       lot_no: form.lotNo,
-    };
-    
-    const result = await addStockItem(itemData);
+      quantity: Number(form.quantity),
+      invoice_no: form.invoiceNumber,
+      credit_note_no: form.creditNoteNumber || null,
+      expiry_date: form.expiryDate,
+      product_name: form.productName,
+      category: form.category,
+      size: form.size,
+      company_name: form.companyName,
+    });
+    setIsSubmitting(false);
 
     if (result.success) {
-      if (form.creditNoteNumber && vendorReturn) {
-        const replacementUnitId = result.data?.id || result.data?.unitId || result.data?.refNo || itemData.refNo;
-        await updateReturnStatus(vendorReturn.returnId || vendorReturn.id, "completed", {
-          is_credit_note_used: true,
-          replacement_unit_id: replacementUnitId,
-        });
-        toast.success(`Credit note ${form.creditNoteNumber} marked as used and linked to ${replacementUnitId}`);
-      }
-
-      toast.success(`Added stock item ${form.productName} (Quantity: ${totalQty}) successfully`);
-      setForm({
-        invoiceNumber: "",
-        creditNoteNumber: "",
-        category: CATEGORIES[0],
-        companyName: "",
-        productName: "",
-        size: "",
-        lotNo: "",
-        quantity: "",
-        expiryDate: "",
-        freshLocation: "",
-        returnedLocation: "",
-      });
+      toast.success(`Added ${form.quantity} unit(s) of ${form.productName}`);
+      setForm(emptyForm);
+      setShowCreditNoteField(false);
     } else {
-      toast.error(result.message || "Failed to add stock item");
+      toast.error(result.message || "Failed to add stock");
     }
   };
 
-  // ⭐ File handlers
+  // ---------- File Handling ----------
   const handleFile = (file) => {
     if (!file) return;
-    
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: "array" });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-        
-        const valid = jsonData.filter((r) => r.productName && r.lotNo);
-        setCsvPreview(valid);
-        toast.success(`Loaded ${valid.length} items from Excel`);
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+        const validated = jsonData.map((row) => {
+          const errors = [];
+          if (!row.refNo) errors.push("Missing refNo");
+          if (!row.lotNo) errors.push("Missing lotNo");
+          if (!row.quantity || Number(row.quantity) < 1) errors.push("Missing/invalid quantity");
+          return { ...row, _errors: errors };
+        });
+
+        setCsvPreview(validated);
+        const valid = validated.filter((r) => r._errors.length === 0).length;
+        toast.success(`Loaded ${valid} valid rows (of ${validated.length})`);
       } catch (err) {
+        console.error(err);
         toast.error("Failed to parse Excel file");
       }
     };
@@ -310,76 +272,82 @@ export default function StockInsertion() {
     handleFile(e.dataTransfer.files[0]);
   };
 
-  const handleBulkImport = () => {
-    let totalImported = 0;
-    
-    csvPreview.forEach((row) => {
-      const qty = Number(row.quantity) || 1;
-      const itemData = {
-        ...row,
-        refNo: generateId("INV"),
-        documentType: form.creditNoteNumber ? "creditNote" : "invoice",
-        invoiceNo: form.invoiceNumber || row.invoiceNumber || row.documentNumber || "",
-        creditNoteNo: form.creditNoteNumber || "",
-        category: row.category || "General",
-        qty: qty,
-        quantity: qty,
-        product: row.productName || row.product || "Dental Item",
-        company: row.companyName || row.company || "Vendor",
-        expiry: row.expiryDate || row.expiry || "",
-        size: row.size || "",
-        status: "active",
-        lot_no: row.lotNo,
-        freshLocation: row.freshLocation || "",
-        returnedLocation: row.returnedLocation || "",
-      };
-      addStockItem(itemData);
-      totalImported++;
-    });
-    
-    toast.success(`Imported ${totalImported} stock items successfully`);
-    setCsvPreview(null);
+  // ---------- Bulk Import ----------
+  const handleBulkImport = async () => {
+    const valid = csvPreview.filter((r) => r._errors.length === 0);
+    if (valid.length === 0) {
+      toast.error("No valid rows to import");
+      return;
+    }
+
+    const rows = valid.map((r) => ({
+      ref_no: r.refNo,
+      lot_no: r.lotNo,
+      quantity: Number(r.quantity),
+      invoice_no: r.invoiceNumber || null,
+      credit_note_no: r.creditNoteNumber || null,
+      expiry_date: r.expiryDate || null,
+      product_name: r.productName,
+      category: r.category,
+      size: r.size,
+      company_name: r.companyName,
+    }));
+
+    setIsSubmitting(true);
+    const result = await bulkReceiveStock(rows);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      if (result.failed === 0) {
+        toast.success(`Imported ${result.imported} row(s) successfully`);
+      } else {
+        toast.warning(`Imported ${result.imported}, failed ${result.failed}`);
+        console.warn("Bulk import errors:", result.errors);
+      }
+      setCsvPreview(null);
+    } else {
+      toast.error(result.message || "Bulk import failed");
+    }
   };
 
+  // ---------- Template ----------
   const downloadTemplate = () => {
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet([
-      {
-        invoiceNumber: "",
-        creditNoteNumber: "",
-        category: "",
-        companyName: "",
-        productName: "",
-        size: "",
-        lotNo: "",
-        quantity: "",
-        expiryDate: "",
-        freshLocation: "",
-        returnedLocation: "",
-      }
-    ]);
-
-    const colWidths = [
-      { wch: 18 }, { wch: 18 }, { wch: 15 },
-      { wch: 25 }, { wch: 25 }, { wch: 12 },
-      { wch: 15 }, { wch: 10 }, { wch: 15 },
-      { wch: 20 }, { wch: 20 },
+    const ws = XLSX.utils.json_to_sheet([{
+  invoiceNumber: "",
+  creditNoteNumber: "",
+  refNo: "",
+  category: "",
+  companyName: "",
+  productName: "",
+  size: "",
+  lotNo: "",
+  quantity: "",
+  expiryDate: "",
+  freshLocation: "",
+  returnedLocation: "",
+}]);
+    ws["!cols"] = [
+      { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 15 },
+      { wch: 22 }, { wch: 25 }, { wch: 12 }, { wch: 15 },
+      { wch: 10 }, { wch: 15 }, { wch: 18 }, { wch: 18 },
     ];
-    ws['!cols'] = colWidths;
-
     XLSX.utils.book_append_sheet(wb, ws, "Inventory");
-    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/octet-stream' });
-    const url = window.URL.createObjectURL(blob);
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([wbout], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
     link.download = "inventory_template.xlsx";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    toast.success("Template downloaded successfully");
+    URL.revokeObjectURL(url);
+    toast.success("Template downloaded");
   };
+
+  const validCount = csvPreview ? csvPreview.filter((r) => r._errors.length === 0).length : 0;
+  const invalidCount = csvPreview ? csvPreview.filter((r) => r._errors.length > 0).length : 0;
 
   return (
     <>
@@ -387,7 +355,7 @@ export default function StockInsertion() {
 
       <main className="stock-insertion">
         <div className="si-container">
-          {/* New Item Section */}
+          {/* ---------- Single Add ---------- */}
           <div className="si-new-section">
             <div className="si-header-row">
               <h3 className="si-section-title">Add New Inventory Item</h3>
@@ -434,138 +402,68 @@ export default function StockInsertion() {
             </div>
 
             <div className="si-new-grid">
-              {/* Invoice Number - Always visible */}
               <div className="si-new-field">
-                <label className="si-new-label">Invoice Number *</label>
-                <Input
-                  value={form.invoiceNumber}
-                  onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })}
-                  placeholder="INV-2024-XXX"
-                  className="si-new-input"
-                />
+                <label className="si-new-label">Ref No *</label>
+                <Input value={form.refNo} onChange={(e) => setForm({ ...form, refNo: e.target.value })} placeholder="e.g. 36704" className="si-new-input" />
               </div>
 
-              {/* Credit Note Number - Toggleable (Beautified Dropdown) */}
+              <div className="si-new-field">
+                <label className="si-new-label">Invoice Number *</label>
+                <Input value={form.invoiceNumber} onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })} placeholder="INV-2024-XXX" className="si-new-input" />
+              </div>
+
               {showCreditNoteField && (
                 <div className="si-new-field">
                   <label className="si-new-label">Credit Note Number</label>
                   <BeautifiedCreditNoteDropdown
                     value={form.creditNoteNumber}
                     onChange={(val) => setForm((prev) => ({ ...prev, creditNoteNumber: val }))}
-                    onSelect={(val) => handleCreditNoteSelect(val)}
-                    availableReturns={(returns || []).filter(
-                      (r) => r.creditNote && !r.creditNoteUsed && !r.is_credit_note_used && !r.isCreditNoteUsed
-                    )}
+                    onSelect={handleCreditNoteSelect}
+                    availableReturns={availableReturns}
                   />
                 </div>
               )}
 
-              {/* Category - Type or select from available */}
               <div className="si-new-field">
                 <label className="si-new-label">Category *</label>
-                <Input
-                  list="categories-list"
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="Select or enter category..."
-                  className="si-new-input"
-                />
+                <Input list="categories-list" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="Select or enter category..." className="si-new-input" />
                 <datalist id="categories-list">
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
+                  {CATEGORIES.map((c) => <option key={c} value={c} />)}
                 </datalist>
               </div>
 
-              {/* Company Name */}
-              <Input
-                label="Company Name *"
-                value={form.companyName}
-                onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                className="si-new-input"
-              />
+              <Input label="Company Name *" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} className="si-new-input" />
+              <Input label="Product Name *" value={form.productName} onChange={(e) => setForm({ ...form, productName: e.target.value })} className="si-new-input" />
+              <Input label="Size" value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} className="si-new-input" />
+              <Input label="Lot No *" value={form.lotNo} onChange={(e) => setForm({ ...form, lotNo: e.target.value })} className="si-new-input" />
+              <Input label="Quantity *" type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="si-new-input" />
+              <Input label="Expiry Date *" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="si-new-input" />
 
-              {/* Product Name */}
-              <Input
-                label="Product Name *"
-                value={form.productName}
-                onChange={(e) => setForm({ ...form, productName: e.target.value })}
-                className="si-new-input"
-              />
-
-              {/* Size */}
-              <Input
-                label="Size"
-                value={form.size}
-                onChange={(e) => setForm({ ...form, size: e.target.value })}
-                className="si-new-input"
-              />
-
-              {/* Lot No */}
-              <Input
-                label="Lot No *"
-                value={form.lotNo}
-                onChange={(e) => setForm({ ...form, lotNo: e.target.value })}
-                className="si-new-input"
-              />
-
-              {/* Quantity */}
-              <Input
-                label="Quantity *"
-                type="number"
-                value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                className="si-new-input"
-              />
-
-              {/* Expiry Date */}
-              <Input
-                label="Expiry Date *"
-                type="date"
-                value={form.expiryDate}
-                onChange={(e) => setForm({ ...form, expiryDate: e.target.value })}
-                className="si-new-input"
-              />
-
-              {/* Fresh Location */}
               <div className="si-new-field">
                 <label className="si-new-label">Fresh Location</label>
                 <div className="si-location-input">
                   <MapPin size={16} className="si-location-icon" />
-                  <input
-                    type="text"
-                    value={form.freshLocation}
-                    onChange={(e) => setForm({ ...form, freshLocation: e.target.value })}
-                    placeholder="e.g., Shelf-A1, Cabinet-B2"
-                    className="si-new-input"
-                  />
+                  <input type="text" value={form.freshLocation} onChange={(e) => setForm({ ...form, freshLocation: e.target.value })} placeholder="Shelf-A1" className="si-new-input" />
                 </div>
               </div>
 
-              {/* Returned Location */}
               <div className="si-new-field">
                 <label className="si-new-label">Returned Location</label>
                 <div className="si-location-input">
                   <MapPin size={16} className="si-location-icon" />
-                  <input
-                    type="text"
-                    value={form.returnedLocation}
-                    onChange={(e) => setForm({ ...form, returnedLocation: e.target.value })}
-                    placeholder="e.g., Shelf-C3, Cabinet-D4"
-                    className="si-new-input"
-                  />
+                  <input type="text" value={form.returnedLocation} onChange={(e) => setForm({ ...form, returnedLocation: e.target.value })} placeholder="Shelf-B2" className="si-new-input" />
                 </div>
               </div>
             </div>
 
             <div className="si-new-actions">
-              <Button onClick={handleNewSubmit} className="si-add-btn">
-                <PlusCircle size={16} /> Add {form.quantity ? `${form.quantity} Unit(s)` : 'Item'}
+              <Button onClick={handleNewSubmit} className="si-add-btn" disabled={isSubmitting}>
+                <PlusCircle size={16} /> {isSubmitting ? "Adding..." : `Add ${form.quantity ? `${form.quantity} Unit(s)` : "Item"}`}
               </Button>
             </div>
           </div>
 
-          {/* Bulk Import Section */}
+          {/* ---------- Bulk Import ---------- */}
           <div className="si-bulk-section-wrapper">
             <div className="si-bulk-header">
               <h3 className="si-section-title">Bulk Import Inventory</h3>
@@ -591,30 +489,22 @@ export default function StockInsertion() {
                 <Button variant="secondary" onClick={() => fileInputRef.current?.click()} className="si-browse-btn">
                   Browse Files
                 </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="si-hidden-input"
-                  onChange={(e) => handleFile(e.target.files[0])}
-                />
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="si-hidden-input" onChange={(e) => handleFile(e.target.files[0])} />
               </div>
             </div>
           </div>
 
-          {/* Preview Modal */}
+          {/* ---------- Preview Modal ---------- */}
           <Modal
             isOpen={!!csvPreview}
             onClose={() => setCsvPreview(null)}
-            title="Import Preview"
+            title={`Import Preview — ${validCount} valid, ${invalidCount} invalid`}
             size="lg"
             footer={
               <>
-                <Button variant="secondary" onClick={() => setCsvPreview(null)} className="si-modal-cancel">
-                  Cancel
-                </Button>
-                <Button onClick={handleBulkImport} className="si-modal-import">
-                  <Check size={16} /> Import Units
+                <Button variant="secondary" onClick={() => setCsvPreview(null)} className="si-modal-cancel">Cancel</Button>
+                <Button onClick={handleBulkImport} className="si-modal-import" disabled={isSubmitting || validCount === 0}>
+                  <Check size={16} /> {isSubmitting ? "Importing..." : `Import ${validCount} Row(s)`}
                 </Button>
               </>
             }
@@ -624,7 +514,7 @@ export default function StockInsertion() {
                 <table className="si-preview-table">
                   <thead>
                     <tr className="si-preview-header">
-                      {["Invoice #", "Credit Note", "Product", "Category", "Company", "Lot No", "Qty", "Expiry", "Fresh Location", "Returned Location"].map((h) => (
+                      {["Status", "Ref No", "Invoice #", "Credit Note", "Product", "Category", "Company", "Size", "Lot No", "Qty", "Expiry", "Fresh Loc", "Returned Loc"].map((h) => (
                         <th key={h} className="si-preview-th">{h}</th>
                       ))}
                     </tr>
@@ -632,14 +522,21 @@ export default function StockInsertion() {
                   <tbody>
                     {csvPreview.map((row, i) => (
                       <tr key={i} className="si-preview-row">
-                        <td className="si-preview-td si-preview-lot">{row.invoiceNumber || row.documentNumber}</td>
-                        <td className="si-preview-td si-preview-lot">{row.creditNoteNumber || "—"}</td>
-                        <td className="si-preview-td">{row.productName}</td>
-                        <td className="si-preview-td"><Badge variant="primary">{row.category || "General"}</Badge></td>
-                        <td className="si-preview-td">{row.companyName}</td>
+                        <td className="si-preview-td">
+                          {row._errors.length === 0
+                            ? <Check size={16} color="#059669" />
+                            : <XCircle size={16} color="#DC2626" title={row._errors.join(", ")} />}
+                        </td>
+                        <td className="si-preview-td si-preview-lot">{row.refNo}</td>
+                        <td className="si-preview-td">{row.invoiceNumber || "—"}</td>
+                        <td className="si-preview-td">{row.creditNoteNumber || "—"}</td>
+                        <td className="si-preview-td">{row.productName || "—"}</td>
+                        <td className="si-preview-td"><Badge variant="primary">{row.category || "—"}</Badge></td>
+                        <td className="si-preview-td">{row.companyName || "—"}</td>
+                        <td className="si-preview-td">{row.size || "—"}</td>
                         <td className="si-preview-td si-preview-lot">{row.lotNo}</td>
                         <td className="si-preview-td">{row.quantity}</td>
-                        <td className="si-preview-td">{row.expiryDate}</td>
+                        <td className="si-preview-td">{row.expiryDate || "—"}</td>
                         <td className="si-preview-td">{row.freshLocation || "—"}</td>
                         <td className="si-preview-td">{row.returnedLocation || "—"}</td>
                       </tr>
