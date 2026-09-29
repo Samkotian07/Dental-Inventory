@@ -218,6 +218,7 @@ export default function Reports() {
           <>
             <h3>Stock Summary Report</h3>
             <p>Total Products: {stockSummary.length} | Total Units: {summaryStats.totalUnits}</p>
+            <div className="reports-table-wrap">
             <table className="reports-table">
               <thead>
                 <tr>
@@ -234,22 +235,25 @@ export default function Reports() {
                 </tr>
               </thead>
               <tbody>
-                {stockSummary.map((item) => (
+                {stockSummary.length === 0 ? (
+                  <tr><td colSpan={10} className="reports-empty">No stock records match this category.</td></tr>
+                ) : stockSummary.map((item) => (
                   <tr key={item.refNo}>
-                    <td>{item.refNo}</td>
-                    <td>{item.productName}</td>
-                    <td><span className="category-tag">{item.category}</span></td>
-                    <td>{item.company}</td>
-                    <td>{item.lotNo}</td>
-                    <td>{item.freshCount}</td>
-                    <td>{item.returnedCount}</td>
-                    <td><strong>{item.totalQuantity}</strong></td>
-                    <td>{item.location}</td>
-                    <td>{item.threshold}</td>
+                    <td data-label="Ref No">{item.refNo}</td>
+                    <td data-label="Product">{item.productName}</td>
+                    <td data-label="Category"><span className="category-tag">{item.category}</span></td>
+                    <td data-label="Company">{item.company}</td>
+                    <td data-label="Lot No">{item.lotNo}</td>
+                    <td data-label="Fresh">{item.freshCount}</td>
+                    <td data-label="Returned">{item.returnedCount}</td>
+                    <td data-label="Total"><strong>{item.totalQuantity}</strong></td>
+                    <td data-label="Location">{item.location}</td>
+                    <td data-label="Threshold">{item.threshold}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </>
         );
 
@@ -258,6 +262,7 @@ export default function Reports() {
           <>
             <h3>Issued Items Report</h3>
             <p>Total Issued: {issuedData.length} items</p>
+            <div className="reports-table-wrap">
             <table className="reports-table">
               <thead>
                 <tr>
@@ -270,18 +275,21 @@ export default function Reports() {
                 </tr>
               </thead>
               <tbody>
-                {issuedData.map((item) => (
+                {issuedData.length === 0 ? (
+                  <tr><td colSpan={6} className="reports-empty">No issued items found for this period.</td></tr>
+                ) : issuedData.map((item) => (
                   <tr key={item.issueId}>
-                    <td>{item.issueId}</td>
-                    <td>{item.student || item.studentName}</td>
-                    <td>{item.product || item.productName}</td>
-                    <td>{item.unitId || item.inventoryId || "—"}</td>
-                    <td>{formatDate(item.issueDate || item.date || item.issuedDate)}</td>
-                    <td><span className="status-badge active">Active</span></td>
+                    <td data-label="Issue ID">{item.issueId}</td>
+                    <td data-label="Student">{item.student || item.studentName}</td>
+                    <td data-label="Product">{item.product || item.productName}</td>
+                    <td data-label="Unit ID">{item.unitId || item.inventoryId || "—"}</td>
+                    <td data-label="Issue Date">{formatDate(item.issueDate || item.date || item.issuedDate)}</td>
+                    <td data-label="Status"><span className="status-badge active">Active</span></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </>
         );
 
@@ -290,6 +298,7 @@ export default function Reports() {
           <>
             <h3>Returned Items Report</h3>
             <p>Total Returned: {returnedData.length} items</p>
+            <div className="reports-table-wrap">
             <table className="reports-table">
               <thead>
                 <tr>
@@ -303,19 +312,22 @@ export default function Reports() {
                 </tr>
               </thead>
               <tbody>
-                {returnedData.map((item) => (
+                {returnedData.length === 0 ? (
+                  <tr><td colSpan={7} className="reports-empty">No returned items found for this period.</td></tr>
+                ) : returnedData.map((item) => (
                   <tr key={item.issueId}>
-                    <td>{item.issueId}</td>
-                    <td>{item.student || item.studentName}</td>
-                    <td>{item.product || item.productName}</td>
-                    <td>{item.unitId || item.inventoryId || "—"}</td>
-                    <td>{formatDate(item.returnDate || item.date)}</td>
-                    <td>{item.returnCondition || "Good"}</td>
-                    <td><span className="status-badge returned">Returned</span></td>
+                    <td data-label="Issue ID">{item.issueId}</td>
+                    <td data-label="Student">{item.student || item.studentName}</td>
+                    <td data-label="Product">{item.product || item.productName}</td>
+                    <td data-label="Unit ID">{item.unitId || item.inventoryId || "—"}</td>
+                    <td data-label="Return Date">{formatDate(item.returnDate || item.date)}</td>
+                    <td data-label="Condition">{item.returnCondition || "Good"}</td>
+                    <td data-label="Status"><span className="status-badge returned">Returned</span></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </>
         );
 

@@ -307,7 +307,7 @@ export default function ArchiveStudents() {
                     
                     return (
                       <tr key={student.campusId} className={hasPending ? "archive-students__row--pending" : ""}>
-                        <td>
+                        <td data-label="Select">
                           <button
                             className="archive-students__checkbox-btn"
                             onClick={() => handleSelectStudent(student.campusId, hasPending)}
@@ -320,13 +320,13 @@ export default function ArchiveStudents() {
                             )}
                           </button>
                         </td>
-                        <td className="archive-students__mono">{student.campusId}</td>
-                        <td className="archive-students__strong">{student.name}</td>
-                        <td>{student.course || "—"}</td>
-                        <td>
+                        <td data-label="Campus ID" className="archive-students__mono">{student.campusId}</td>
+                        <td data-label="Name" className="archive-students__strong">{student.name}</td>
+                        <td data-label="Course">{student.course || "—"}</td>
+                        <td data-label="Batch">
                           <span className="archive-students__batch-tag">{student.batch || "—"}</span>
                         </td>
-                        <td>
+                        <td data-label="Pending returns">
                           {hasPending ? (
                             <span className="archive-students__pending-badge">
                               <Package size={12} />
@@ -336,7 +336,7 @@ export default function ArchiveStudents() {
                             <span className="archive-students__no-pending">✅ Clear</span>
                           )}
                         </td>
-                        <td>
+                        <td data-label="Status">
                           <span className={`archive-students__status-badge ${student.status === 'active' ? 'active' : 'archived'}`}>
                             {student.status || 'active'}
                           </span>

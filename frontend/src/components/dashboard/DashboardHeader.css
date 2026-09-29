@@ -18,6 +18,7 @@
   color: var(--ink);
   padding: 6px;
   cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .dash-header h1 {
@@ -27,6 +28,7 @@
   margin: 0;
   color: var(--ink);
   white-space: nowrap;
+  min-width: 0;
 }
 
 .dash-header__pills {
@@ -75,6 +77,29 @@
 
   .dash-pill {
     padding: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header {
+    gap: 8px;
+    padding: 12px;
+    min-width: 0;
+  }
+
+  .dash-header h1 {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 19px;
+  }
+
+  .dash-header__pills {
+    display: none;
+  }
+
+  .notif {
+    flex: 0 0 auto;
   }
 }
 
