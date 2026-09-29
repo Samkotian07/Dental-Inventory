@@ -53,11 +53,8 @@ export default function Stock() {
 
   const {
     stock: rows,
-    updateStockItem,
-    deleteStockItem,
-    moveStockToFailed,
-    toggleStockStatus,
-    getInventoryId,
+    moveToFailed,
+    getLotsForRef,
   } = useInventory();
 
   const [query, setQuery] = useState("");
@@ -169,110 +166,62 @@ export default function Stock() {
   };
 
   const handleSaveEdit = async (refNo, patch) => {
-    const productUnits = getProductUnits(refNo);
-    if (productUnits.length === 0) {
-      toast.error("Product not found");
-      return;
-    }
-
-    let successCount = 0;
-    for (const unit of productUnits) {
-      const result = await updateStockItem(unit.id, {
-        product_name: patch.product,
-        category: patch.category,
-        company_name: patch.company,
-        size: patch.size,
-        lot_no: patch.lotNo,
-        quantity: Number(patch.qty),
-        expiry_date: patch.expiry,
-      });
-      if (result.success) successCount++;
-    }
-
-    if (successCount > 0) {
-      toast.success("Stock item updated successfully");
-    } else {
-      toast.error("Failed to update item");
-    }
+    toast.info("Stock editing coming soon");
     setEditItem(null);
   };
 
   const handleConfirmDelete = async (refNo, options) => {
-    const productUnits = getProductUnits(refNo);
-    if (productUnits.length === 0) {
-      toast.error("Product not found");
+    const qtyRequested = Number(options?.quantity ?? 1);
+    const reason = options?.reason || "Damaged";
+
+    let failureType = "damaged";
+    const rLower = reason.toLowerCase();
+    if (rLower.includes("expire")) failureType = "expired";
+    else if (rLower.includes("qualit")) failureType = "quality_fail";
+    else if (rLower.includes("condemn")) failureType = "condemned";
+
+    let lots = await getLotsForRef(refNo);
+    if (!lots || lots.length === 0) {
+      const match = rows.find(r => (r.refNo || r.id) === refNo);
+      if (match?.lotId) {
+        lots = [{ lotId: match.lotId, qtyAvailable: match.quantity || match.qty || 1 }];
+      }
+    }
+
+    if (!lots || lots.length === 0) {
+      toast.error("No active lots found for this product to move to failed");
+      setDeleteItem(null);
       return;
     }
 
-    const qtyRequested = options?.quantity ?? 1;
+    let remainingToMove = qtyRequested;
+    let successCount = 0;
 
-    if (options?.moveToFailed) {
-      let remainingToMove = qtyRequested;
-      let successCount = 0;
+    for (const lot of lots) {
+      if (remainingToMove <= 0) break;
+      const lotQty = Number(lot.qtyAvailable ?? lot.quantity ?? 0);
+      if (lotQty <= 0) continue;
+      const moveQty = Math.min(lotQty, remainingToMove);
 
-      for (const unit of productUnits) {
-        if (remainingToMove <= 0) break;
-        const unitQty = Number(unit.quantity ?? unit.qty ?? 1);
-        const moveQty = Math.min(unitQty, remainingToMove);
+      const result = await moveToFailed({
+        lotId: lot.lotId,
+        quantity: moveQty,
+        failureType,
+        failureReason: reason,
+      });
 
-        const result = await moveStockToFailed(unit.id, options.reason, moveQty, unit);
-        if (result.success) {
-          successCount += moveQty;
-          remainingToMove -= moveQty;
-        }
+      if (result.success) {
+        successCount += moveQty;
+        remainingToMove -= moveQty;
       }
+    }
 
-      if (successCount > 0) {
-        toast.success(`Moved ${successCount} unit(s) to Failed Inventory`);
-      } else {
-        toast.error("Failed to move item(s) to Failed Inventory");
-      }
+    if (successCount > 0) {
+      toast.success(`Moved ${successCount} unit(s) to Failed Inventory`);
     } else {
-      let remainingToDelete = qtyRequested;
-      let successCount = 0;
-
-      for (const unit of productUnits) {
-        if (remainingToDelete <= 0) break;
-        const unitQty = Number(unit.quantity ?? unit.qty ?? 1);
-
-        if (unitQty > remainingToDelete) {
-          const newQty = unitQty - remainingToDelete;
-          const result = await updateStockItem(unit.id, { quantity: newQty });
-          if (result.success) {
-            successCount += remainingToDelete;
-            remainingToDelete = 0;
-          }
-        } else {
-          const result = await deleteStockItem(unit.id);
-          if (result.success) {
-            successCount += unitQty;
-            remainingToDelete -= unitQty;
-          }
-        }
-      }
-
-      if (successCount > 0) {
-        toast.success(`Deleted ${successCount} unit(s) from stock`);
-      } else {
-        toast.error("Failed to delete stock items");
-      }
+      toast.error("Failed to move item(s) to Failed Inventory");
     }
     setDeleteItem(null);
-  };
-
-  const handleToggleStatus = async (row) => {
-    const targetKey = row.refNo || row.id;
-    const productUnits = getProductUnits(targetKey);
-    let successCount = 0;
-    for (const unit of productUnits) {
-      const result = await toggleStockStatus(unit.id);
-      if (result.success) successCount++;
-    }
-    if (successCount > 0) {
-      toast.success(`Status updated for ${row.product} (${successCount} unit(s))`);
-    } else {
-      toast.error("Failed to update status");
-    }
   };
 
   const columns = [
@@ -414,8 +363,8 @@ export default function Stock() {
                             <button
                               className="stock__icon-btn stock__icon-btn--danger"
                               onClick={() => setDeleteItem(row)}
-                              aria-label={`Delete ${row.refNo}`}
-                              title="Delete item"
+                              aria-label={`Move ${row.refNo} to failed`}
+                              title="Move to Failed"
                             >
                               <Trash2 size={16} strokeWidth={2} />
                             </button>

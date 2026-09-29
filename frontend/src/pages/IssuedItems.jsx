@@ -54,7 +54,7 @@ export default function IssuedItems() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const canWrite = user?.role !== 'readonly';
-  const { issuedItems, issueItem, returnIssuedItem, condemnIssuedItem, stock, batchIssueItems, exchangeWithVendor } = useInventory();
+  const { issues: issuedItems, issueFreshUnit, issueReturnedUnit, returnUnit, condemnUnit, exchangeWithVendor, stock } = useInventory();
   const { students } = useData();
 
   const [query, setQuery] = useState("");
@@ -142,9 +142,8 @@ export default function IssuedItems() {
     );
   };
 
-  // ⭐ UPDATED: Return handler with QR data
   const handleConfirmReturn = async (issueId, returnDateISO, condition = "Good") => {
-    const result = await returnIssuedItem(issueId, returnDateISO, condition);
+    const result = await returnUnit(issueId, condition);
     if (result.success) {
       toast.success("Item returned to inventory successfully");
       
@@ -174,7 +173,7 @@ export default function IssuedItems() {
   };
 
   const handleCondemn = async (issueId, returnDate, reason) => {
-    const result = await condemnIssuedItem(issueId);
+    const result = await condemnUnit(issueId, reason || "Damaged");
     if (result.success) {
       toast.success(`Item condemned: ${reason || "Discarded"}`);
       setReturnItem(null);
@@ -195,52 +194,35 @@ export default function IssuedItems() {
     }
   };
 
-  const handleIssueNew = async ({ studentId, refNo, qty, unitIds, lotNo, stockType }) => {
-    console.log("🔍 IssueNew called with:", { studentId, refNo, qty, unitIds, lotNo, stockType });
-    
+  const handleIssueNew = async ({ studentId, refNo, lotId, qty, unitIds, stockType }) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) {
       toast.error("Student not found");
       return;
     }
-    
-    if (unitIds && unitIds.length > 1) {
-      const items = unitIds.map(unitId => ({
-        student_id: studentId,
-        unit_id: unitId,
-        ref_no: refNo,
-        issue_date: new Date().toISOString().slice(0, 10),
-      }));
-      
-      const result = await batchIssueItems({ items });
-      if (result.success) {
-        toast.success(result.data?.message || `Issued ${result.data?.total || qty} unit(s) to ${student?.name || studentId}`);
-        setIssueModalOpen(false);
-        setPage(1);
-        return;
-      } else {
-        toast.error(result.message || "Failed to issue items");
+
+    let result;
+    if (stockType === "returned" && unitIds?.length > 0) {
+      result = await issueReturnedUnit({
+        studentId,
+        unitSerial: unitIds[0],
+        issueDate: new Date().toISOString().slice(0, 10),
+      });
+    } else {
+      if (!lotId) {
+        toast.error("Please select a lot to issue from");
         return;
       }
+      result = await issueFreshUnit({
+        studentId,
+        refNo,
+        lotId,
+        issueDate: new Date().toISOString().slice(0, 10),
+      });
     }
-    
-    const targetId = unitIds?.[0] || refNo;
-    console.log("🔍 Issuing single unit:", { studentId, targetId, refNo, qty });
-    
-    const result = await issueItem({
-      studentId,
-      inventoryId: targetId,
-      unitId: targetId,
-      refNo,
-      qty: Number(qty),
-      issueDate: new Date().toISOString().slice(0, 10),
-      stockType: stockType || "fresh",
-    });
-
-    console.log("🔍 Issue result:", result);
 
     if (result.success) {
-      toast.success(result.message || `Issued ${qty} unit(s) to ${student?.name || studentId}`);
+      toast.success(`Issued to ${student?.name || studentId}`);
       setIssueModalOpen(false);
       setPage(1);
     } else {

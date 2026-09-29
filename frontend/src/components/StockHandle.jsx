@@ -17,7 +17,7 @@ const PAGE_SIZE = 8;
 export default function StockHandle() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { stock, fetchStock, updateStockItem, toggleStockStatus, getInventoryId, issuedItems } = useInventory();
+  const { stock, fetchStock, issues } = useInventory();
   const [searchRef, setSearchRef] = useState("");
   const [foundItem, setFoundItem] = useState(null);
   const [search, setSearch] = useState("");
@@ -80,43 +80,14 @@ export default function StockHandle() {
     }
   };
 
-  // ⭐ Toggle status for a specific unit
-  const handleToggleUnitStatus = async (unitId, refNo) => {
-    const result = await toggleStockStatus(unitId);
-    if (result.success) {
-      toast.success(`Unit ${unitId} status updated`);
-      const updatedStock = await fetchStock();
-      if (foundItem && foundItem.refNo === refNo) {
-        const updatedUnit = (updatedStock || []).find(s => s.id === unitId);
-        if (updatedUnit) {
-          const updatedUnits = foundItem.units.map(u => 
-            u.id === unitId ? { ...u, status: updatedUnit.status } : u
-          );
-          setFoundItem({ 
-            ...foundItem, 
-            units: updatedUnits, 
-            status: updatedUnit.status 
-          });
-        }
-      }
-    } else {
-      toast.error(result.message || "Failed to update status");
-    }
+  // ⭐ Toggle unit — coming soon
+  const handleToggleUnitStatus = async (unitId) => {
+    toast.info("Status toggling coming soon");
   };
 
-  // ⭐ Toggle all units
-  const handleToggleAllUnits = async (refNo, currentStatus) => {
-    const targetStatus = currentStatus === "inactive" ? "active" : "inactive";
-    const result = await toggleStockStatus(refNo, targetStatus);
-    if (result.success) {
-      toast.success(`All units for ${refNo} set to ${targetStatus}`);
-      await fetchStock();
-      if (foundItem && foundItem.refNo === refNo) {
-        setFoundItem({ ...foundItem, status: targetStatus });
-      }
-    } else {
-      toast.error(result.message || "Failed to update status");
-    }
+  // ⭐ Toggle all units — coming soon
+  const handleToggleAllUnits = async (refNo) => {
+    toast.info("Status toggling coming soon");
   };
 
   const filtered = useMemo(() => {
@@ -135,10 +106,11 @@ export default function StockHandle() {
     currentPage * PAGE_SIZE,
   );
 
-  // ⭐ Get unit history
+  // ⭐ Get unit history from flattened issues
   const getUnitHistory = (unitId) => {
-    return (issuedItems || [])
-      .filter(i => i.unitId === unitId)
+    return (issues || [])
+      .flatMap(issue => (issue.units || []).map(u => ({ ...u, student: issue.student, issueDate: issue.issueDate })))
+      .filter(u => u.unitSerial === unitId || u.unitId === unitId || u.id === unitId)
       .sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
   };
 
