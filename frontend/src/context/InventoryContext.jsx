@@ -38,7 +38,12 @@ function normalizeStock(item) {
     stockStatus: item.stockStatus || "OK",
     freshLocation: item.freshLocation || "",
     returnedLocation: item.returnedLocation || "",
+    lotNo: item.lotNo || item.lot_no || "",
+    expiry: item.expiry || item.expiryDate || item.expiry_date || "",
+    size: item.size || item.groupSize || "",
     lowStockThreshold: item.lowStockThreshold ?? 10,
+    isActive: item.isActive !== undefined ? Boolean(item.isActive) : (item.is_active !== undefined ? Boolean(item.is_active) : (item.status !== "inactive")),
+    status: (item.isActive === false || item.is_active === 0 || item.status === "inactive") ? "inactive" : "active",
   };
 }
 
@@ -78,10 +83,21 @@ function normalizeIssuedUnit(item) {
   };
 }
 
+function mapIssueStatus(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "issued" || s === "active") return "Active";
+  if (s.includes("return")) return "Returned";
+  if (s === "condemned") return "Condemned";
+  if (s === "awaiting_vendor" || s === "exchanged" || s === "credited" || s.includes("vendor")) return "Vendor Exchange";
+  return "Active";
+}
+
 function normalizeIssue(item) {
   // item is an issue_events row with nested units[]
   const units = (item.units || []).map(normalizeIssuedUnit);
+  const first = units[0] || {};
   return {
+    id: item.issueId || item.issue_id,
     issueId: item.issueId || item.issue_id,
     studentId: item.studentId || item.student_id,
     student: item.studentName || item.student_name || "Student",
@@ -91,6 +107,21 @@ function normalizeIssue(item) {
     remarks: item.remarks || "",
     overallStatus: item.overallStatus || "issued",
     createdAt: item.createdAt || item.created_at,
+    // Flattened convenience fields for UI display & actions:
+    product: first.product || first.productName || item.product || item.productName || "Product",
+    productName: first.productName || first.product || item.productName || item.product || "Product",
+    lotNo: first.lotNo || item.lotNo || "",
+    refNo: first.refNo || item.refNo || "",
+    unitId: first.unitId || item.unitId || "",
+    unitSerial: first.unitId || item.unitId || "",
+    category: first.category || "",
+    isImplantAbutment: Boolean(first.isImplantAbutment),
+    qty: units.length || 1,
+    quantity: units.length || 1,
+    date: item.issueDate || item.issue_date,
+    returnDate: first.returnedDate || item.returnedDate || item.returnDate || null,
+    returnedDate: first.returnedDate || item.returnedDate || item.returnDate || null,
+    status: mapIssueStatus(first.status || item.overallStatus || "Active"),
     units,
   };
 }
@@ -129,13 +160,18 @@ function normalizeFailed(item) {
     category: item.category || "",
     vendorName: item.vendorName || item.vendor_name || "",
     quantity: Number(item.quantity ?? 0),
+    qty: Number(item.quantity ?? 0),
     failureType: item.failureType || item.failure_type,
     failureReason: item.failureReason || item.failure_reason,
+    reason: item.reason || item.failureReason || item.failure_reason || item.failureType || item.failure_type || "Damaged",
     status: item.status || "pending",
     movedBy: item.movedBy || item.moved_by,
     restoredLotId: item.restoredLotId || item.restored_lot_id,
     vendorReturnId: item.vendorReturnId || item.vendor_return_id,
     createdAt: item.createdAt || item.created_at,
+    updatedAt: item.updatedAt || item.updated_at || "",
+    date: item.updatedAt || item.updated_at || item.createdAt || item.created_at || "",
+    failedDate: item.updatedAt || item.updated_at || item.createdAt || item.created_at || "",
   };
 }
 
@@ -547,12 +583,49 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  const toggleStockStatus = async (refNo, targetStatus) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/${encodeURIComponent(refNo)}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: targetStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.message || "Failed to update status" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const updateStockQuantity = async (refNo, newQuantity, reason) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/${encodeURIComponent(refNo)}/quantity`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ new_quantity: Number(newQuantity), reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.message || "Update failed" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
   // ---------- CONTEXT VALUE ----------
 
   const value = {
     stock,
     failed,
     issues,
+    issuedItems: issues,
     returns,
     loading,
     fetchStock,
@@ -576,6 +649,8 @@ export function InventoryProvider({ children }) {
     deleteReturn,
     receiveStock,
     bulkReceiveStock,
+    toggleStockStatus,
+    updateStockQuantity,
   };
 
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;

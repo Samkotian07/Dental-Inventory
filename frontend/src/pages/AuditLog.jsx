@@ -31,6 +31,9 @@ function renderDetails(details) {
   if (typeof details === "string") return details;
   if (typeof details === "object") {
     if (typeof details.message === "string") return details.message;
+    if (details.batch && details.new_status) {
+      return `Batch ${details.batch}: status changed to ${details.new_status}`;
+    }
     try {
       return JSON.stringify(details);
     } catch {

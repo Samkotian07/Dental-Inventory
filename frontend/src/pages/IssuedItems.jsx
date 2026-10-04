@@ -96,7 +96,13 @@ export default function IssuedItems() {
     }
 
     let list = (issuedItems || []).filter((r) => {
-      const matchesStatus = status === "All Status" || r.status === status;
+      const matchesStatus =
+        status === "All Status" ||
+        r.status === status ||
+        (status === "Active" && (r.status === "Active" || r.overallStatus === "issued")) ||
+        (status === "Returned" && (r.status === "Returned" || r.overallStatus === "returned")) ||
+        (status === "Condemned" && (r.status === "Condemned" || r.overallStatus === "condemned")) ||
+        (status === "Vendor Exchange" && (r.status === "Vendor Exchange" || r.overallStatus === "vendor_return"));
       const matchesQuery =
         !q ||
         (r.student || "").toLowerCase().includes(q) ||

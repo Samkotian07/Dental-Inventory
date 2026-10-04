@@ -10,7 +10,7 @@ function formatDate(iso) {
 }
 
 export default function StudentHistoryModal({ student, onClose }) {
-  const { issuedItems = [] } = useInventory();
+  const { issues = [], issuedItems = issues } = useInventory();
 
   const history = useMemo(() => {
     if (!student) return [];

@@ -17,25 +17,28 @@ def _call_procedure(proc_name, in_params, out_param_count):
     conn = db.get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.callproc(proc_name, in_params)
+        call_params = list(in_params) + [''] * out_param_count
+        res = cursor.callproc(proc_name, call_params)
         conn.commit()
         results = []
         for r in cursor.stored_results():
             results.extend(r.fetchall() or [])
         out_values = []
-        if out_param_count:
-            placeholders = ", ".join(
-                [f"@_{proc_name}_{i}" for i in range(len(in_params), len(in_params) + out_param_count)]
-            )
-            out_cursor = conn.cursor(dictionary=True)
-            out_cursor.execute(f"SELECT {placeholders}")
-            row = out_cursor.fetchone()
-            out_cursor.close()
-            if row:
-                out_values = list(row.values())
+        if out_param_count and res:
+            if isinstance(res, dict):
+                out_values = list(res.values())[-out_param_count:]
+            elif isinstance(res, (list, tuple)):
+                out_values = list(res)[-out_param_count:]
         return results, out_values
     finally:
-        cursor.close()
+        try:
+            cursor.close()
+        except:
+            pass
+        try:
+            conn.close()
+        except:
+            pass
 
 
 # ---------- Read endpoints ----------

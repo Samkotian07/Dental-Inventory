@@ -123,6 +123,13 @@
   border-color: var(--accent-deep);
 }
 
+.modal__field-hint {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
 .modal__actions {
   display: flex;
   justify-content: flex-end;

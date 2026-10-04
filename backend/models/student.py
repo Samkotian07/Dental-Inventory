@@ -36,6 +36,8 @@ class Student:
         self.course = data.get('course')
         self.batch = data.get('batch')
         self.status = data.get('status', 'active')
+        self.pending_return_count = int(data.get('pending_return_count') or 0)
+        self.has_pending_returns = self.pending_return_count > 0
         self.added_date = data.get('added_date')
         self.created_at = data.get('created_at')
         self.updated_at = data.get('updated_at')
@@ -47,10 +49,21 @@ class Student:
     @classmethod
     def find_all(cls, active_only=False):
         db = cls.get_db()
-        query = "SELECT * FROM students"
+        query = """
+            SELECT s.*, COALESCE(p.pending_cnt, 0) AS pending_return_count
+            FROM students s
+            LEFT JOIN (
+              SELECT e.student_id, COUNT(*) AS pending_cnt
+              FROM issued_units u
+              JOIN issue_events e ON e.issue_id = u.issue_id
+              WHERE u.is_implant_abutment = 0
+                AND u.status IN ('issued', 'awaiting_vendor')
+              GROUP BY e.student_id
+            ) p ON p.student_id = s.campus_id
+        """
         if active_only:
-            query += " WHERE status = 'active'"
-        query += " ORDER BY created_at DESC"
+            query += " WHERE s.status = 'active'"
+        query += " ORDER BY s.created_at DESC"
         result = db.execute_query(query)
         return [cls(row) for row in result]
     
@@ -68,10 +81,20 @@ class Student:
     @classmethod
     def find_by_batch(cls, batch):
         db = cls.get_db()
-        results = db.execute_query(
-            "SELECT * FROM students WHERE batch = %s",
-            (batch,)
-        )
+        results = db.execute_query("""
+            SELECT s.*, COALESCE(p.pending_cnt, 0) AS pending_return_count
+            FROM students s
+            LEFT JOIN (
+              SELECT e.student_id, COUNT(*) AS pending_cnt
+              FROM issued_units u
+              JOIN issue_events e ON e.issue_id = u.issue_id
+              WHERE u.is_implant_abutment = 0
+                AND u.status IN ('issued', 'awaiting_vendor')
+              GROUP BY e.student_id
+            ) p ON p.student_id = s.campus_id
+            WHERE s.batch = %s
+            ORDER BY s.name
+        """, (batch,))
         return [cls(row) for row in results]
 
     @classmethod
@@ -79,9 +102,18 @@ class Student:
         db = cls.get_db()
         pattern = f"%{query_str}%"
         result = db.execute_query("""
-            SELECT * FROM students 
-            WHERE name LIKE %s OR campus_id LIKE %s OR course LIKE %s OR email LIKE %s
-            ORDER BY name
+            SELECT s.*, COALESCE(p.pending_cnt, 0) AS pending_return_count
+            FROM students s
+            LEFT JOIN (
+              SELECT e.student_id, COUNT(*) AS pending_cnt
+              FROM issued_units u
+              JOIN issue_events e ON e.issue_id = u.issue_id
+              WHERE u.is_implant_abutment = 0
+                AND u.status IN ('issued', 'awaiting_vendor')
+              GROUP BY e.student_id
+            ) p ON p.student_id = s.campus_id
+            WHERE s.name LIKE %s OR s.campus_id LIKE %s OR s.course LIKE %s OR s.email LIKE %s
+            ORDER BY s.name
         """, (pattern, pattern, pattern, pattern))
         return [cls(row) for row in result]
     
@@ -203,7 +235,14 @@ class Student:
                 'students_with_pending_returns': result.get('students_with_pending_returns', 0)
             }
         finally:
-            cursor.close()
+            try:
+                cursor.close()
+            except:
+                pass
+            try:
+                conn.close()
+            except:
+                pass
     
     def to_dict(self):
         created_val = self.created_at.isoformat() if hasattr(self.created_at, 'isoformat') else (str(self.created_at) if self.created_at else None)
@@ -217,6 +256,8 @@ class Student:
             'course': self.course,
             'batch': self.batch,
             'status': self.status,
+            'pendingReturnCount': self.pending_return_count,
+            'hasPendingReturns': self.has_pending_returns,
             'addedDate': str(self.added_date) if self.added_date else None,
             'createdAt': created_val,
             'updatedAt': updated_val

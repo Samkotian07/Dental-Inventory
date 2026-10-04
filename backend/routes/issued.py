@@ -19,25 +19,43 @@ def _call_procedure(proc_name, in_params, out_param_count):
     conn = db.get_connection()
     cursor = conn.cursor(dictionary=True)
     try:
-        cursor.callproc(proc_name, in_params)
+        call_params = list(in_params) + [''] * out_param_count
+        res = cursor.callproc(proc_name, call_params)
         conn.commit()
         # fetch result sets
         results = []
         for r in cursor.stored_results():
             results.extend(r.fetchall() or [])
-        # fetch OUT params
+        # fetch OUT params directly from callproc return value
         out_values = []
-        if out_param_count:
-            placeholders = ", ".join([f"@_{proc_name}_{i}" for i in range(len(in_params), len(in_params) + out_param_count)])
-            out_cursor = conn.cursor(dictionary=True)
-            out_cursor.execute(f"SELECT {placeholders}")
-            row = out_cursor.fetchone()
-            out_cursor.close()
-            if row:
-                out_values = list(row.values())
+        if out_param_count and res:
+            if isinstance(res, dict):
+                out_values = list(res.values())[-out_param_count:]
+            elif isinstance(res, (list, tuple)):
+                out_values = list(res)[-out_param_count:]
         return results, out_values
     finally:
-        cursor.close()
+        try:
+            cursor.close()
+        except:
+            pass
+        try:
+            conn.close()
+        except:
+            pass
+
+
+def _resolve_unit_serial(identifier):
+    """If identifier is an issue_id or not found by serial, look up by issue_id."""
+    if not identifier:
+        return identifier
+    unit = IssuedUnit.find_by_serial(identifier)
+    if not unit:
+        units = IssuedUnit.find_by_issue_id(identifier)
+        if units:
+            return units[0].unit_serial
+    return identifier
+
 
 
 # ---------- Read endpoints ----------
@@ -96,6 +114,9 @@ def issue_unit():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
+    if not issue_id:
+        return jsonify({'success': False, 'message': 'Issue failed. Verify lot is open and has stock.'}), 400
+
     AuditLog.create(
         action='ISSUE',
         entity_type='ISSUED',
@@ -121,6 +142,8 @@ def issue_returned_unit():
     if not unit_serial or not student_id:
         return jsonify({'success': False, 'message': 'unit_serial and student_id required'}), 400
 
+    unit_serial = _resolve_unit_serial(unit_serial)
+
     student = Student.find_by_id(student_id)
     if not student:
         return jsonify({'success': False, 'message': 'Student not found'}), 404
@@ -138,6 +161,9 @@ def issue_returned_unit():
         issue_id = outs[0]
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
+
+    if not issue_id:
+        return jsonify({'success': False, 'message': 'Reissue failed.'}), 400
 
     AuditLog.create(
         action='REISSUE',
@@ -157,6 +183,7 @@ def issue_returned_unit():
 @issued_bp.route('/<unit_serial>/return', methods=['POST'])
 @token_required
 def return_unit(unit_serial):
+    unit_serial = _resolve_unit_serial(unit_serial)
     data = request.get_json() or {}
     condition = data.get('condition', 'Good')
     return_date = data.get('return_date') or date.today().isoformat()
@@ -196,6 +223,7 @@ def return_unit(unit_serial):
 @issued_bp.route('/<unit_serial>/exchange', methods=['POST'])
 @token_required
 def exchange_unit(unit_serial):
+    unit_serial = _resolve_unit_serial(unit_serial)
     data = request.get_json() or {}
     return_date = data.get('return_date') or date.today().isoformat()
     reason = data.get('reason') or 'Defective'
@@ -239,6 +267,7 @@ def exchange_unit(unit_serial):
 @token_required
 @admin_required
 def condemn_unit(unit_serial):
+    unit_serial = _resolve_unit_serial(unit_serial)
     data = request.get_json() or {}
     reason = data.get('reason') or 'Damaged'
 
@@ -271,6 +300,7 @@ def condemn_unit(unit_serial):
 @issued_bp.route('/<unit_serial>/used-in-patient', methods=['POST'])
 @token_required
 def mark_used_in_patient(unit_serial):
+    unit_serial = _resolve_unit_serial(unit_serial)
     user = getattr(request, 'current_user', None)
     user_name = user.name if user else 'Admin'
 

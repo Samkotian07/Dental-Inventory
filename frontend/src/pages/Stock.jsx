@@ -55,6 +55,7 @@ export default function Stock() {
     stock: rows,
     moveToFailed,
     getLotsForRef,
+    updateStockQuantity,
   } = useInventory();
 
   const [query, setQuery] = useState("");
@@ -100,6 +101,7 @@ export default function Stock() {
         (r.product || "").toLowerCase().includes(q) ||
         (r.company || "").toLowerCase().includes(q) ||
         (r.refNo || "").toLowerCase().includes(q) ||
+        (r.size || "").toLowerCase().includes(q) ||
         (r.lotNo || "").toLowerCase().includes(q);
       return matchesCategory && matchesQuery;
     });
@@ -166,8 +168,22 @@ export default function Stock() {
   };
 
   const handleSaveEdit = async (refNo, patch) => {
-    toast.info("Stock editing coming soon");
-    setEditItem(null);
+    const newQty = Number(patch.qty);
+    if (!newQty || newQty < 1) {
+      toast.error("Quantity must be at least 1");
+      return;
+    }
+    if (!patch.reason || !patch.reason.trim()) {
+      toast.error("Reason is required");
+      return;
+    }
+    const result = await updateStockQuantity(refNo, newQty, patch.reason.trim());
+    if (result.success) {
+      toast.success(result.data?.delta === 0 ? "No change" : `Quantity updated to ${newQty}`);
+      setEditItem(null);
+    } else {
+      toast.error(result.message || "Failed to update quantity");
+    }
   };
 
   const handleConfirmDelete = async (refNo, options) => {
@@ -316,7 +332,10 @@ export default function Stock() {
                 )}
 
                 {pageRows.map((row) => (
-                  <tr key={row.refNo || row.id}>
+                  <tr
+                    key={row.refNo || row.id}
+                    className={row.status === "inactive" || row.isActive === false ? "stock__row--inactive" : ""}
+                  >
                     <td className="stock__mono">{row.refNo}</td>
                     <td>
                       <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>
@@ -325,7 +344,7 @@ export default function Stock() {
                     </td>
                     <td>{row.company}</td>
                     <td className="stock__strong">{row.product}</td>
-                    <td>{row.size}</td>
+                    <td>{row.size || "—"}</td>
                     <td className="stock__mono">{row.lotNo}</td>
                     <td>{row.qty}</td>
                     <td className={isExpiringSoon(row.expiry) ? "stock__expiry-warning" : "stock__expiry"}>
@@ -350,25 +369,25 @@ export default function Stock() {
                         >
                           <Eye size={16} strokeWidth={2} />
                         </button>
+                        {isAdmin && (
+                          <button
+                            className="stock__icon-btn"
+                            onClick={() => setEditItem(row)}
+                            aria-label={`Edit ${row.refNo}`}
+                            title="Edit item"
+                          >
+                            <Pencil size={16} strokeWidth={2} />
+                          </button>
+                        )}
                         {canWrite && (
-                          <>
-                            <button
-                              className="stock__icon-btn"
-                              onClick={() => setEditItem(row)}
-                              aria-label={`Edit ${row.refNo}`}
-                              title="Edit item"
-                            >
-                              <Pencil size={16} strokeWidth={2} />
-                            </button>
-                            <button
-                              className="stock__icon-btn stock__icon-btn--danger"
-                              onClick={() => setDeleteItem(row)}
-                              aria-label={`Move ${row.refNo} to failed`}
-                              title="Move to Failed"
-                            >
-                              <Trash2 size={16} strokeWidth={2} />
-                            </button>
-                          </>
+                          <button
+                            className="stock__icon-btn stock__icon-btn--danger"
+                            onClick={() => setDeleteItem(row)}
+                            aria-label={`Move ${row.refNo} to failed`}
+                            title="Move to Failed"
+                          >
+                            <Trash2 size={16} strokeWidth={2} />
+                          </button>
                         )}
                       </div>
                     </td>

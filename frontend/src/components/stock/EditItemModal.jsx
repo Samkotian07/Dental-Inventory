@@ -1,84 +1,201 @@
 import { useState } from "react";
+import { Package, Plus, Minus, AlertCircle, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import Modal from "./Modal.jsx";
-import { CATEGORIES } from "../utils/constants.js";
+import "./EditItemModal.css";
 
-const editableCategories = CATEGORIES.filter((c) => c !== "All Categories");
+const PRESET_REASONS = [
+  "Physical count correction",
+  "Damaged in storage",
+  "Audit reconciliation",
+  "Shipment adjustment",
+];
 
 export default function EditItemModal({ item, onClose, onSave }) {
   if (!item) return null;
 
-  const [form, setForm] = useState({
-    category: item.category || editableCategories[0],
-    company: item.company || item.companyName || "",
-    product: item.product || item.productName || "",
-    size: item.size || "",
-    lotNo: item.lotNo || "",
-    qty: item.qty ?? item.quantity ?? 1,
-    expiry: item.expiry || item.expiryDate || "",
-  });
+  const currentQty = Number(item?.qty || item?.quantity || 0);
+  const [qty, setQty] = useState(currentQty);
+  const [reason, setReason] = useState("");
 
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const numQty = Number(qty);
+  const unchanged = numQty === currentQty;
+  const canSave = numQty >= 1 && reason.trim().length > 0 && !unchanged;
+  const delta = numQty - currentQty;
+
+  const handleStep = (step) => {
+    setQty((prev) => Math.max(1, (Number(prev) || 0) + step));
+  };
 
   const handleSave = () => {
-    onSave(item.refNo || item.id, { ...form, qty: Number(form.qty) });
+    if (!canSave) return;
+    onSave(item.refNo || item.id, { qty: numQty, reason: reason.trim() });
   };
 
   return (
-    <Modal title="Edit Inventory Item" onClose={onClose} width={520}>
-      <div className="modal__field-row">
-        <div className="modal__field">
-          <label htmlFor="edit-category">Category</label>
-          <select id="edit-category" value={form.category} onChange={set("category")}>
-            {editableCategories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
+    <Modal title="Edit Inventory Item" onClose={onClose} width={540}>
+      <div className="edit-stock">
+        {/* Product Banner */}
+        <div className="edit-stock__banner">
+          <div className="edit-stock__icon">
+            <Package size={22} strokeWidth={2.2} />
+          </div>
+          <div className="edit-stock__info">
+            <h3 className="edit-stock__title">
+              {item.product || item.productName || "Unknown Product"}
+            </h3>
+            <div className="edit-stock__meta-tags">
+              <span className="edit-stock__ref-badge">
+                Ref: {item.refNo || item.id || "—"}
+              </span>
+              {item.category && (
+                <span className={`stock-tag stock-tag--${item.category.toLowerCase()}`}>
+                  {item.category}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Read-only Specs Grid */}
+        <div className="edit-stock__meta-grid">
+          <div className="edit-stock__meta-cell">
+            <span className="edit-stock__meta-label">Company</span>
+            <span className="edit-stock__meta-val">
+              {item.company || item.companyName || "—"}
+            </span>
+          </div>
+
+          <div className="edit-stock__meta-cell">
+            <span className="edit-stock__meta-label">Size</span>
+            <span className="edit-stock__meta-val">
+              {item.size || "—"}
+            </span>
+          </div>
+
+          <div className="edit-stock__meta-cell">
+            <span className="edit-stock__meta-label">Current Stock</span>
+            <span className="edit-stock__meta-val">
+              {currentQty} unit{currentQty === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="edit-stock__meta-cell">
+            <span className="edit-stock__meta-label">Lot Number</span>
+            <span className="edit-stock__meta-val">
+              {item.lotNo || "Standard"}
+            </span>
+          </div>
+        </div>
+
+        {/* Quantity Stepper & Delta Card */}
+        <div className="edit-stock__qty-card">
+          <div className="edit-stock__qty-header">
+            <label className="edit-stock__section-label">
+              New Quantity *
+            </label>
+            {unchanged ? (
+              <span className="edit-stock__delta-badge edit-stock__delta-badge--none">
+                No Change
+              </span>
+            ) : delta > 0 ? (
+              <span className="edit-stock__delta-badge edit-stock__delta-badge--inc">
+                <ArrowUpRight size={12} strokeWidth={2.5} />
+                +{delta} ({currentQty} → {numQty})
+              </span>
+            ) : (
+              <span className="edit-stock__delta-badge edit-stock__delta-badge--dec">
+                <ArrowDownRight size={12} strokeWidth={2.5} />
+                {delta} ({currentQty} → {numQty})
+              </span>
+            )}
+          </div>
+
+          <div className="edit-stock__stepper-row">
+            <div className="edit-stock__stepper">
+              <button
+                type="button"
+                className="edit-stock__stepper-btn"
+                onClick={() => handleStep(-1)}
+                disabled={numQty <= 1}
+                aria-label="Decrease quantity"
+              >
+                <Minus size={15} strokeWidth={2.5} />
+              </button>
+              <input
+                type="number"
+                min="1"
+                className="edit-stock__stepper-input"
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+              />
+              <button
+                type="button"
+                className="edit-stock__stepper-btn"
+                onClick={() => handleStep(1)}
+                aria-label="Increase quantity"
+              >
+                <Plus size={15} strokeWidth={2.5} />
+              </button>
+            </div>
+            <span className="edit-stock__current-note">
+              Currently available in stock: <strong>{currentQty}</strong>
+            </span>
+          </div>
+
+          {unchanged && (
+            <span className="modal__field-hint">
+              Change the quantity to enable save
+            </span>
+          )}
+        </div>
+
+        {/* Reason Card */}
+        <div className="edit-stock__reason-card">
+          <label className="edit-stock__section-label">
+            Reason for Adjustment *
+          </label>
+          <div className="edit-stock__chips">
+            {PRESET_REASONS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`edit-stock__chip ${reason === preset ? "edit-stock__chip--active" : ""}`}
+                onClick={() => setReason(preset)}
+              >
+                {preset}
+              </button>
             ))}
-          </select>
+          </div>
+
+          <textarea
+            className="edit-stock__textarea"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Physical count correction or reason for stock adjustment..."
+            rows={3}
+          />
+
+          {!reason.trim() && (
+            <span className="modal__field-hint">
+              Reason is required
+            </span>
+          )}
         </div>
 
-        <div className="modal__field">
-          <label htmlFor="edit-company">Company Name</label>
-          <input id="edit-company" type="text" value={form.company} onChange={set("company")} />
+        {/* Actions */}
+        <div className="modal__actions">
+          <button type="button" className="modal__btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="modal__btn modal__btn--primary"
+            onClick={handleSave}
+            disabled={!canSave}
+          >
+            Save Changes
+          </button>
         </div>
-      </div>
-
-      <div className="modal__field-row">
-        <div className="modal__field">
-          <label htmlFor="edit-product">Product Name</label>
-          <input id="edit-product" type="text" value={form.product} onChange={set("product")} />
-        </div>
-
-        <div className="modal__field">
-          <label htmlFor="edit-size">Size</label>
-          <input id="edit-size" type="text" value={form.size} onChange={set("size")} />
-        </div>
-      </div>
-
-      <div className="modal__field-row">
-        <div className="modal__field">
-          <label htmlFor="edit-lot">Lot No</label>
-          <input id="edit-lot" type="text" value={form.lotNo} onChange={set("lotNo")} />
-        </div>
-
-        <div className="modal__field">
-          <label htmlFor="edit-qty">Quantity</label>
-          <input id="edit-qty" type="number" min="0" value={form.qty} onChange={set("qty")} />
-        </div>
-      </div>
-
-      <div className="modal__field">
-        <label htmlFor="edit-expiry">Expiry Date</label>
-        <input id="edit-expiry" type="date" value={form.expiry} onChange={set("expiry")} />
-      </div>
-
-      <div className="modal__actions">
-        <button className="modal__btn" onClick={onClose}>
-          Cancel
-        </button>
-        <button className="modal__btn modal__btn--primary" onClick={handleSave}>
-          Save Changes
-        </button>
       </div>
     </Modal>
   );

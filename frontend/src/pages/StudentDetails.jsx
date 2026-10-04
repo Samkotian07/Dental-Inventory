@@ -39,7 +39,7 @@ export default function StudentDetails() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { students, loading, addStudent, updateStudent, deleteStudent, bulkImportStudents } = useData();
-  const { issuedItems = [] } = useInventory();
+  const { issues = [], issuedItems = issues } = useInventory();
 
   const [query, setQuery] = useState("");
   const [searchParams] = useSearchParams();

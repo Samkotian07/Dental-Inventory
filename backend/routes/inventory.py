@@ -105,9 +105,20 @@ def get_products():
 @token_required
 def get_inventory():
     db = StockLot.get_db()
-    rows = db.execute_query("SELECT * FROM v_available_stock ORDER BY product_name")
+    rows = db.execute_query("""
+        SELECT v.*,
+               (SELECT l.lot_no FROM stock_lots l 
+                WHERE l.ref_no = v.ref_no 
+                ORDER BY (l.status = 'open') DESC, l.created_at DESC LIMIT 1) AS lot_no,
+               (SELECT l.expiry_date FROM stock_lots l 
+                WHERE l.ref_no = v.ref_no 
+                ORDER BY (l.status = 'open') DESC, l.created_at DESC LIMIT 1) AS expiry_date
+        FROM v_available_stock v 
+        ORDER BY v.product_name
+    """)
     data = []
     for r in rows:
+        exp = r.get('expiry_date')
         data.append({
             'refNo': r.get('ref_no'),
             'groupCode': r.get('group_code'),
@@ -116,6 +127,8 @@ def get_inventory():
             'category': r.get('category'),
             'company': r.get('company_name'),
             'companyName': r.get('company_name'),
+            'lotNo': r.get('lot_no') or '',
+            'expiry': exp.isoformat() if hasattr(exp, 'isoformat') else (str(exp) if exp else ''),
             'isReturnable': bool(r.get('is_returnable')),
             'freshLocation': r.get('fresh_location'),
             'returnedLocation': r.get('returned_location'),
@@ -127,6 +140,9 @@ def get_inventory():
             'issuedCount': int(r.get('issued_count') or 0),
             'failedCount': int(r.get('failed_count') or 0),
             'stockStatus': r.get('stock_status'),
+            'size': r.get('size') or '',
+            'isActive': bool(r.get('is_active', 1)),
+            'status': 'active' if r.get('is_active', 1) else 'inactive',
         })
     return jsonify({'success': True, 'data': data}), 200
 
@@ -169,6 +185,22 @@ def get_available_lots(ref_no):
     lots = StockLot.find_available_by_ref_no(ref_no)
     return jsonify({'success': True, 'data': [l.to_dict() for l in lots]}), 200
 
+
+# ---------- Toggle product active status ----------
+
+@inventory_bp.route('/<ref_no>/status', methods=['PUT'])
+@token_required
+def toggle_product_status(ref_no):
+    data = request.get_json() or {}
+    target_status = data.get('status')
+    db = StockLot.get_db()
+    if target_status:
+        is_active = 1 if target_status.lower() == 'active' else 0
+        db.execute_query("UPDATE products SET is_active = %s WHERE ref_no = %s", (is_active, ref_no))
+    else:
+        db.execute_query("UPDATE products SET is_active = NOT is_active WHERE ref_no = %s", (ref_no,))
+    return jsonify({'success': True, 'message': f'Status updated for {ref_no}'}), 200
+
 # ---------- Receive single stock ----------
 
 @inventory_bp.route('/receive', methods=['POST'])
@@ -207,7 +239,14 @@ def receive_stock():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
     finally:
-        cursor.close()
+        try:
+            cursor.close()
+        except:
+            pass
+        try:
+            conn.close()
+        except:
+            pass
 
     return jsonify({'success': True, 'message': f'Received {qty} of {ref_no}'}), 201
 
@@ -268,7 +307,15 @@ def bulk_receive_stock():
         except Exception as e:
             errors.append({'row': i + 1, 'error': str(e)})
 
-    cursor.close()
+    try:
+        cursor.close()
+    except:
+        pass
+    try:
+        conn.close()
+    except:
+        pass
+
     return jsonify({
         'success': True,
         'imported': imported,
@@ -352,3 +399,136 @@ def _auto_create_product(data):
             return False
 
     return True
+
+
+# ---------- Update stock quantity (admin only) ----------
+
+@inventory_bp.route('/<ref_no>/quantity', methods=['PUT'])
+@token_required
+@admin_required
+def update_stock_quantity(ref_no):
+    data = request.get_json() or {}
+    new_qty = data.get('new_quantity')
+    reason = (data.get('reason') or '').strip()
+
+    if new_qty is None:
+        return jsonify({'success': False, 'message': 'new_quantity required'}), 400
+    try:
+        new_qty = int(new_qty)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'new_quantity must be a number'}), 400
+
+    if new_qty < 1:
+        return jsonify({'success': False, 'message': 'Quantity must be at least 1'}), 400
+
+    if not reason:
+        return jsonify({'success': False, 'message': 'Reason is required'}), 400
+
+    db = StockLot.get_db()
+    conn = db.get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Lock all lots for this ref
+        cursor.execute("""
+            SELECT lot_id, qty_received, qty_available,
+                   qty_issued_total, qty_failed_total, status
+            FROM stock_lots
+            WHERE ref_no = %s
+            ORDER BY created_at ASC
+            FOR UPDATE
+        """, (ref_no,))
+        lots = cursor.fetchall()
+
+        if not lots:
+            return jsonify({'success': False, 'message': f'No lots found for {ref_no}'}), 404
+
+        current_total = sum(int(l['qty_received'] or 0) for l in lots)
+        issued_failed = sum(int(l['qty_issued_total'] or 0) + int(l['qty_failed_total'] or 0) for l in lots)
+
+        if new_qty < issued_failed:
+            return jsonify({
+                'success': False,
+                'message': f'New quantity ({new_qty}) cannot be less than issued+failed total ({issued_failed})'
+            }), 400
+
+        delta = new_qty - current_total
+
+        user = getattr(request, 'current_user', None)
+        user_name = user.name if user else 'Admin'
+
+        if delta == 0:
+            return jsonify({'success': True, 'message': 'No change', 'data': {'refNo': ref_no, 'newQuantity': new_qty, 'delta': 0}}), 200
+
+        if delta > 0:
+            # Increase: add entire delta to first lot
+            target = lots[0]
+            cursor.execute("""
+                UPDATE stock_lots
+                SET qty_received = qty_received + %s,
+                    qty_available = qty_available + %s,
+                    qty_fresh = qty_fresh + %s,
+                    status = IF(status = 'depleted', 'open', status),
+                    version = version + 1
+                WHERE lot_id = %s
+            """, (delta, delta, delta, target['lot_id']))
+
+            cursor.execute("""
+                INSERT INTO stock_movements
+                  (unit_serial, lot_id, ref_no, movement_type, from_status, to_status,
+                   quantity_change, moved_by, remarks)
+                VALUES (NULL, %s, %s, 'status_change', 'in_stock', 'in_stock',
+                        %s, %s, %s)
+            """, (target['lot_id'], ref_no, delta, user_name, reason))
+        else:
+            # Decrease: subtract using newest lots first
+            remaining = -delta
+            for lot in reversed(lots):
+                if remaining <= 0:
+                    break
+                avail = int(lot['qty_available'] or 0)
+                if avail <= 0:
+                    continue
+                take = min(avail, remaining)
+                cursor.execute("""
+                    UPDATE stock_lots
+                    SET qty_received = GREATEST(qty_received - %s, 0),
+                        qty_available = GREATEST(qty_available - %s, 0),
+                        qty_fresh = GREATEST(qty_fresh - %s, 0),
+                        status = IF(qty_available - %s = 0, 'depleted', status),
+                        version = version + 1
+                    WHERE lot_id = %s
+                """, (take, take, take, take, lot['lot_id']))
+
+                cursor.execute("""
+                    INSERT INTO stock_movements
+                      (unit_serial, lot_id, ref_no, movement_type, from_status, to_status,
+                       quantity_change, moved_by, remarks)
+                    VALUES (NULL, %s, %s, 'status_change', 'in_stock', 'in_stock',
+                            %s, %s, %s)
+                """, (lot['lot_id'], ref_no, -take, user_name, reason))
+
+                remaining -= take
+
+            if remaining > 0:
+                conn.rollback()
+                return jsonify({'success': False, 'message': 'Could not reduce quantity enough'}), 400
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+    finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    return jsonify({
+        'success': True,
+        'message': f'Quantity updated to {new_qty}',
+        'data': {'refNo': ref_no, 'newQuantity': new_qty, 'delta': delta}
+    }), 200

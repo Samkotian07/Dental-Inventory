@@ -274,9 +274,9 @@ export default function FailedInventory() {
                     </td>
                     <td className="failed__strong">{row.product}</td>
                     <td className="failed__mono">{row.lotNo}</td>
-                    <td>{formatDisplayDate(row.failedDate)}</td>
+                    <td>{formatDisplayDate(row.failedDate || row.updatedAt || row.date || row.createdAt)}</td>
                     <td>
-                      <span className="failed-reason-pill">{row.reason}</span>
+                      <span className="failed-reason-pill">{row.reason || row.failureReason || row.failureType || "Damaged"}</span>
                     </td>
                     <td>{row.qty}</td>
                     <td>

@@ -4,6 +4,7 @@ import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
+import { useInventory } from "../context/InventoryContext.jsx";
 import { useMenuClick } from "../components/Layout.jsx";
 import { toast } from "sonner";
 import "./css/ArchiveStudents.css";
@@ -22,12 +23,32 @@ export default function ArchiveStudents() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const { students, fetchStudents } = useData();
+  const { issues = [], issuedItems = issues } = useInventory();
   const [selectedBatch, setSelectedBatch] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedStudents, setSelectedStudents] = useState({});
   const [selectAll, setSelectAll] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+
+  const getPendingCount = (student) => {
+    const sId = (student.campusId || student.id || "").toLowerCase();
+    const sName = (student.name || "").toLowerCase();
+    const liveMatches = (issuedItems || []).filter((i) => {
+      const matchId = (i.studentId || "").toLowerCase() === sId;
+      const matchName = (i.studentName || i.student || "").toLowerCase() === sName;
+      const isReturned = i.status?.toLowerCase() === "returned";
+      const isCondemned = i.status?.toLowerCase() === "condemned";
+      const isExchanged = i.status?.toLowerCase() === "vendor exchange";
+      const isImplantAbutment = Boolean(
+        i.isImplantAbutment || i.is_implant_abutment ||
+        i.category?.toLowerCase() === "implant" || i.category?.toLowerCase() === "abutment"
+      );
+      return (matchId || matchName) && !isReturned && !isCondemned && !isExchanged && !isImplantAbutment;
+    });
+    if (liveMatches.length > 0) return liveMatches.length;
+    return Number(student.pendingReturnCount || 0);
+  };
 
   useEffect(() => {
     fetchStudents();
@@ -76,7 +97,7 @@ export default function ArchiveStudents() {
     } else {
       const all = {};
       pageStudents.forEach(s => {
-        if (!s.hasPendingReturns) {
+        if (getPendingCount(s) === 0) {
           all[s.campusId] = true;
         }
       });
@@ -94,10 +115,10 @@ export default function ArchiveStudents() {
   };
 
   const isAllSelected = useMemo(() => {
-    const pageIds = pageStudents.filter(s => !s.hasPendingReturns).map(s => s.campusId);
+    const pageIds = pageStudents.filter(s => getPendingCount(s) === 0).map(s => s.campusId);
     if (pageIds.length === 0) return false;
     return pageIds.every(id => selectedStudents[id]);
-  }, [pageStudents, selectedStudents]);
+  }, [pageStudents, selectedStudents, issuedItems]);
 
   useEffect(() => {
     setSelectAll(isAllSelected);
@@ -165,8 +186,8 @@ export default function ArchiveStudents() {
     }
 
     const batchStudents = filteredStudents.filter(s => s.batch === selectedBatch && s.status === 'active');
-    const withPending = batchStudents.filter(s => s.hasPendingReturns);
-    const withoutPending = batchStudents.filter(s => !s.hasPendingReturns);
+    const withPending = batchStudents.filter(s => getPendingCount(s) > 0);
+    const withoutPending = batchStudents.filter(s => getPendingCount(s) === 0);
 
     if (withoutPending.length === 0) {
       toast.error(`No students without pending returns in batch "${selectedBatch}"`);
@@ -275,7 +296,7 @@ export default function ArchiveStudents() {
                     <button
                       className="archive-students__checkbox-btn"
                       onClick={handleSelectAll}
-                      disabled={pageStudents.filter(s => !s.hasPendingReturns).length === 0}
+                      disabled={pageStudents.filter(s => getPendingCount(s) === 0).length === 0}
                     >
                       {selectAll ? (
                         <CheckSquare size={18} />
@@ -303,7 +324,8 @@ export default function ArchiveStudents() {
                 ) : (
                   pageStudents.map((student) => {
                     const isSelected = selectedStudents[student.campusId] || false;
-                    const hasPending = student.hasPendingReturns || false;
+                    const pendingCount = getPendingCount(student);
+                    const hasPending = pendingCount > 0;
                     
                     return (
                       <tr key={student.campusId} className={hasPending ? "archive-students__row--pending" : ""}>
@@ -330,7 +352,7 @@ export default function ArchiveStudents() {
                           {hasPending ? (
                             <span className="archive-students__pending-badge">
                               <Package size={12} />
-                              {student.pendingReturnCount || 0} item{(student.pendingReturnCount || 0) > 1 ? 's' : ''}
+                              {pendingCount} item{pendingCount > 1 ? 's' : ''}
                             </span>
                           ) : (
                             <span className="archive-students__no-pending">✅ Clear</span>

@@ -98,6 +98,7 @@ class IssuedUnit:
 
         return {
             'unitId': self.unit_serial,
+            'unitSerial': self.unit_serial,
             'lotId': self.lot_id,
             'issueId': self.issue_id,
             'refNo': self.ref_no,

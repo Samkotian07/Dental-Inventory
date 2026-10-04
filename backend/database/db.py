@@ -15,7 +15,7 @@ def get_pool():
         try:
             _db_pool = pooling.MySQLConnectionPool(
                 pool_name="dental_inventory_pool",
-                pool_size=10,
+                pool_size=20,
                 pool_reset_session=True,
                 host=Config.DB_HOST,
                 port=Config.DB_PORT,

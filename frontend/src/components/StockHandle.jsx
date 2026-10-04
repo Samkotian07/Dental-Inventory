@@ -17,7 +17,7 @@ const PAGE_SIZE = 8;
 export default function StockHandle() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
-  const { stock, fetchStock, issues } = useInventory();
+  const { stock, fetchStock, issues, toggleStockStatus } = useInventory();
   const [searchRef, setSearchRef] = useState("");
   const [foundItem, setFoundItem] = useState(null);
   const [search, setSearch] = useState("");
@@ -80,14 +80,34 @@ export default function StockHandle() {
     }
   };
 
-  // ⭐ Toggle unit — coming soon
-  const handleToggleUnitStatus = async (unitId) => {
-    toast.info("Status toggling coming soon");
+  // ⭐ Toggle unit
+  const handleToggleUnitStatus = async (unitId, refNo) => {
+    const targetRef = refNo || unitId;
+    const current = groupedStock.find(i => i.refNo === targetRef || i.id === targetRef);
+    const targetStatus = current?.status === "inactive" ? "active" : "inactive";
+    const result = await toggleStockStatus(targetRef, targetStatus);
+    if (result.success) {
+      toast.success(`Status set to ${targetStatus}`);
+      if (foundItem && foundItem.refNo === targetRef) {
+        setFoundItem(prev => ({ ...prev, status: targetStatus }));
+      }
+    } else {
+      toast.error(result.message || "Failed to update status");
+    }
   };
 
-  // ⭐ Toggle all units — coming soon
-  const handleToggleAllUnits = async (refNo) => {
-    toast.info("Status toggling coming soon");
+  // ⭐ Toggle all units
+  const handleToggleAllUnits = async (refNo, currentStatus) => {
+    const targetStatus = currentStatus === "inactive" ? "active" : "inactive";
+    const result = await toggleStockStatus(refNo, targetStatus);
+    if (result.success) {
+      toast.success(`Status set to ${targetStatus}`);
+      if (foundItem && foundItem.refNo === refNo) {
+        setFoundItem(prev => ({ ...prev, status: targetStatus }));
+      }
+    } else {
+      toast.error(result.message || "Failed to update status");
+    }
   };
 
   const filtered = useMemo(() => {
