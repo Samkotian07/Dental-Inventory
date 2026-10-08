@@ -149,21 +149,29 @@ export default function IssuedItems() {
   };
 
   const handleConfirmReturn = async (issueId, returnDateISO, condition = "Good") => {
-    const result = await returnUnit(issueId, condition);
+    const result = await returnUnit(issueId, condition, returnDateISO);
     if (result.success) {
       toast.success("Item returned to inventory successfully");
       
       // ⭐ Check if QR data was returned
       if (result.qr_data) {
+        let qr = result.qr_data;
+        if (typeof qr === "string") {
+          try {
+            qr = JSON.parse(qr);
+          } catch {
+            // keep as-is
+          }
+        }
         // Find the unit details to show in QR modal
-        const unit = stock.find(s => s.id === result.qr_data?.unit_id);
+        const unit = stock.find(s => s.refNo === qr?.ref_no || s.id === qr?.ref_no);
         setQrData({
-          unitId: result.qr_data.unit_id || unit?.id,
-          refNo: result.qr_data.ref_no || unit?.refNo,
+          unitId: qr?.unit_id || unit?.id,
+          refNo: qr?.ref_no || unit?.refNo,
           productName: unit?.product || unit?.productName || "Product",
           location: unit?.freshLocation || unit?.location || "—",
           returnDate: returnDateISO ? formatDate(returnDateISO) : formatDate(new Date()),
-          qrCode: result.qr_data,
+          qrCode: qr,
         });
         setQrModalOpen(true);
       }
@@ -208,7 +216,7 @@ export default function IssuedItems() {
     }
 
     let result;
-    if (stockType === "returned" && unitIds?.length > 0) {
+    if (stockType === "returned" || (!lotId && unitIds?.length > 0)) {
       result = await issueReturnedUnit({
         studentId,
         unitSerial: unitIds[0],

@@ -95,6 +95,8 @@ export default function Stock() {
     }
 
     let filteredItems = (rows || []).filter((r) => {
+      const available = Number(r.quantity ?? r.qty ?? 0);
+      if (available <= 0) return false;
       const matchesCategory = isCategoryMatch(r.category, category);
       const matchesQuery =
         !q ||
@@ -123,7 +125,7 @@ export default function Stock() {
           units: []
         };
       }
-      const unitQty = Number(r.quantity ?? r.qty ?? 1);
+      const unitQty = Number(r.quantity ?? r.qty ?? 0);
       groupedMap[key].quantity += unitQty;
       groupedMap[key].qty += unitQty;
       // ⭐ Count returned units
@@ -133,7 +135,7 @@ export default function Stock() {
       groupedMap[key].units.push(r.id);
     });
 
-    let list = Object.values(groupedMap);
+    let list = Object.values(groupedMap).filter((item) => Number(item.quantity ?? item.qty ?? 0) > 0);
 
     if (sort.key) {
       list = [...list].sort((a, b) => {

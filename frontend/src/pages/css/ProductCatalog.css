@@ -1,0 +1,90 @@
+@import "./Stock.css";
+
+/* Product Catalog Specific Styles */
+.stock__table th {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.catalog-bulk-dropzone {
+  margin-top: 16px;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-md, 12px);
+  padding: 24px;
+  text-align: center;
+  background: var(--surface);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.catalog-bulk-dropzone:hover,
+.catalog-bulk-dropzone.is-dragging {
+  border-color: var(--accent-deep, #18181b);
+  background: var(--accent-soft, #f4f4f5);
+}
+
+.catalog-bulk-dropzone__icon {
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+}
+
+.catalog-bulk-dropzone__title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.catalog-bulk-dropzone__sub {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+/* Modal Button fallbacks */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--accent-deep);
+  color: #fff;
+  border: 1px solid var(--accent-deep);
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2b2b2e;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--accent-soft);
+}

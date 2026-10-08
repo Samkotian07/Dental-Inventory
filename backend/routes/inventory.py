@@ -39,19 +39,116 @@ def get_unit_history(identifier):
     unit = IssuedUnit.find_by_serial(identifier)
     product = None
     rows = []
+    cycles = []
 
     if unit:
         product = Product.find_by_ref_no(unit.ref_no)
-        rows = db.execute_query("""
-            SELECT u.unit_serial, u.status AS rawStatus,
-                   e.student_id, e.student_name AS student,
-                   e.issue_date AS issued, u.returned_date AS returned,
-                   u.return_condition, u.lot_no, u.ref_no, u.product_name
-            FROM issued_units u
-            JOIN issue_events e ON e.issue_id = u.issue_id
-            WHERE u.unit_serial = %s
-            ORDER BY e.issue_date ASC
-        """, (identifier,))
+        # 1. Fetch movements for this unit
+        movements = db.execute_query("""
+            SELECT m.id, m.unit_serial, m.lot_id, m.ref_no, m.movement_type,
+                   m.from_status, m.to_status, m.quantity_change, m.reference_id,
+                   m.moved_by, m.moved_at,
+                   e.student_id, e.student_name, e.issue_date, e.issued_by
+            FROM stock_movements m
+            LEFT JOIN issue_events e ON e.issue_id = m.reference_id
+            WHERE m.unit_serial = %s
+            ORDER BY m.moved_at ASC, m.id ASC
+        """, (unit.unit_serial,))
+
+        if movements:
+            audit_returns = db.execute_query("""
+                SELECT entity_id, details, timestamp, user_name
+                FROM audit_logs
+                WHERE details LIKE %s AND action = 'RETURN'
+                ORDER BY timestamp ASC
+            """, (f'%{unit.unit_serial}%',))
+
+            current_cycle = None
+            ret_idx = 0
+
+            for m in movements:
+                m_type = m['movement_type']
+                if m_type == 'issue':
+                    if current_cycle:
+                        cycles.append(current_cycle)
+                    current_cycle = {
+                        'issueId': m['reference_id'] or '—',
+                        'student': m['student_name'] or 'Student',
+                        'studentId': m['student_id'] or '',
+                        'issuedBy': m['issued_by'] or m['moved_by'] or '',
+                        'issued': m['moved_at'].isoformat() if hasattr(m['moved_at'], 'isoformat') else str(m['moved_at']),
+                        'returned': None,
+                        'returnedBy': None,
+                        'returnCondition': None,
+                        'status': 'Active',
+                        'rawStatus': 'issued',
+                        'unitId': unit.unit_serial,
+                        'lotNo': unit.lot_no,
+                        'refNo': unit.ref_no,
+                    }
+                elif m_type == 'return' and current_cycle:
+                    current_cycle['returned'] = m['moved_at'].isoformat() if hasattr(m['moved_at'], 'isoformat') else str(m['moved_at'])
+                    current_cycle['returnedBy'] = m['moved_by'] or ''
+                    to_stat = (m['to_status'] or '').lower()
+                    if 'damage' in to_stat:
+                        current_cycle['status'] = 'Damaged'
+                        current_cycle['rawStatus'] = 'returned_damaged'
+                        current_cycle['returnCondition'] = 'Damaged'
+                    else:
+                        current_cycle['status'] = 'Returned'
+                        current_cycle['rawStatus'] = 'returned_good'
+                        current_cycle['returnCondition'] = 'Good'
+
+                    if ret_idx < len(audit_returns):
+                        adet = audit_returns[ret_idx].get('details') or ''
+                        if 'condition: Damaged' in adet:
+                            current_cycle['returnCondition'] = 'Damaged'
+                        elif 'condition: Good' in adet:
+                            current_cycle['returnCondition'] = 'Good'
+                        ret_idx += 1
+
+            if current_cycle:
+                if unit.status in ('returned_good', 'returned_damaged') and not current_cycle['returned']:
+                    current_cycle['returned'] = unit.returned_date.isoformat() if hasattr(unit.returned_date, 'isoformat') else (str(unit.returned_date) if unit.returned_date else None)
+                    current_cycle['returnCondition'] = unit.return_condition or ('Good' if unit.status == 'returned_good' else 'Damaged')
+                    current_cycle['returnedBy'] = unit.returned_by or current_cycle.get('returnedBy') or ''
+                    current_cycle['status'] = 'Returned'
+                    current_cycle['rawStatus'] = unit.status
+                cycles.append(current_cycle)
+
+            for idx, c in enumerate(cycles, 1):
+                c['cycle'] = idx
+        else:
+            # Fallback to single-row query if no movements exist
+            rows = db.execute_query("""
+                SELECT u.unit_serial, u.status AS rawStatus,
+                       e.student_id, e.student_name AS student,
+                       e.issue_date AS issued, u.returned_date AS returned,
+                       u.return_condition, u.lot_no, u.ref_no, u.product_name,
+                       e.issued_by, u.returned_by, e.issue_id
+                FROM issued_units u
+                JOIN issue_events e ON e.issue_id = u.issue_id
+                WHERE u.unit_serial = %s
+                ORDER BY e.issue_date ASC
+            """, (identifier,))
+            for i, r in enumerate(rows, 1):
+                raw = (r.get('rawStatus') or '').lower()
+                cycles.append({
+                    'cycle': i,
+                    'issueId': r.get('issue_id') or '—',
+                    'student': r.get('student') or 'Student',
+                    'studentId': r.get('student_id') or '',
+                    'issuedBy': r.get('issued_by') or '',
+                    'unitId': r.get('unit_serial') or '—',
+                    'lotNo': r.get('lot_no') or '',
+                    'refNo': r.get('ref_no') or '',
+                    'issued': r.get('issued').isoformat() if hasattr(r.get('issued'), 'isoformat') else r.get('issued'),
+                    'returned': r.get('returned').isoformat() if hasattr(r.get('returned'), 'isoformat') else (r.get('returned') or 'NULL'),
+                    'returnedBy': r.get('returned_by') or '',
+                    'returnCondition': r.get('return_condition') or ('Good' if raw == 'returned_good' else ('Damaged' if raw == 'returned_damaged' else None)),
+                    'status': _status_label(raw),
+                    'rawStatus': raw,
+                })
     else:
         # Try as ref_no
         product = Product.find_by_ref_no(identifier)
@@ -61,29 +158,35 @@ def get_unit_history(identifier):
             SELECT u.unit_serial, u.status AS rawStatus,
                    e.student_id, e.student_name AS student,
                    e.issue_date AS issued, u.returned_date AS returned,
-                   u.return_condition, u.lot_no, u.ref_no, u.product_name
+                   u.return_condition, u.lot_no, u.ref_no, u.product_name,
+                   e.issued_by, u.returned_by, e.issue_id
             FROM issued_units u
             JOIN issue_events e ON e.issue_id = u.issue_id
             WHERE u.ref_no = %s
             ORDER BY e.issue_date ASC
         """, (identifier,))
-
-    cycles = []
-    for i, r in enumerate(rows, 1):
-        raw = (r.get('rawStatus') or '').lower()
-        cycles.append({
-            'cycle': i,
-            'student': r.get('student') or 'Student',
-            'studentId': r.get('student_id') or '',
-            'unitId': r.get('unit_serial') or '—',
-            'issued': r.get('issued').isoformat() if hasattr(r.get('issued'), 'isoformat') else r.get('issued'),
-            'returned': r.get('returned').isoformat() if hasattr(r.get('returned'), 'isoformat') else (r.get('returned') or 'NULL'),
-            'status': _status_label(raw),
-            'rawStatus': raw,
-        })
+        for i, r in enumerate(rows, 1):
+            raw = (r.get('rawStatus') or '').lower()
+            cycles.append({
+                'cycle': i,
+                'issueId': r.get('issue_id') or '—',
+                'student': r.get('student') or 'Student',
+                'studentId': r.get('student_id') or '',
+                'issuedBy': r.get('issued_by') or '',
+                'unitId': r.get('unit_serial') or '—',
+                'lotNo': r.get('lot_no') or '',
+                'refNo': r.get('ref_no') or '',
+                'issued': r.get('issued').isoformat() if hasattr(r.get('issued'), 'isoformat') else r.get('issued'),
+                'returned': r.get('returned').isoformat() if hasattr(r.get('returned'), 'isoformat') else (r.get('returned') or 'NULL'),
+                'returnedBy': r.get('returned_by') or '',
+                'returnCondition': r.get('return_condition') or ('Good' if raw == 'returned_good' else ('Damaged' if raw == 'returned_damaged' else None)),
+                'status': _status_label(raw),
+                'rawStatus': raw,
+            })
 
     return jsonify({
         'success': True,
+        'unit': unit.to_dict() if unit else None,
         'product': product.to_dict() if product else {},
         'history': cycles,
         'summary': f"Summary: {len(cycles)} cycles",
@@ -184,6 +287,15 @@ def get_lots_by_ref(ref_no):
 def get_available_lots(ref_no):
     lots = StockLot.find_available_by_ref_no(ref_no)
     return jsonify({'success': True, 'data': [l.to_dict() for l in lots]}), 200
+
+
+# ---------- Returned units by ref (for issue modal) ----------
+
+@inventory_bp.route('/returned-units/<ref_no>', methods=['GET'])
+@token_required
+def get_returned_units(ref_no):
+    units = IssuedUnit.find_returned_by_ref_no(ref_no)
+    return jsonify({'success': True, 'data': [u.to_dict() for u in units]}), 200
 
 
 # ---------- Toggle product active status ----------
@@ -581,3 +693,154 @@ def update_stock_quantity(ref_no):
         'message': f'Quantity updated to {new_qty}',
         'data': {'refNo': ref_no, 'newQuantity': new_qty, 'delta': delta}
     }), 200
+
+
+# ---------- Product catalog create/update ----------
+
+@inventory_bp.route('/products', methods=['POST'])
+@token_required
+def create_product():
+    data = request.get_json() or {}
+    ref_no = data.get('ref_no')
+    product_name = data.get('product_name')
+    if not ref_no or not product_name:
+        return jsonify({'success': False, 'message': 'ref_no and product_name are required'}), 400
+
+    if Product.find_by_ref_no(ref_no):
+        return jsonify({'success': False, 'message': f'Product {ref_no} already exists'}), 409
+
+    threshold = data.get('low_stock_threshold')
+    if threshold is not None:
+        try:
+            threshold = int(threshold)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': 'Threshold must be a valid number'}), 400
+        if threshold < 0:
+            return jsonify({'success': False, 'message': 'Threshold must be non-negative'}), 400
+
+    if not _auto_create_product(data):
+        return jsonify({'success': False, 'message': 'Failed to create product'}), 400
+
+    updates = {}
+    for key in ('fresh_location', 'returned_location'):
+        if key in data:
+            updates[key] = data[key]
+    if threshold is not None:
+        updates['low_stock_threshold'] = threshold
+
+    if updates:
+        set_clause = ', '.join(f'{column} = %s' for column in updates)
+        StockLot.get_db().execute_query(
+            f"UPDATE products SET {set_clause}, updated_at = NOW() WHERE ref_no = %s",
+            (*updates.values(), ref_no)
+        )
+
+    product = Product.find_by_ref_no(ref_no)
+    return jsonify({
+        'success': True,
+        'message': 'Product created successfully',
+        'data': product.to_dict() if product else {'refNo': ref_no},
+    }), 201
+
+
+@inventory_bp.route('/products/bulk', methods=['POST'])
+@token_required
+def bulk_create_products():
+    rows = request.get_json()
+    if not isinstance(rows, list):
+        return jsonify({'success': False, 'message': 'Expected a JSON array'}), 400
+
+    imported = 0
+    errors = []
+    db = StockLot.get_db()
+
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            errors.append({'row': index, 'error': 'Row must be an object'})
+            continue
+
+        ref_no = row.get('ref_no')
+        product_name = row.get('product_name')
+        if not ref_no or not product_name:
+            errors.append({'row': index, 'error': 'ref_no and product_name are required'})
+            continue
+
+        if Product.find_by_ref_no(ref_no):
+            errors.append({'row': index, 'error': f'Product {ref_no} already exists'})
+            continue
+
+        threshold = row.get('low_stock_threshold')
+        if threshold is not None:
+            try:
+                threshold = int(threshold)
+            except (TypeError, ValueError):
+                errors.append({'row': index, 'error': 'Threshold must be a valid number'})
+                continue
+            if threshold < 0:
+                errors.append({'row': index, 'error': 'Threshold must be non-negative'})
+                continue
+
+        if not _auto_create_product(row):
+            errors.append({'row': index, 'error': f'Product {ref_no} could not be created'})
+            continue
+
+        updates = {}
+        for key in ('fresh_location', 'returned_location'):
+            if key in row:
+                updates[key] = row[key]
+        if threshold is not None:
+            updates['low_stock_threshold'] = threshold
+
+        if updates:
+            set_clause = ', '.join(f'{column} = %s' for column in updates)
+            db.execute_query(
+                f"UPDATE products SET {set_clause}, updated_at = NOW() WHERE ref_no = %s",
+                (*updates.values(), ref_no)
+            )
+        imported += 1
+
+    return jsonify({
+        'success': True,
+        'imported': imported,
+        'failed': len(errors),
+        'errors': errors,
+    }), 201
+
+
+@inventory_bp.route('/products/<ref_no>', methods=['PUT'])
+@token_required
+def update_product(ref_no):
+    product = Product.find_by_ref_no(ref_no)
+    if not product:
+        return jsonify({'success': False, 'message': f'Product {ref_no} not found'}), 404
+
+    data = request.get_json() or {}
+    allowed_keys = {'fresh_location', 'returned_location', 'low_stock_threshold'}
+    if not data or any(key not in allowed_keys for key in data):
+        return jsonify({'success': False, 'message': 'Only fresh_location, returned_location, and low_stock_threshold can be updated'}), 400
+
+    threshold = data.get('low_stock_threshold')
+    if 'low_stock_threshold' in data:
+        try:
+            threshold = int(threshold)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'message': 'Threshold must be a valid number'}), 400
+        if threshold < 0:
+            return jsonify({'success': False, 'message': 'Threshold must be non-negative'}), 400
+
+    updates = {
+        key: threshold if key == 'low_stock_threshold' else value
+        for key, value in data.items()
+    }
+    set_clause = ', '.join(f'{column} = %s' for column in updates)
+    StockLot.get_db().execute_query(
+        f"UPDATE products SET {set_clause}, updated_at = NOW() WHERE ref_no = %s",
+        (*updates.values(), ref_no)
+    )
+
+    updated_product = Product.find_by_ref_no(ref_no)
+    return jsonify({
+        'success': True,
+        'message': f'Product {ref_no} updated successfully',
+        'data': updated_product.to_dict() if updated_product else {'refNo': ref_no},
+    }), 200

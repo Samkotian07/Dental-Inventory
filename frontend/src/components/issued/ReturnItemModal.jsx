@@ -18,6 +18,7 @@ export default function ReturnItemModal({
   const { stock = [], issuedItems = [] } = useInventory();
   
   const [returnDate, setReturnDate] = useState(todayISO());
+  const [returnCondition, setReturnCondition] = useState("Good");
   const [step, setStep] = useState("confirm");
   const [actionType, setActionType] = useState("return");
   const [condemnReason, setCondemnReason] = useState("");
@@ -320,6 +321,28 @@ export default function ReturnItemModal({
           />
         </div>
 
+        {actionType === "return" && !isImplantAbutment && (
+          <div className="modal__field">
+            <label htmlFor="return-condition">Condition</label>
+            <select
+              id="return-condition"
+              value={returnCondition}
+              onChange={(e) => setReturnCondition(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid #D1D5DB",
+                fontSize: "14px",
+                background: "white",
+              }}
+            >
+              <option value="Good">Good (Restock to inventory)</option>
+              <option value="Damaged">Damaged (Returned damaged)</option>
+            </select>
+          </div>
+        )}
+
         {actionType === "exchange" && isImplantAbutment && (
           <div className="modal__field">
             <label htmlFor="exchange-reason">Exchange Reason *</label>
@@ -611,7 +634,7 @@ export default function ReturnItemModal({
               setIsProcessing(true);
               try {
                 const targetIssueId = item?.issueId || item?.id;
-                const result = await onConfirm(targetIssueId, returnDate);
+                const result = await onConfirm(targetIssueId, returnDate, returnCondition || "Good");
                 if (result.success) {
                   setStep("complete");
                 } else {

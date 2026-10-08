@@ -52,7 +52,7 @@ export default function UnitHistory() {
   const { unitId } = useParams();
   const navigate = useNavigate();
   const onMenuClick = useMenuClick();
-  const { stock, issuedItems, getUnitHistory, issueItem, returnIssuedItem, condemnIssuedItem } = useInventory();
+  const { stock, issuedItems, getUnitHistory, issueItem, issueReturnedUnit, returnIssuedItem, condemnIssuedItem } = useInventory();
   const { students = [] } = useData();
   const { isAuthenticated, user } = useAuth();
   
@@ -92,19 +92,26 @@ export default function UnitHistory() {
       setLoading(false);
       return;
     }
-    
+
+    const match = unitId.match(/^(.+?)-L[^-]+-\d+$/);
+    const refNo = match ? match[1] : unitId.split('-')[0];
+
     const foundInStock = (stock || []).find(s => 
       s.id === unitId || 
       s.unitId === unitId || 
       s.refNo === unitId ||
+      s.refNo === refNo ||
+      s.id === refNo ||
       s.inventoryId === unitId
     );
 
     const localHistory = (issuedItems || [])
       .filter(i => 
         i.unitId === unitId || 
+        i.unitSerial === unitId ||
         i.inventoryId === unitId || 
         i.refNo === unitId ||
+        i.refNo === refNo ||
         i.id === unitId ||
         i.issueId === unitId
       )
@@ -113,80 +120,102 @@ export default function UnitHistory() {
     if (foundInStock) {
       setApiUnit(foundInStock);
       setApiHistory(localHistory);
-      setLoading(false);
-      return;
     }
 
     let isMounted = true;
     setLoading(true);
-    const host = window.location.hostname || "localhost";
-    const apiUrls = [
-      `http://${host}:5000/api/inventory/unit-history/${encodeURIComponent(unitId)}`,
-      `http://127.0.0.1:5000/api/inventory/unit-history/${encodeURIComponent(unitId)}`,
-      `http://localhost:5000/api/inventory/unit-history/${encodeURIComponent(unitId)}`
-    ];
 
-    const fetchPublicData = async () => {
+    const loadData = async () => {
       let successData = null;
-      for (const url of apiUrls) {
-        try {
-          const res = await fetch(url);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.success) {
-              successData = data;
-              break;
+      if (getUnitHistory) {
+        successData = await getUnitHistory(unitId);
+      }
+
+      if (!successData) {
+        const token = localStorage.getItem("dental_token");
+        const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+        const host = window.location.hostname || "localhost";
+        const apiUrls = [
+          `http://${host}:5000/api/inventory/unit-history/${encodeURIComponent(unitId)}`,
+          `http://127.0.0.1:5000/api/inventory/unit-history/${encodeURIComponent(unitId)}`,
+          `http://localhost:5000/api/inventory/unit-history/${encodeURIComponent(unitId)}`
+        ];
+        for (const url of apiUrls) {
+          try {
+            const res = await fetch(url, { headers });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success) {
+                successData = data;
+                break;
+              }
             }
+          } catch {
+            // ignore & try next URL
           }
-        } catch {
-          // ignore & try next URL
         }
       }
 
       if (!isMounted) return;
 
-      if (successData && successData.product) {
-        const prod = successData.product;
+      if (successData && (successData.product || successData.unit)) {
+        const prod = successData.product || {};
+        const u = successData.unit || {};
+        const uStatus = (u.status || prod.status || "active").toLowerCase();
+        const isRet = uStatus === 'returned_good' || uStatus === 'returned' || Boolean(prod.is_returned);
+
         setApiUnit({
-          id: prod.id || unitId,
-          unitId: prod.id || unitId,
-          refNo: prod.ref_no || prod.refNo || unitId,
-          product: prod.product_name || prod.productName || prod.ref_no,
-          productName: prod.product_name || prod.productName || prod.ref_no,
+          id: u.unitSerial || u.unitId || prod.id || unitId,
+          unitId: u.unitSerial || u.unitId || prod.id || unitId,
+          refNo: u.refNo || prod.ref_no || prod.refNo || refNo,
+          product: prod.product_name || prod.productName || u.productName || prod.ref_no || "Product",
+          productName: prod.product_name || prod.productName || u.productName || prod.ref_no || "Product",
           company: prod.company_name || prod.company || prod.companyName || "Vendor",
           companyName: prod.company_name || prod.company || prod.companyName || "Vendor",
-          category: prod.category || "General",
-          lotNo: prod.lot_no || prod.lotNo || "—",
+          category: u.category || prod.category || "General",
+          lotNo: u.lotNo || prod.lot_no || prod.lotNo || "—",
           freshLocation: prod.fresh_location || prod.freshLocation || "—",
-          isReturned: Boolean(prod.is_returned),
-          status: prod.status || "active",
+          returnedLocation: prod.returned_location || prod.returnedLocation || "—",
+          isReturned: isRet,
+          status: uStatus,
           quantity: prod.quantity || 1,
         });
+
         const historyList = (successData.history || []).map((c, idx) => ({
-          id: c.issue_id || `cycle-${idx}`,
-          issueId: c.issue_id || `cycle-${idx}`,
+          id: c.issueId || c.issue_id || `cycle-${idx}`,
+          issueId: c.issueId || c.issue_id || `cycle-${idx}`,
+          cycle: c.cycle || idx + 1,
           student: c.student,
           studentName: c.student,
           studentId: c.studentId,
           issueDate: c.issued,
           date: c.issued,
+          issuedBy: c.issuedBy || '',
           returnDate: c.returned === 'NULL' ? null : c.returned,
-          status: c.rawStatus === 'returned' ? 'Returned' : c.rawStatus === 'condemned' ? 'Condemned' : 'Active',
+          returnedBy: c.returnedBy || '',
+          returnCondition: c.returnCondition || c.return_condition || null,
+          status: (c.status === 'Returned' || c.rawStatus === 'returned' || c.rawStatus === 'returned_good')
+            ? 'Returned'
+            : (c.status === 'Condemned' || c.rawStatus === 'condemned')
+            ? 'Condemned'
+            : (c.status === 'Damaged' || c.rawStatus === 'returned_damaged')
+            ? 'Damaged'
+            : 'Active',
         }));
         setApiHistory(historyList);
-      } else {
+      } else if (!foundInStock) {
         setApiUnit(null);
         setApiHistory([]);
       }
       setLoading(false);
     };
 
-    fetchPublicData();
+    loadData();
 
     return () => {
       isMounted = false;
     };
-  }, [unitId, stock, issuedItems]);
+  }, [unitId, stock, issuedItems, getUnitHistory]);
 
   const unit = apiUnit;
   const history = useMemo(() => {
@@ -212,7 +241,7 @@ export default function UnitHistory() {
     
     if (unit.status === 'condemned') return 'condemned';
     
-    if (unit.isReturned === true || unit.status === 'returned') return 'returned';
+    if (unit.isReturned === true || unit.status === 'returned' || unit.status === 'returned_good') return 'returned';
     
     return 'available';
   };
@@ -225,15 +254,22 @@ export default function UnitHistory() {
       return;
     }
     setIsActionLoading(true);
+    const isRet = unit?.isReturned || unit?.status === 'returned_good' || unit?.status === 'returned';
     try {
-      const result = await issueItem({
-        studentId: selectedStudentId,
-        unitId: unitId,
-        refNo: unit?.refNo,
-        qty: 1,
-        issueDate: issueDate,
-        stockType: unit?.isReturned ? 'returned' : 'fresh',
-      });
+      const result = isRet && issueReturnedUnit
+        ? await issueReturnedUnit({
+            studentId: selectedStudentId,
+            unitSerial: unitId,
+            issueDate: issueDate,
+          })
+        : await issueItem({
+            studentId: selectedStudentId,
+            unitId: unitId,
+            refNo: unit?.refNo,
+            qty: 1,
+            issueDate: issueDate,
+            stockType: isRet ? 'returned' : 'fresh',
+          });
       if (result.success) {
         toast.success(`Unit ${unitId} issued successfully`);
         setIssueModalOpen(false);
@@ -320,6 +356,19 @@ export default function UnitHistory() {
     quantity: unit.quantity,
     freshLocation: unit.freshLocation || unit.fresh_location,
   } : null;
+
+  if (loading && !unit) {
+    return (
+      <>
+        <DashboardHeader title="Unit History" onMenuClick={onMenuClick} />
+        <main className="unit-history-page">
+          <div className="unit-history-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+            <p style={{ color: 'var(--ink-soft)', fontSize: '15px' }}>Loading unit history...</p>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   if (!loading && !unit) {
     return (
@@ -503,12 +552,14 @@ export default function UnitHistory() {
                               <Calendar size={14} strokeWidth={2} />
                               <span>Issued: {formatDisplayDate(item.issueDate)}</span>
                               <span className="timeline-time">{formatTime(item.issueDate)}</span>
+                              {item.issuedBy && <span className="timeline-by" style={{ marginLeft: "6px", color: "var(--ink-soft)" }}>· by {item.issuedBy}</span>}
                             </div>
                             {item.returnDate && (
                               <div className="timeline-date timeline-date-returned">
                                 <CheckCircle size={14} strokeWidth={2} />
                                 <span>Returned: {formatDisplayDate(item.returnDate)}</span>
                                 <span className="timeline-time">{formatTime(item.returnDate)}</span>
+                                {item.returnedBy && <span className="timeline-by" style={{ marginLeft: "6px", color: "var(--ink-soft)" }}>· to {item.returnedBy}</span>}
                               </div>
                             )}
                             {!item.returnDate && isActive && (

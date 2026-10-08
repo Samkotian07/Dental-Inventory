@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+import json
 from middleware.auth import token_required, admin_required
 from models.issue import Issue
 from models.issued_unit import IssuedUnit
@@ -198,6 +199,11 @@ def return_unit(unit_serial):
             1
         )
         qr_json = outs[0] if outs else None
+        if isinstance(qr_json, str):
+            try:
+                qr_json = json.loads(qr_json)
+            except Exception:
+                pass
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 

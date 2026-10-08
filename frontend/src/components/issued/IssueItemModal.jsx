@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Modal from "./Modal.jsx";
 import { useData } from "../../context/DataContext.jsx";
 import { useInventory } from "../../context/InventoryContext.jsx";
@@ -14,13 +14,14 @@ function formatDisplayDate(iso) {
 
 export default function IssueItemModal({ onClose, onConfirm }) {
   const { students } = useData();
-  const { stock = [], issuedItems = [], getUnitHistory, getLotsForRef } = useInventory();
+  const { stock = [], issuedItems = [], getUnitHistory, getLotsForRef, getReturnedUnitsForRef } = useInventory();
 
   const [studentId, setStudentId] = useState("");
   const [itemId, setItemId] = useState("");
   const [qty, setQty] = useState(1);
   const [stockSource, setStockSource] = useState("all");
   const [selectedUnitId, setSelectedUnitId] = useState(null);
+  const [apiReturnedUnits, setApiReturnedUnits] = useState([]);
 
   // Lot selection
   const [availableLots, setAvailableLots] = useState([]);
@@ -44,6 +45,8 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           lotNo: r.lotNo,
           expiry: r.expiry,
           isReturnable: r.isReturnable,
+          freshStock: r.freshStock || 0,
+          returnedStock: r.returnedStock || 0,
           totalQuantity: 0,
           units: [],
           unitIds: [],
@@ -52,17 +55,19 @@ export default function IssueItemModal({ onClose, onConfirm }) {
         };
       }
       groupedMap[key].totalQuantity += r.quantity || 1;
+      groupedMap[key].freshStock += (r.freshStock || 0);
+      groupedMap[key].returnedStock += (r.returnedStock || 0);
       groupedMap[key].units.push(r);
       groupedMap[key].unitIds.push(r.id);
     });
     
     Object.values(groupedMap).forEach(group => {
-      group.hasFresh = group.units.some(u => {
+      group.hasFresh = group.freshStock > 0 || group.units.some(u => {
         const isActive = issuedItems.some(i => i.inventoryId === u.id && i.status === 'Active');
         const hasReturned = issuedItems.some(i => i.inventoryId === u.id && i.status === 'Returned');
         return !isActive && !hasReturned && !u.isReturned && u.quantity > 0;
       });
-      group.hasReturned = group.units.some(u => {
+      group.hasReturned = group.returnedStock > 0 || group.units.some(u => {
         const isActive = issuedItems.some(i => i.inventoryId === u.id && i.status === 'Active');
         return !isActive && (u.isReturned === true || issuedItems.some(i => i.inventoryId === u.id && i.status === 'Returned')) && u.quantity > 0;
       });
@@ -77,25 +82,56 @@ export default function IssueItemModal({ onClose, onConfirm }) {
       return groupedStock.filter(g => g.hasFresh);
     }
     if (stockSource === "returned") {
-      return groupedStock.filter(g => g.hasReturned && g.isReturnable !== false);
+      return groupedStock.filter(g => (g.hasReturned || g.returnedStock > 0) && g.isReturnable !== false);
     }
     return groupedStock;
   }, [groupedStock, stockSource]);
 
   const selectedItem = useMemo(
-    () => filteredGroupedStock.find((i) => i.refNo === itemId),
-    [filteredGroupedStock, itemId]
+    () => groupedStock.find((i) => i.refNo === itemId),
+    [groupedStock, itemId]
   );
+
+  useEffect(() => {
+    if (!itemId) {
+      setApiReturnedUnits([]);
+      return;
+    }
+    if (getReturnedUnitsForRef) {
+      getReturnedUnitsForRef(itemId).then((units) => {
+        setApiReturnedUnits(units || []);
+      }).catch(() => {
+        setApiReturnedUnits([]);
+      });
+    }
+  }, [itemId, getReturnedUnitsForRef]);
+
+  const hasReturned = apiReturnedUnits.length > 0;
 
   const returnedUnits = useMemo(() => {
     if (!selectedItem || stockSource !== "returned") return [];
-    return selectedItem.units
-      .filter(u => u.isReturned === true && u.quantity > 0)
-      .map(u => ({
+    return apiReturnedUnits.map((u) => {
+      const uId = u.unitSerial || u.unitId;
+      const matchingIssue = (issuedItems || []).find((i) =>
+        i.unitSerial === uId ||
+        i.unitId === uId ||
+        (i.units && i.units.some((subU) => subU.unitSerial === uId || subU.unitId === uId))
+      );
+      const studentName = u.studentName || u.student || matchingIssue?.student || matchingIssue?.studentName || "—";
+      const studentId = u.studentId || matchingIssue?.studentId || "";
+      const returnDate = u.returnedDate || matchingIssue?.returnDate;
+      const lotNo = u.lotNo || u.lot_no || matchingIssue?.lotNo || "—";
+
+      return {
         ...u,
-        history: getUnitHistory(u.id),
-      }));
-  }, [selectedItem, stockSource, getUnitHistory]);
+        id: uId,
+        lotNo,
+        studentName,
+        studentId,
+        returnDate,
+      };
+    });
+  }, [selectedItem, stockSource, apiReturnedUnits, issuedItems]);
 
   const maxQty = stockSource === "returned" 
     ? returnedUnits.length 
@@ -114,6 +150,8 @@ export default function IssueItemModal({ onClose, onConfirm }) {
     let unitIds = [];
     let isImplantAbutment = false;
     
+    const isReturned = stockSource === "returned" || Boolean(selectedUnitId);
+
     // ⭐ CRITICAL: For implants/abutments, we DON'T use unit_id
     if (isNonReturnable) {
       // Implant/Abutment - use ref_no directly (no unit)
@@ -132,12 +170,12 @@ export default function IssueItemModal({ onClose, onConfirm }) {
         // No units - use ref_no (this is correct for implants)
         toast.info(`Issuing ${selectedItem.product} (${selectedItem.refNo}) as implant/abutment`);
       }
-    } else if (stockSource === "returned") {
+    } else if (isReturned) {
       // Returned stock - use returned units
-      const availableUnits = returnedUnits.map(u => u.id);
       if (selectedUnitId) {
         unitIds = [selectedUnitId];
       } else {
+        const availableUnits = returnedUnits.map(u => u.id);
         unitIds = availableUnits.slice(0, qty);
       }
     } else {
@@ -154,19 +192,18 @@ export default function IssueItemModal({ onClose, onConfirm }) {
       return;
     }
 
-    const hasReturned = selectedItem.units.some(u => 
-      unitIds.includes(u.id) && u.isReturned === true
-    );
-    
+    const returnedUnitObj = returnedUnits.find(u => u.id === (selectedUnitId || unitIds[0]));
+    const effectiveLotId = isReturned ? (returnedUnitObj?.lotId || null) : (selectedLotId || null);
+
     // ⭐ Pass isImplantAbutment flag to backend
     onConfirm({
       studentId,
       refNo: selectedItem.refNo,
-      lotId: selectedLotId || null,
+      lotId: effectiveLotId,
       qty: isImplantAbutment ? 1 : unitIds.length,
       unitIds: isImplantAbutment ? [] : unitIds,
-      lotNo: selectedItem.lotNo,
-      stockType: hasReturned ? "returned" : "fresh",
+      lotNo: isReturned ? (returnedUnitObj?.lotNo || selectedItem.lotNo) : selectedItem.lotNo,
+      stockType: isReturned ? "returned" : "fresh",
       isNonReturnable: isNonReturnable,
       isImplantAbutment: isImplantAbutment,
     });
@@ -315,7 +352,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
                 color: stockSource === "returned" ? "#D97706" : "#374151",
                 cursor: "pointer",
               }}
-              disabled={!groupedStock.some(g => g.hasReturned)}
+              disabled={!hasReturned}
             >
               🔄 Returned Stock
             </button>
@@ -334,7 +371,6 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           <label>Select Returned Unit</label>
           <div className="returned-units-list">
             {returnedUnits.map((unit) => {
-              const lastHistory = unit.history?.[0];
               return (
                 <div 
                   key={unit.id} 
@@ -351,8 +387,8 @@ export default function IssueItemModal({ onClose, onConfirm }) {
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontWeight: "600", fontSize: "14px" }}>
-                      🔢 {unit.id}
+                    <span style={{ fontWeight: "600", fontSize: "14px", color: "#1F2937" }}>
+                      📦 Lot {unit.lotNo || "—"}
                     </span>
                     <span style={{ 
                       background: "#FEF3C7", 
@@ -365,22 +401,25 @@ export default function IssueItemModal({ onClose, onConfirm }) {
                       🔄 Returned
                     </span>
                   </div>
-                  {lastHistory && (
-                    <div style={{ fontSize: "12px", color: "#6B7280", marginTop: "4px" }}>
-                      📋 Last: <strong>{lastHistory.student}</strong> 
-                      {' '}({formatDisplayDate(lastHistory.returnDate)})
-                      <span style={{ marginLeft: "8px" }}>
-                        🔄 {unit.history?.length || 0} cycles
+                  <div style={{ fontSize: "12.5px", color: "#4B5563", marginTop: "4px" }}>
+                    👤 Last issued to: <strong>{unit.studentName}</strong>
+                    {unit.studentId ? ` (${unit.studentId})` : ""}
+                    {unit.returnDate && (
+                      <span style={{ marginLeft: "8px", color: "#6B7280" }}>
+                        · Returned: {formatDisplayDate(unit.returnDate)}
                       </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
           {selectedUnitId && (
             <small style={{ color: "#D97706", display: "block", marginTop: "4px" }}>
-              ✅ Selected: {selectedUnitId}
+              ✅ Selected: Lot {returnedUnits.find(u => u.id === selectedUnitId)?.lotNo || selectedUnitId}
+              {returnedUnits.find(u => u.id === selectedUnitId)?.studentName && returnedUnits.find(u => u.id === selectedUnitId)?.studentName !== "—"
+                ? ` (Last issued to: ${returnedUnits.find(u => u.id === selectedUnitId)?.studentName})`
+                : ""}
             </small>
           )}
         </div>

@@ -20,6 +20,8 @@ class IssuedUnit:
         self.qr_generated_at = data.get('qr_generated_at')
         self.qr_print_count = data.get('qr_print_count', 0)
         self.version = data.get('version', 0)
+        self.student_id = data.get('student_id')
+        self.student_name = data.get('student_name')
         self.created_at = data.get('created_at')
         self.updated_at = data.get('updated_at')
 
@@ -81,9 +83,11 @@ class IssuedUnit:
             return []
         db = cls.get_db()
         rows = db.execute_query(
-            """SELECT * FROM issued_units
-               WHERE ref_no = %s AND status = 'returned_good'
-               ORDER BY returned_date ASC""",
+            """SELECT u.*, e.student_id, e.student_name, e.issue_date
+               FROM issued_units u
+               LEFT JOIN issue_events e ON e.issue_id = u.issue_id
+               WHERE u.ref_no = %s AND u.status = 'returned_good'
+               ORDER BY u.returned_date DESC, u.created_at DESC""",
             (ref_no,)
         )
         return [cls(r) for r in rows]
@@ -111,6 +115,8 @@ class IssuedUnit:
             'returnedDate': fmt(self.returned_date),
             'returnCondition': self.return_condition,
             'returnedBy': self.returned_by,
+            'studentId': self.student_id,
+            'studentName': self.student_name,
             'qrCode': self.qr_code,
             'qrPrintCount': self.qr_print_count,
             'createdAt': fmt(self.created_at),

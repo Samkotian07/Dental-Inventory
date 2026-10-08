@@ -21,6 +21,7 @@ import UnitHistory from "./pages/UnitHistory.jsx";
 
 import ArchiveStudents from "./pages/ArchiveStudents.jsx";
 import Reports from "./pages/Reports.jsx"; // ⭐ Uncommented
+import ProductCatalog from "./pages/ProductCatalog.jsx";
 
 function ProtectedRoute({ children, requireAdmin = false }) {
   const { isAuthenticated, user, loading } = useAuth();
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/failed-inventory" element={<FailedInventory />} />
         <Route path="/stock-insertion" element={<WriteRoute><StockInsertion /></WriteRoute>} />
         <Route path="/stock-handle" element={<WriteRoute><StockHandle /></WriteRoute>} />
+        <Route path="/product-catalog" element={<WriteRoute><ProductCatalog /></WriteRoute>} />
         <Route path="/unit-history/:unitId" element={<UnitHistory />} />
 
         {/* ⭐ Reports Route - All users */}

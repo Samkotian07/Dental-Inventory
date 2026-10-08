@@ -306,22 +306,32 @@ export function InventoryProvider({ children }) {
   }, []);
 
   const getReturnedUnitsForRef = useCallback(async (refNo) => {
-    // Filter already-loaded issues for returned units of this ref
-    const found = [];
-    issues.forEach(issue => {
-      (issue.units || []).forEach(u => {
-        if (u.refNo === refNo && u.status === 'returned_good') {
-          found.push({
-            ...u,
-            issueId: issue.issueId,
-            student: issue.student,
-            studentId: issue.studentId,
-          });
-        }
+    try {
+      const res = await fetch(`${API_URL}/inventory/returned-units/${encodeURIComponent(refNo)}`, {
+        headers: getAuthHeaders(),
       });
-    });
-    return found;
-  }, [issues]);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.success && Array.isArray(data.data) ? data.data : [];
+    } catch (err) {
+      console.error("Returned units fetch error:", err);
+      return [];
+    }
+  }, []);
+
+  const getUnitHistory = useCallback(async (identifier) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/unit-history/${encodeURIComponent(identifier)}`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.success ? data : null;
+    } catch (err) {
+      console.error("Unit history fetch error:", err);
+      return null;
+    }
+  }, []);
 
   // ---------- MUTATIONS ----------
 
@@ -370,12 +380,12 @@ export function InventoryProvider({ children }) {
     }
   };
 
-  const returnUnit = async (unitSerial, condition = "Good") => {
+  const returnUnit = async (unitSerial, condition = "Good", returnDate = null) => {
     try {
       const res = await fetch(`${API_URL}/issued/${encodeURIComponent(unitSerial)}/return`, {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify({ condition }),
+        body: JSON.stringify({ condition, return_date: returnDate }),
       });
       const data = await res.json();
       if (data.success) {
@@ -695,6 +705,62 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  // ---------- PRODUCT CATALOG METHODS ----------
+
+  const createProduct = async (payload) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/products`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.message || "Failed to create product" };
+    } catch {
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const updateProduct = async (refNo, payload) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/products/${encodeURIComponent(refNo)}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.message || "Failed to update product" };
+    } catch {
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const bulkCreateProducts = async (rows) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/products/bulk`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(rows),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, imported: data.imported, failed: data.failed, errors: data.errors || [] };
+      }
+      return { success: false, message: data.message || "Bulk create failed" };
+    } catch {
+      return { success: false, message: "Network error" };
+    }
+  };
+
   // ---------- CONTEXT VALUE ----------
 
   const value = {
@@ -711,10 +777,14 @@ export function InventoryProvider({ children }) {
     loadAllData,
     getLotsForRef,
     getReturnedUnitsForRef,
+    getUnitHistory,
     issueFreshUnit,
     issueReturnedUnit,
+    issueItem: issueFreshUnit,
     returnUnit,
+    returnIssuedItem: returnUnit,
     condemnUnit,
+    condemnIssuedItem: condemnUnit,
     exchangeWithVendor,
     markUsedInPatient,
     moveToFailed,
@@ -731,6 +801,9 @@ export function InventoryProvider({ children }) {
     toggleStockStatus,
     updateStockQuantity,
     updateStockItem,
+    createProduct,
+    updateProduct,
+    bulkCreateProducts,
   };
 
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;

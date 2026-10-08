@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
@@ -14,6 +14,8 @@ export default function Login() {
   const [error, setError] = useState("");
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/";
 
   // Reset form when component mounts
   useEffect(() => {
@@ -25,9 +27,9 @@ export default function Login() {
   // Redirect if already logged in
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/");
+      navigate(redirectTo);
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, redirectTo]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,7 +47,7 @@ export default function Login() {
 
     if (result.success) {
       toast.success(`Welcome back, ${result.user.name}!`);
-      navigate("/");
+      navigate(redirectTo);
     } else {
       toast.error(result.message);
       setError(result.message);

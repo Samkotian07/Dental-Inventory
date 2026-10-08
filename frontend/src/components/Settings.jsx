@@ -15,20 +15,11 @@ import "./Settings.css";
 export default function Settings() {
   const onMenuClick = useMenuClick();
   const { user, logout, logoutAll } = useAuth();
-  const { settings = { lowQuantityThreshold: 10, twoFactor: false }, updateSettings, changePassword } = useData();
+  const { changePassword } = useData();
   const { darkMode, toggleDarkMode } = useTheme();
 
-  const [twoFactor, setTwoFactor] = useState(settings?.twoFactor || false);
   const [pwd, setPwd] = useState({ current: "", new: "", confirm: "" });
   const [logoutAllOpen, setLogoutAllOpen] = useState(false);
-
-  const handle2FAToggle = () => {
-    setTwoFactor(!twoFactor);
-    updateSettings({ twoFactor: !twoFactor });
-    toast.success(
-      `Two-factor authentication ${!twoFactor ? "enabled" : "disabled"}`,
-    );
-  };
 
   const handleDarkToggle = () => {
     toggleDarkMode();
@@ -140,18 +131,6 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* 2FA */}
-          <div className="settings-2fa-section">
-            <div className="settings-2fa-content">
-              <div>
-                <p className="settings-2fa-title">Two-Factor Authentication</p>
-                <p className="settings-2fa-desc">
-                  Keep your account secure by enabling 2FA
-                </p>
-              </div>
-              <ToggleSwitch isOn={twoFactor} onToggle={handle2FAToggle} />
-            </div>
-          </div>
         </div>
 
         {/* Logout all devices */}
