@@ -60,42 +60,24 @@ export default function LowStockSettings() {
     let errorMessages = [];
 
     for (const [key, val] of changed) {
-      const newThreshold = Number(val);
-      if (isNaN(newThreshold) || newThreshold < 0) {
-        errorMessages.push(`Invalid threshold value for ${key}`);
+      const trimmedVal = String(val).trim();
+      const newThreshold = Number(trimmedVal);
+      if (trimmedVal === "" || isNaN(newThreshold) || newThreshold < 0 || !Number.isInteger(newThreshold)) {
+        errorMessages.push(`Invalid threshold value for ${key} (must be a non-negative integer)`);
         continue;
       }
 
-      const matchingUnits = stock.filter(s => s.refNo === key || s.id === key);
-      
-      if (matchingUnits.length > 0) {
-        for (const unit of matchingUnits) {
-          try {
-            const result = await updateStockItem(unit.id, { 
-              low_stock_threshold: newThreshold
-            });
-            if (result?.success) {
-              successCount++;
-            } else {
-              errorMessages.push(`Failed to update ${unit.id}: ${result?.message || 'Unknown error'}`);
-            }
-          } catch (err) {
-            errorMessages.push(`Error updating ${unit.id}: ${err.message}`);
-          }
+      try {
+        const result = await updateStockItem(key, { 
+          low_stock_threshold: newThreshold
+        });
+        if (result?.success) {
+          successCount++;
+        } else {
+          errorMessages.push(`Failed to update ${key}: ${result?.message || 'Unknown error'}`);
         }
-      } else {
-        try {
-          const result = await updateStockItem(key, { 
-            low_stock_threshold: newThreshold
-          });
-          if (result?.success) {
-            successCount++;
-          } else {
-            errorMessages.push(`Failed to update ${key}: ${result?.message || 'Unknown error'}`);
-          }
-        } catch (err) {
-          errorMessages.push(`Error updating ${key}: ${err.message}`);
-        }
+      } catch (err) {
+        errorMessages.push(`Error updating ${key}: ${err.message}`);
       }
     }
 

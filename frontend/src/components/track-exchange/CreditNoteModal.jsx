@@ -1,155 +1,219 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Modal from "./Modal.jsx";
 import { useInventory } from "../../context/InventoryContext.jsx";
+import { toast } from "sonner";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function CreditNoteModal({ onClose, onConfirm }) {
-  const { stock = [] } = useInventory();
-  const [itemId, setItemId] = useState("");
-  const [batchNo, setBatchNo] = useState("");
-  const [customBatch, setCustomBatch] = useState("");
+  const { stock = [], getLotsForRef, sendOverstockToVendor } = useInventory();
+
+  const [searchRef, setSearchRef] = useState("");
+  const [selectedRef, setSelectedRef] = useState("");
+  const [lots, setLots] = useState([]);
+  const [loadingLots, setLoadingLots] = useState(false);
+  const [selectedLotId, setSelectedLotId] = useState("");
   const [quantity, setQuantity] = useState(1);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = useState("Overstock");
   const [returnDate, setReturnDate] = useState(todayISO());
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const inventoryOptions = useMemo(
-    () =>
-      stock.map((s) => ({
-        id: s.refNo || s.id,
-        product: s.product || s.productName,
-        batches: s.lotNo ? [s.lotNo] : [],
-      })),
-    [stock]
-  );
+  // Filter stock for product search
+  const filteredProducts = useMemo(() => {
+    const q = searchRef.trim().toLowerCase();
+    if (!q) return stock.slice(0, 50);
+    return stock.filter(
+      (s) =>
+        (s.refNo || "").toLowerCase().includes(q) ||
+        (s.product || s.productName || "").toLowerCase().includes(q)
+    );
+  }, [stock, searchRef]);
 
-  const selectedItem = inventoryOptions.find((i) => i.id === itemId);
-  const availableBatches = selectedItem?.batches || [];
+  // When a product is selected, load available lots
+  useEffect(() => {
+    if (!selectedRef) {
+      setLots([]);
+      setSelectedLotId("");
+      return;
+    }
 
-  const handleItemChange = (e) => {
-    const id = e.target.value;
-    setItemId(id);
-    const item = inventoryOptions.find((i) => i.id === id);
-    if (item?.batches && item.batches.length > 0) {
-      setBatchNo(item.batches[0]);
-    } else {
-      setBatchNo("");
+    let isMounted = true;
+    setLoadingLots(true);
+    getLotsForRef(selectedRef).then((fetchedLots) => {
+      if (!isMounted) return;
+      setLots(fetchedLots || []);
+      setLoadingLots(false);
+      if (fetchedLots && fetchedLots.length > 0) {
+        setSelectedLotId(fetchedLots[0].lotId);
+        setQuantity(1);
+      } else {
+        setSelectedLotId("");
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedRef, getLotsForRef]);
+
+  const selectedLot = useMemo(() => {
+    return lots.find((l) => l.lotId === selectedLotId);
+  }, [lots, selectedLotId]);
+
+  const maxQty = selectedLot ? Math.max(1, selectedLot.qtyAvailable || selectedLot.qtyFresh || 1) : 1;
+
+  const canSubmit = selectedRef && selectedLotId && quantity > 0 && quantity <= maxQty && reason.trim() && !isSubmitting;
+
+  const handleSubmit = async (e) => {
+    e?.preventDefault();
+    if (!canSubmit) return;
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        lotId: selectedLotId,
+        quantity: Number(quantity),
+        reason: reason.trim(),
+        returnDate,
+      };
+
+      let result;
+      if (onConfirm) {
+        result = await onConfirm(payload);
+      } else if (sendOverstockToVendor) {
+        result = await sendOverstockToVendor(payload);
+      }
+
+      if (result?.success) {
+        toast.success("Credit note return created successfully");
+        onClose();
+      } else {
+        toast.error(result?.message || "Failed to create credit note return");
+      }
+    } catch (err) {
+      toast.error(err.message || "Failed to submit credit note return");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const finalBatchNo = batchNo === "custom" ? customBatch : batchNo;
-  const canSubmit = itemId && quantity > 0 && finalBatchNo.trim() && reason.trim();
-
-  const handleSubmit = () => {
-    if (!canSubmit) return;
-    onConfirm({
-      itemId,
-      quantity: Number(quantity),
-      batchNo: finalBatchNo.trim(),
-      reason: reason.trim(),
-      returnDate,
-      type: "return",
-    });
-  };
-
   return (
-    <Modal title="Return - To Vendor / Manufacturer" onClose={onClose} width={460}>
-      <div className="modal__field">
-        <label htmlFor="credit-item">Inventory Item (Ref No) *</label>
-        <select id="credit-item" value={itemId} onChange={handleItemChange}>
-          <option value="">Select item...</option>
-          {inventoryOptions.map((i) => (
-            <option key={i.id} value={i.id}>
-              {i.product} ({i.id})
-            </option>
-          ))}
-        </select>
-      </div>
+    <Modal title="Create Credit Note Return" onClose={onClose} width={480}>
+      <form onSubmit={handleSubmit}>
+        {/* Search / Select Product by ref_no */}
+        <div className="modal__field">
+          <label htmlFor="credit-search">Search Product by Ref No / Name</label>
+          <input
+            id="credit-search"
+            type="text"
+            placeholder="Type to search products..."
+            value={searchRef}
+            onChange={(e) => setSearchRef(e.target.value)}
+            style={{ marginBottom: "8px" }}
+          />
 
-      <div className="modal__field">
-        <label htmlFor="credit-batch">Batch / Lot No *</label>
-        {itemId && availableBatches.length > 0 ? (
-          <>
+          <label htmlFor="credit-item">Select Product *</label>
+          <select
+            id="credit-item"
+            value={selectedRef}
+            onChange={(e) => setSelectedRef(e.target.value)}
+            required
+          >
+            <option value="">Select a product...</option>
+            {filteredProducts.map((p) => (
+              <option key={p.refNo || p.id} value={p.refNo || p.id}>
+                {p.refNo} — {p.productName || p.product} ({p.company || p.companyName || "Vendor"})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Load available lots via GET /api/inventory/available-lots/<ref_no> */}
+        <div className="modal__field">
+          <label htmlFor="credit-lot">Available Lot *</label>
+          {loadingLots ? (
+            <p style={{ fontSize: "13px", color: "var(--ink-soft)" }}>Loading available lots...</p>
+          ) : selectedRef && lots.length === 0 ? (
+            <p style={{ fontSize: "13px", color: "#dc2626" }}>
+              No available open lots found for this product.
+            </p>
+          ) : (
             <select
-              id="credit-batch"
-              value={batchNo}
-              onChange={(e) => setBatchNo(e.target.value)}
+              id="credit-lot"
+              value={selectedLotId}
+              onChange={(e) => {
+                setSelectedLotId(e.target.value);
+                setQuantity(1);
+              }}
+              disabled={!selectedRef || lots.length === 0}
+              required
             >
-              {availableBatches.map((b) => (
-                <option key={b} value={b}>
-                  {b}
+              <option value="">Select an available lot...</option>
+              {lots.map((l) => (
+                <option key={l.lotId} value={l.lotId}>
+                  Lot #{l.lotNo} — Avail: {l.qtyAvailable ?? l.qtyFresh} units {l.expiryDate ? `(Exp: ${l.expiryDate})` : ""}
                 </option>
               ))}
-              <option value="custom">Other / Custom Lot...</option>
             </select>
+          )}
+        </div>
 
-            {batchNo === "custom" && (
-              <input
-                type="text"
-                placeholder="Enter custom batch no..."
-                style={{ marginTop: "6px" }}
-                value={customBatch}
-                onChange={(e) => setCustomBatch(e.target.value)}
-              />
-            )}
-          </>
-        ) : (
+        {/* Quantity */}
+        <div className="modal__field">
+          <label htmlFor="credit-qty">
+            Quantity * {selectedLot && `(Max: ${maxQty})`}
+          </label>
           <input
-            id="credit-batch"
-            type="text"
-            placeholder="LOT-2024-001"
-            value={batchNo}
-            onChange={(e) => setBatchNo(e.target.value)}
+            id="credit-qty"
+            type="number"
+            min="1"
+            max={maxQty}
+            value={quantity}
+            onChange={(e) => setQuantity(Math.max(1, Math.min(maxQty, Number(e.target.value) || 1)))}
+            disabled={!selectedLotId}
+            required
           />
-        )}
-      </div>
+        </div>
 
-      <div className="modal__field">
-        <label htmlFor="credit-qty">Quantity *</label>
-        <input
-          id="credit-qty"
-          type="number"
-          min="1"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-        />
-      </div>
+        {/* Reason */}
+        <div className="modal__field">
+          <label htmlFor="credit-reason">Reason *</label>
+          <textarea
+            id="credit-reason"
+            rows={2}
+            placeholder="Overstock, excess stock to vendor, etc."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            required
+          />
+        </div>
 
-      <div className="modal__field">
-        <label htmlFor="credit-reason">Reason for Return *</label>
-        <textarea
-          id="credit-reason"
-          rows={3}
-          placeholder="Overstock, Excess inventory, etc..."
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-        />
-      </div>
+        {/* Return Date */}
+        <div className="modal__field">
+          <label htmlFor="credit-date">Return Date</label>
+          <input
+            id="credit-date"
+            type="date"
+            value={returnDate}
+            onChange={(e) => setReturnDate(e.target.value)}
+          />
+        </div>
 
-      <div className="modal__field">
-        <label htmlFor="credit-date">Return Date</label>
-        <input
-          id="credit-date"
-          type="date"
-          value={returnDate}
-          onChange={(e) => setReturnDate(e.target.value)}
-        />
-      </div>
-
-      <div className="modal__actions">
-        <button className="modal__btn" onClick={onClose}>
-          Cancel
-        </button>
-        <button
-          className="modal__btn modal__btn--primary"
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-        >
-          Create Return
-        </button>
-      </div>
+        <div className="modal__actions">
+          <button type="button" className="modal__btn" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="modal__btn modal__btn--primary"
+            disabled={!canSubmit}
+          >
+            {isSubmitting ? "Submitting..." : "Submit Credit Note Return"}
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }

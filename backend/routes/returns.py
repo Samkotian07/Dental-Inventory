@@ -71,8 +71,21 @@ def create_overstock_return():
     reason = data.get('reason') or 'Overstock'
     return_date = data.get('return_date') or date.today().isoformat()
 
-    if not lot_id or not qty or not vendor_id:
-        return jsonify({'success': False, 'message': 'lot_id, quantity, vendor_id required'}), 400
+    if not lot_id or not qty:
+        return jsonify({'success': False, 'message': 'lot_id and quantity required'}), 400
+
+    if not vendor_id:
+        db = VendorReturn.get_db()
+        rows = db.execute_query("""
+            SELECT p.vendor_id
+            FROM stock_lots l
+            JOIN products p ON p.ref_no = l.ref_no
+            WHERE l.lot_id = %s
+        """, (lot_id,))
+        if rows and rows[0].get('vendor_id'):
+            vendor_id = rows[0]['vendor_id']
+        else:
+            vendor_id = 1
 
     user = getattr(request, 'current_user', None)
     user_name = user.name if user else 'Admin'
@@ -123,6 +136,13 @@ def complete_return(return_id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
+    if new_lot_no:
+        db = VendorReturn.get_db()
+        db.execute_query(
+            "UPDATE vendor_return_items SET replacement_lot_no = %s WHERE return_id = %s",
+            (new_lot_no, return_id)
+        )
+
     AuditLog.create(
         action='COMPLETE_RETURN',
         entity_type='VENDOR_RETURN',
@@ -142,39 +162,91 @@ def complete_return(return_id):
 @token_required
 def update_status(return_id):
     data = request.get_json() or {}
-    new_status = (data.get('status') or '').strip().lower().replace(' ', '_')
+    raw_status = (data.get('status') or '').strip().lower().replace(' ', '_')
 
-    # Only allow in_progress via this route.
-    # Use /complete for completion.
-    allowed = {'pending', 'in_progress'}
-    if new_status not in allowed:
+    status_map = {
+        'pending': 'pending',
+        'in_progress': 'in_progress',
+        'inprogress': 'in_progress',
+        'completed': 'completed',
+        'complete': 'completed',
+        'rejected': 'rejected',
+        'reject': 'rejected',
+        'cancelled': 'cancelled',
+        'canceled': 'cancelled',
+    }
+    new_status = status_map.get(raw_status)
+
+    allowed = {'pending', 'in_progress', 'completed', 'rejected', 'cancelled'}
+    if not new_status or new_status not in allowed:
         return jsonify({
             'success': False,
-            'message': f'Only {allowed} allowed here. Use /complete endpoint for completion.'
+            'message': f"Invalid status '{raw_status}'. Allowed: pending, in_progress, completed, rejected, cancelled."
         }), 400
 
     obj = VendorReturn.find_by_id(return_id)
     if not obj:
         return jsonify({'success': False, 'message': 'Return not found'}), 404
 
-    db = VendorReturn.get_db()
-    db.execute_query(
-        "UPDATE vendor_returns SET status = %s WHERE return_id = %s",
-        (new_status, return_id)
-    )
-
     user = getattr(request, 'current_user', None)
-    AuditLog.create(
-        action='UPDATE_RETURN_STATUS',
-        entity_type='VENDOR_RETURN',
-        entity_id=return_id,
-        details=f'Status changed to {new_status}',
-        user_id=user.id if user else None,
-        user_name=user.name if user else 'Admin',
-    )
+    user_name = user.name if user else 'Admin'
+
+    if new_status == 'completed':
+        # Completion path using stored procedure
+        new_lot_no = data.get('new_lot_no') or data.get('newBatchNo') or data.get('new_batch_no')
+        new_qty = data.get('new_qty') or data.get('quantity')
+        credit_note_no = data.get('credit_note_no') or data.get('creditNote') or data.get('credit_note')
+        credit_amount = data.get('credit_amount')
+
+        if not new_qty and obj.items:
+            new_qty = obj.items[0].get('quantity') or 1
+        elif not new_qty:
+            new_qty = 1
+
+        if credit_amount is None:
+            credit_amount = 0.0
+
+        try:
+            _call_procedure(
+                'sp_complete_vendor_return',
+                (return_id, new_lot_no, new_qty, credit_note_no, credit_amount, user_name),
+                0
+            )
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 400
+
+        if new_lot_no:
+            db = VendorReturn.get_db()
+            db.execute_query(
+                "UPDATE vendor_return_items SET replacement_lot_no = %s WHERE return_id = %s",
+                (new_lot_no, return_id)
+            )
+
+        AuditLog.create(
+            action='COMPLETE_RETURN',
+            entity_type='VENDOR_RETURN',
+            entity_id=return_id,
+            details=f'Completed return {return_id}',
+            user_id=user.id if user else None,
+            user_name=user_name,
+        )
+    else:
+        db = VendorReturn.get_db()
+        db.execute_query(
+            "UPDATE vendor_returns SET status = %s WHERE return_id = %s",
+            (new_status, return_id)
+        )
+        AuditLog.create(
+            action='UPDATE_RETURN_STATUS',
+            entity_type='VENDOR_RETURN',
+            entity_id=return_id,
+            details=f'Status changed to {new_status}',
+            user_id=user.id if user else None,
+            user_name=user_name,
+        )
 
     updated = VendorReturn.find_by_id(return_id)
-    return jsonify({'success': True, 'data': updated.to_dict()}), 200
+    return jsonify({'success': True, 'data': updated.to_dict() if updated else {}}), 200
 
 
 # ---------- Soft delete credit note ----------

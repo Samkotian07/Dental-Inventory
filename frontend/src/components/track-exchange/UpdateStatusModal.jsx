@@ -12,7 +12,7 @@ export default function UpdateStatusModal({ item, onClose, onConfirm }) {
   const [creditNote, setCreditNote] = useState(item.creditNote || "");
 
   const isExchange = item.type === "exchange";
-  const isCreditNote = item.type === "creditNote" || item.type === "return";
+  const isCreditNote = item.type === "creditNote" || item.type === "return" || item.type === "credit_note";
   const showBatchField = isExchange && newStatus === "Completed";
   const showCreditNoteField = isCreditNote && newStatus === "Completed";
 
@@ -38,7 +38,7 @@ export default function UpdateStatusModal({ item, onClose, onConfirm }) {
     onConfirm(item.returnId, newStatus, extraData);
   };
 
-  const statusOptions = ["Pending", "In Progress", "Completed", "Rejected"];
+  const statusOptions = ["Pending", "In Progress", "Completed", "Rejected", "Cancelled"];
 
   return (
     <Modal title="Update Return Status" onClose={onClose} width={480}>

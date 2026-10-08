@@ -126,25 +126,40 @@ function normalizeIssue(item) {
   };
 }
 
+function mapReturnStatus(raw) {
+  const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
+  if (s === "completed") return "Completed";
+  if (s === "in_progress" || s === "inprogress") return "In Progress";
+  if (s === "rejected") return "Rejected";
+  if (s === "cancelled" || s === "canceled") return "Cancelled";
+  return "Pending";
+}
+
 function normalizeReturn(item) {
   const first = (item.items && item.items[0]) || {};
+  const replLot = first.replacementLotNo || item.replacementLotNo || item.newBatchNo || item.new_lot_no || first.replacement_lot_no || "";
+  const cn = item.creditNote || item.creditNoteNo || item.credit_note || item.credit_note_no || first.creditNote || first.credit_note || "";
+
   return {
     returnId: item.returnId || item.return_id,
-    type: item.type || item.return_type,
+    type: (item.type === "credit_note" || item.type === "creditNote") ? "creditNote" : (item.type || item.return_type || "exchange"),
     vendorId: item.vendorId || item.vendor_id,
     returnDate: item.returnDate || item.return_date,
     reason: item.reason || "",
-    status: item.status || "pending",
+    status: mapReturnStatus(item.status),
     createdBy: item.createdBy || item.created_by,
     completedAt: item.completedAt || item.completed_at,
     createdAt: item.createdAt || item.created_at,
     // Flattened convenience fields for existing UI
-    refNo: first.refNo || "",
-    productName: first.productName || "",
-    quantity: first.quantity || 0,
-    batchNo: first.lotNo || "",
-    newBatchNo: first.replacementLotNo || "",
-    creditNote: "",
+    refNo: first.refNo || item.refNo || "",
+    productName: first.productName || item.productName || "",
+    quantity: first.quantity || item.quantity || 0,
+    batchNo: first.lotNo || item.lotNo || "",
+    newBatchNo: replLot,
+    replacementLotNo: replLot,
+    creditNote: cn,
+    creditNoteNo: cn,
+    creditNoteOrRepl: replLot || cn || "",
     items: item.items || [],
   };
 }
@@ -177,7 +192,7 @@ function normalizeFailed(item) {
 
 
 export function InventoryProvider({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [stock, setStock] = useState([]);
   const [failed, setFailed] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -507,12 +522,18 @@ export function InventoryProvider({ children }) {
     }
   };
 
-  const sendOverstockToVendor = async ({ lotId, quantity, vendorId, reason }) => {
+  const sendOverstockToVendor = async ({ lotId, quantity, vendorId, reason, returnDate }) => {
     try {
       const res = await fetch(`${API_URL}/returns/overstock`, {
         method: "POST",
         headers: getAuthHeaders(),
-        body: JSON.stringify({ lot_id: lotId, quantity, vendor_id: vendorId, reason }),
+        body: JSON.stringify({
+          lot_id: lotId,
+          quantity: Number(quantity),
+          ...(vendorId ? { vendor_id: Number(vendorId) } : {}),
+          reason: reason || "Overstock",
+          ...(returnDate ? { return_date: returnDate } : {}),
+        }),
       });
       const data = await res.json();
       if (data.success) {
@@ -527,7 +548,7 @@ export function InventoryProvider({ children }) {
 
   const deleteReturn = async (returnId) => {
     try {
-      const res = await fetch(`${API_URL}/returns/${returnId}`, {
+      const res = await fetch(`${API_URL}/returns/${encodeURIComponent(returnId)}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
       });
@@ -540,6 +561,43 @@ export function InventoryProvider({ children }) {
     } catch (err) {
       return { success: false, message: "Network error" };
     }
+  };
+
+  const updateReturnStatus = async (returnId, newStatus, extraData = {}) => {
+    try {
+      const payload = {
+        status: newStatus.toLowerCase().replace(/\s+/g, "_"),
+        ...extraData,
+      };
+      const res = await fetch(`${API_URL}/returns/${encodeURIComponent(returnId)}/status`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchReturns(), fetchStock()]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.message || "Failed to update return status" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const discardReturn = async (returnId) => {
+    // If admin → DELETE /api/returns/<id>
+    // If staff → updateReturnStatus(id, 'cancelled')
+    const role = user?.role || "staff";
+    if (role === "admin") {
+      return deleteReturn(returnId);
+    } else {
+      return updateReturnStatus(returnId, "cancelled");
+    }
+  };
+
+  const addReturn = async () => {
+    return { success: false, message: "Use overstock endpoint" };
   };
 
   const receiveStock = async (data) => {
@@ -619,6 +677,24 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  const updateStockItem = async (refNo, updates) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/${encodeURIComponent(refNo)}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(updates),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.message || "Update failed" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
   // ---------- CONTEXT VALUE ----------
 
   const value = {
@@ -647,10 +723,14 @@ export function InventoryProvider({ children }) {
     completeVendorReturn,
     sendOverstockToVendor,
     deleteReturn,
+    updateReturnStatus,
+    discardReturn,
+    addReturn,
     receiveStock,
     bulkReceiveStock,
     toggleStockStatus,
     updateStockQuantity,
+    updateStockItem,
   };
 
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>;

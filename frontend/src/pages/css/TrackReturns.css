@@ -272,6 +272,11 @@
   color: #dc2626;
 }
 
+.ret-status-pill--cancelled {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
 /* Type Badge */
 .ret-type-badge {
   display: inline-block;

@@ -201,6 +201,55 @@ def toggle_product_status(ref_no):
         db.execute_query("UPDATE products SET is_active = NOT is_active WHERE ref_no = %s", (ref_no,))
     return jsonify({'success': True, 'message': f'Status updated for {ref_no}'}), 200
 
+
+# ---------- Update stock item / low stock threshold ----------
+
+@inventory_bp.route('/<ref_no>', methods=['PUT'])
+@inventory_bp.route('/<ref_no>/threshold', methods=['PUT'])
+@token_required
+def update_stock_item(ref_no):
+    product = Product.find_by_ref_no(ref_no)
+    if not product:
+        return jsonify({'success': False, 'message': f'Product {ref_no} not found'}), 404
+
+    data = request.get_json() or {}
+
+    allowed_keys = {'low_stock_threshold', 'lowStockThreshold'}
+    if not data or not any(k in allowed_keys for k in data.keys()):
+        return jsonify({'success': False, 'message': 'Only low_stock_threshold is editable via this endpoint.'}), 400
+
+    extra_keys = [k for k in data.keys() if k not in allowed_keys]
+    if extra_keys:
+        return jsonify({'success': False, 'message': 'Only low_stock_threshold is editable via this endpoint.'}), 400
+
+    raw_val = data.get('low_stock_threshold')
+    if raw_val is None:
+        raw_val = data.get('lowStockThreshold')
+
+    if raw_val is None or str(raw_val).strip() == '':
+        return jsonify({'success': False, 'message': 'Threshold value is required'}), 400
+
+    try:
+        threshold_val = int(raw_val)
+        if threshold_val < 0:
+            return jsonify({'success': False, 'message': 'Threshold must be non-negative'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': 'Threshold must be a valid number'}), 400
+
+    db = StockLot.get_db()
+    db.execute_query(
+        "UPDATE products SET low_stock_threshold = %s, updated_at = NOW() WHERE ref_no = %s",
+        (threshold_val, ref_no)
+    )
+
+    updated_prod = Product.find_by_ref_no(ref_no)
+    return jsonify({
+        'success': True,
+        'message': f'Threshold updated to {threshold_val} for {ref_no}',
+        'data': updated_prod.to_dict() if updated_prod else {'refNo': ref_no, 'lowStockThreshold': threshold_val}
+    }), 200
+
+
 # ---------- Receive single stock ----------
 
 @inventory_bp.route('/receive', methods=['POST'])
