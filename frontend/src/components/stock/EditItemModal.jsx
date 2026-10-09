@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, Plus, Minus, AlertCircle, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Package, Plus, Minus, AlertCircle, ArrowUpRight, ArrowDownRight, Trash2 } from "lucide-react";
 import Modal from "./Modal.jsx";
 import "./EditItemModal.css";
 
@@ -10,7 +10,7 @@ const PRESET_REASONS = [
   "Shipment adjustment",
 ];
 
-export default function EditItemModal({ item, onClose, onSave }) {
+export default function EditItemModal({ item, onClose, onSave, onDelete }) {
   if (!item) return null;
 
   const currentQty = Number(item?.qty || item?.quantity || 0);
@@ -32,7 +32,7 @@ export default function EditItemModal({ item, onClose, onSave }) {
   };
 
   return (
-    <Modal title="Edit Inventory Item" onClose={onClose} width={540}>
+    <Modal title="Edit Inventory Item" onClose={onClose} width={780}>
       <div className="edit-stock">
         {/* Product Banner */}
         <div className="edit-stock__banner">
@@ -184,6 +184,16 @@ export default function EditItemModal({ item, onClose, onSave }) {
 
         {/* Actions */}
         <div className="modal__actions">
+          {onDelete && (
+            <button
+              type="button"
+              className="modal__btn modal__btn--danger edit-stock__delete-btn"
+              onClick={onDelete}
+            >
+              <Trash2 size={15} strokeWidth={2.2} />
+              Move to Failed
+            </button>
+          )}
           <button type="button" className="modal__btn" onClick={onClose}>
             Cancel
           </button>

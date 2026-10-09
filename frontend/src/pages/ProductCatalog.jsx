@@ -254,39 +254,49 @@ export default function ProductCatalog() {
             <table className="stock__table">
               <thead>
                 <tr>
+                  <th>Invoice No</th>
+                  <th>Credit Note No</th>
                   <th>Ref No</th>
-                  <th>Product</th>
                   <th>Category</th>
                   <th>Company</th>
+                  <th>Product</th>
                   <th>Size</th>
+                  <th>Lot No</th>
+                  <th>Quantity</th>
+                  <th>Expiry Date</th>
                   <th>Fresh Loc</th>
                   <th>Returned Loc</th>
-                  <th>Threshold</th>
                   <th className="stock__actions-head">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {pageRows.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="stock__empty">
+                    <td colSpan={13} className="stock__empty">
                       No products found.
                     </td>
                   </tr>
                 )}
                 {pageRows.map((row) => (
                   <tr key={row.refNo} className={row.isActive === false ? "stock__row--inactive" : ""}>
+                    <td className="stock__mono">{row.invoiceNo || row.invoice_no || "—"}</td>
+                    <td className="stock__mono">{row.creditNoteNo || row.credit_note_no || "—"}</td>
                     <td className="stock__mono">{row.refNo}</td>
-                    <td className="stock__strong">{row.product || row.productName}</td>
                     <td>
                       <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>
                         {normalizeCategory(row.category)}
                       </span>
                     </td>
-                    <td>{row.company || row.companyName || "—"}</td>
+                    <td className="stock__strong">{row.company || row.companyName || "—"}</td>
+                    <td>{row.product || row.productName || "—"}</td>
                     <td>{row.size || "—"}</td>
+                    <td className="stock__mono">{row.lotNo || row.lot_no || "—"}</td>
+                    <td style={{ textAlign: "center", fontWeight: 600 }}>
+                      {row.quantity ?? row.qty ?? "—"}
+                    </td>
+                    <td>{row.expiryDate || row.expiry_date || row.expiry || "—"}</td>
                     <td className="stock__mono">{row.freshLocation || "—"}</td>
                     <td className="stock__mono">{row.returnedLocation || "—"}</td>
-                    <td style={{ textAlign: "center", fontWeight: 600 }}>{row.lowStockThreshold ?? 10}</td>
                     <td>
                       <div className="stock__row-actions">
                         <button

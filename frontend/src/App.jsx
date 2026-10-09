@@ -114,7 +114,7 @@ export default function App() {
               <StaffManager />
             </AdminRoute>
           }
-        />
+        />{/*
         <Route
           path="/audit-log"
           element={
@@ -122,7 +122,7 @@ export default function App() {
               <AuditLog />
             </AdminRoute>
           }
-        />
+        />*/}
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

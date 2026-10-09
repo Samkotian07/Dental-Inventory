@@ -1,6 +1,9 @@
 .reports-page {
   padding: 24px 28px 44px;
   max-width: 1200px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin: 0 auto;
 }
 
@@ -117,6 +120,7 @@
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 18px;
+  min-width: 0;
   overflow: hidden;
   box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
 }
@@ -164,13 +168,17 @@
 /* Table */
 .reports-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 660px;
   border-collapse: collapse;
-  font-size: 13px;
+  table-layout: fixed;
+  font-size: 12px;
 }
 
 .reports-table-wrap {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
   border: 1px solid var(--line);
   border-radius: 10px;
   scrollbar-width: thin;
@@ -178,20 +186,41 @@
 
 .reports-table th {
   text-align: left;
-  padding: 11px 12px;
+  padding: 9px 8px;
   font-weight: 600;
   color: var(--ink-soft);
   border-bottom: 2px solid var(--line);
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   background: var(--panel);
 }
 
 .reports-table td {
-  padding: 11px 12px;
+  padding: 9px 8px;
   border-bottom: 1px solid var(--line);
   color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reports-table th:nth-child(1) { width: 7%; }
+.reports-table th:nth-child(2) { width: 16%; }
+.reports-table th:nth-child(3) { width: 10%; }
+.reports-table th:nth-child(4) { width: 13%; }
+.reports-table th:nth-child(5) { width: 11%; }
+.reports-table th:nth-child(6),
+.reports-table th:nth-child(7),
+.reports-table th:nth-child(8) { width: 7%; text-align: center; }
+.reports-table th:nth-child(9) { width: 13%; }
+.reports-table th:nth-child(10) { width: 9%; text-align: center; }
+
+.reports-table td:nth-child(6),
+.reports-table td:nth-child(7),
+.reports-table td:nth-child(8),
+.reports-table td:nth-child(10) {
+  text-align: center;
 }
 
 .reports-table tr:hover td {
@@ -310,6 +339,10 @@
   .reports-content {
     padding: 16px;
   }
+
+  .reports-table {
+    min-width: 620px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -383,6 +416,7 @@
     padding: 9px 0;
     border-bottom: 1px solid var(--line);
     overflow-wrap: anywhere;
+    white-space: normal;
     text-align: right;
   }
 

@@ -469,7 +469,7 @@ export default function StockInsertion() {
             </div>
           </div>
 
-          {/* ---------- Bulk Import ---------- */}
+          {/* ---------- Bulk Import ---------- 
           <div className="si-bulk-section-wrapper">
             <div className="si-bulk-header">
               <h3 className="si-section-title">Bulk Import Inventory</h3>
@@ -498,7 +498,7 @@ export default function StockInsertion() {
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="si-hidden-input" onChange={(e) => handleFile(e.target.files[0])} />
               </div>
             </div>
-          </div>
+          </div>*/}
 
           {/* ---------- Preview Modal ---------- */}
           <Modal

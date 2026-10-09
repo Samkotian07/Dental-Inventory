@@ -318,14 +318,14 @@ export function DataProvider({ children }) {
   useEffect(() => {
     const interval = setInterval(() => {
       const token = localStorage.getItem("dental_token");
-      if (token && token !== "null" && token !== "undefined" && students.length === 0) {
+      if (isAuthenticated && token && token !== "null" && token !== "undefined" && students.length === 0) {
         console.log("🔄 Token found, reloading students...");
         fetchStudents();
         fetchStaff();
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [students.length]);
+  }, [isAuthenticated, students.length]);
 
   const value = {
     students,

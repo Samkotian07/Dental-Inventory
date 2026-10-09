@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Download, Eye, Pencil, Trash2, ArrowUpDown } from "lucide-react";
+import { Search, Download, Eye, Pencil, ArrowUpDown } from "lucide-react";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import ItemDetailsModal from "../components/stock/ItemDetailsModal.jsx";
 import EditItemModal from "../components/stock/EditItemModal.jsx";
 import DeleteItemModal from "../components/stock/DeleteItemModal.jsx";
+import ToggleSwitch from "../components/common/ToggleSwitch.jsx";
 import { CATEGORIES as categories, normalizeCategory, isCategoryMatch } from "../components/utils/constants.js";
 import { exportToCsv } from "../utils/csv.js";
 import { useMenuClick } from "../components/Layout.jsx";
@@ -56,6 +57,7 @@ export default function Stock() {
     moveToFailed,
     getLotsForRef,
     updateStockQuantity,
+    toggleStockStatus,
   } = useInventory();
 
   const [query, setQuery] = useState("");
@@ -245,6 +247,19 @@ export default function Stock() {
     setDeleteItem(null);
   };
 
+  const handleToggleStockStatus = async (row) => {
+    const refNo = row.refNo || row.id;
+    const isActive = row.status !== "inactive" && row.isActive !== false;
+    const targetStatus = isActive ? "inactive" : "active";
+    const result = await toggleStockStatus(refNo, targetStatus);
+
+    if (result.success) {
+      toast.success(`${row.product || "Stock item"} ${targetStatus === "active" ? "enabled" : "disabled"}`);
+    } else {
+      toast.error(result.message || "Failed to update stock status");
+    }
+  };
+
   const columns = [
     { key: "refNo", label: "Ref No" },
     { key: "category", label: "Category" },
@@ -341,21 +356,21 @@ export default function Stock() {
                     key={row.refNo || row.id}
                     className={row.status === "inactive" || row.isActive === false ? "stock__row--inactive" : ""}
                   >
-                    <td className="stock__mono">{row.refNo}</td>
-                    <td>
+                    <td className="stock__mono" data-label="Ref no">{row.refNo}</td>
+                    <td data-label="Category">
                       <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>
                         {row.category || "General"}
                       </span>
                     </td>
-                    <td>{row.company}</td>
-                    <td className="stock__strong">{row.product}</td>
-                    <td>{row.size || "—"}</td>
-                    <td className="stock__mono">{row.lotNo}</td>
-                    <td>{row.qty}</td>
-                    <td className={isExpiringSoon(row.expiry) ? "stock__expiry-warning" : "stock__expiry"}>
+                    <td data-label="Company">{row.company}</td>
+                    <td className="stock__strong" data-label="Product">{row.product}</td>
+                    <td data-label="Size">{row.size || "—"}</td>
+                    <td className="stock__mono" data-label="Lot no">{row.lotNo}</td>
+                    <td data-label="Quantity">{row.qty}</td>
+                    <td data-label="Expiry" className={isExpiringSoon(row.expiry) ? "stock__expiry-warning" : "stock__expiry"}>
                       {formatDisplayDate(row.expiry)}
                     </td>
-                    <td>
+                    <td data-label="Returned">
                       {row.returnedCount > 0 ? (
                         <span className="returned-badge">
                           🔄 {row.returnedCount} unit{row.returnedCount > 1 ? 's' : ''}
@@ -364,7 +379,7 @@ export default function Stock() {
                         <span className="fresh-badge">📦 Fresh</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Actions">
                       <div className="stock__row-actions">
                         <button
                           className="stock__icon-btn"
@@ -375,24 +390,22 @@ export default function Stock() {
                           <Eye size={16} strokeWidth={2} />
                         </button>
                         {isAdmin && (
-                          <button
-                            className="stock__icon-btn"
-                            onClick={() => setEditItem(row)}
-                            aria-label={`Edit ${row.refNo}`}
-                            title="Edit item"
-                          >
-                            <Pencil size={16} strokeWidth={2} />
-                          </button>
-                        )}
-                        {canWrite && (
-                          <button
-                            className="stock__icon-btn stock__icon-btn--danger"
-                            onClick={() => setDeleteItem(row)}
-                            aria-label={`Move ${row.refNo} to failed`}
-                            title="Move to Failed"
-                          >
-                            <Trash2 size={16} strokeWidth={2} />
-                          </button>
+                          <>
+                            <button
+                              className="stock__icon-btn"
+                              onClick={() => setEditItem(row)}
+                              aria-label={`Edit ${row.refNo}`}
+                              title="Edit item"
+                            >
+                              <Pencil size={16} strokeWidth={2} />
+                            </button>
+                            <div className="stock__status-control">
+                              <ToggleSwitch
+                                isOn={row.status !== "inactive" && row.isActive !== false}
+                                onToggle={() => handleToggleStockStatus(row)}
+                              />
+                            </div>
+                          </>
                         )}
                       </div>
                     </td>
@@ -419,7 +432,15 @@ export default function Stock() {
       {detailItem && <ItemDetailsModal item={detailItem} onClose={() => setDetailItem(null)} />}
 
       {editItem && (
-        <EditItemModal item={editItem} onClose={() => setEditItem(null)} onSave={handleSaveEdit} />
+        <EditItemModal
+          item={editItem}
+          onClose={() => setEditItem(null)}
+          onSave={handleSaveEdit}
+          onDelete={canWrite ? () => {
+            setDeleteItem(editItem);
+            setEditItem(null);
+          } : undefined}
+        />
       )}
 
       {deleteItem && (

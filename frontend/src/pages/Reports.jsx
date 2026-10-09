@@ -231,7 +231,7 @@ export default function Reports() {
                   <th>Company</th>
                   <th>Lot No</th>
                   <th>Fresh</th>
-                  <th>Returned</th>
+                  <th>Return</th>
                   <th>Total</th>
                   <th>Location</th>
                   <th>Threshold</th>
@@ -248,7 +248,7 @@ export default function Reports() {
                     <td data-label="Company">{item.company}</td>
                     <td data-label="Lot No">{item.lotNo}</td>
                     <td data-label="Fresh">{item.freshCount}</td>
-                    <td data-label="Returned">{item.returnedCount}</td>
+                    <td data-label="Return">{item.returnedCount}</td>
                     <td data-label="Total"><strong>{item.totalQuantity}</strong></td>
                     <td data-label="Location">{item.location}</td>
                     <td data-label="Threshold">{item.threshold}</td>

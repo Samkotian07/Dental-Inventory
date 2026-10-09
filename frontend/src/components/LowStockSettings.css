@@ -156,12 +156,13 @@
 .lss-search-wrapper {
   position: relative;
   padding: 0 20px 18px;
+  --lss-search-inset: 20px;
 }
 
 .lss-search-icon {
   position: absolute;
-  left: 32px;
-  top: 50%;
+  left: calc(var(--lss-search-inset) + 12px);
+  top: 21px;
   transform: translateY(-50%);
   color: var(--ink-soft);
   width: 16px;
@@ -413,6 +414,7 @@
 
   .lss-search-wrapper {
     padding: 0 18px 16px;
+    --lss-search-inset: 18px;
   }
 
   .lss-search-input {
@@ -521,6 +523,7 @@
 
   .lss-search-wrapper {
     padding: 0 12px 10px;
+    --lss-search-inset: 12px;
   }
 
   .lss-table th {

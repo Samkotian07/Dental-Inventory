@@ -4,11 +4,12 @@ import Input from "../common/Input";
 import Button from "../common/Button";
 import { toast } from "sonner";
 import { useInventory } from "../../context/InventoryContext.jsx";
+import "./AddProductModal.css";
 
 const CATEGORIES = ["implant", "abutment", "prosthetic", "tool", "consumable", "other"];
 
 export default function AddProductModal({ onClose, onSaved }) {
-  const { createProduct } = useInventory();
+  const { createProduct, receiveStock } = useInventory();
   const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
@@ -22,6 +23,11 @@ export default function AddProductModal({ onClose, onSaved }) {
     freshLocation: "",
     returnedLocation: "",
     lowStockThreshold: 10,
+    lotNo: "",
+    quantity: "",
+    invoiceNo: "",
+    creditNoteNo: "",
+    expiryDate: "",
     isReturnable: false, // implants usually false by default
     isActive: true,
   });
@@ -45,6 +51,12 @@ export default function AddProductModal({ onClose, onSaved }) {
 
   const handleSave = async () => {
     if (!canSubmit) return;
+    const hasAnyLotValue = [form.lotNo, form.quantity, form.invoiceNo, form.creditNoteNo, form.expiryDate]
+      .some((value) => String(value).trim() !== "");
+    if (hasAnyLotValue && (!form.lotNo.trim() || Number(form.quantity) < 1)) {
+      toast.error("Lot number and quantity are required when adding stock details");
+      return;
+    }
     setSubmitting(true);
     const result = await createProduct({
       ref_no: form.refNo.trim(),
@@ -60,6 +72,25 @@ export default function AddProductModal({ onClose, onSaved }) {
       is_returnable: form.isReturnable,
       is_active: form.isActive,
     });
+    if (result.success && hasAnyLotValue) {
+      const stockResult = await receiveStock({
+        ref_no: form.refNo.trim(),
+        lot_no: form.lotNo.trim(),
+        quantity: Number(form.quantity),
+        invoice_no: form.invoiceNo.trim() || null,
+        credit_note_no: form.creditNoteNo.trim() || null,
+        expiry_date: form.expiryDate || null,
+        product_name: form.productName.trim(),
+        category: form.category,
+        size: form.size.trim(),
+        company_name: form.companyName.trim(),
+      });
+      if (!stockResult.success) {
+        setSubmitting(false);
+        toast.error(stockResult.message || "Product was created, but the opening stock could not be added");
+        return;
+      }
+    }
     setSubmitting(false);
 
     if (result.success) {
@@ -72,8 +103,18 @@ export default function AddProductModal({ onClose, onSaved }) {
   };
 
   return (
-    <Modal isOpen={true} onClose={onClose} title="Add New Product" width={600}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "4px" }}>
+    <Modal isOpen={true} onClose={onClose} title="Add New Product" size="xl">
+      <div className="add-product-form">
+        <div className="modal__field">
+          <label>Invoice No</label>
+          <Input value={form.invoiceNo} onChange={(e) => update("invoiceNo", e.target.value)} placeholder="e.g. INV-2026-001" />
+        </div>
+
+        <div className="modal__field">
+          <label>Credit Note No</label>
+          <Input value={form.creditNoteNo} onChange={(e) => update("creditNoteNo", e.target.value)} placeholder="Optional credit note" />
+        </div>
+
         <div className="modal__field">
           <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600 }}>Ref No *</label>
           <Input
@@ -92,7 +133,7 @@ export default function AddProductModal({ onClose, onSaved }) {
           />
         </div>
 
-        <div className="modal__field" style={{ gridColumn: "span 2" }}>
+        <div className="modal__field modal__field--product">
           <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600 }}>Product Name *</label>
           <Input
             value={form.productName}
@@ -146,11 +187,31 @@ export default function AddProductModal({ onClose, onSaved }) {
         <div className="modal__field">
           <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600 }}>Low Stock Threshold</label>
           <Input
-            type="number"
-            min="0"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={form.lowStockThreshold}
-            onChange={(e) => update("lowStockThreshold", e.target.value)}
+            onChange={(e) => {
+              if (/^\d*$/.test(e.target.value)) {
+                update("lowStockThreshold", e.target.value);
+              }
+            }}
           />
+        </div>
+
+        <div className="modal__field">
+          <label>Lot No</label>
+          <Input value={form.lotNo} onChange={(e) => update("lotNo", e.target.value)} placeholder="e.g. 194032" />
+        </div>
+
+        <div className="modal__field">
+          <label>Quantity</label>
+          <Input type="number" min="1" value={form.quantity} onChange={(e) => update("quantity", e.target.value)} placeholder="Opening quantity" />
+        </div>
+
+        <div className="modal__field">
+          <label>Expiry Date</label>
+          <Input type="date" value={form.expiryDate} onChange={(e) => update("expiryDate", e.target.value)} />
         </div>
 
         <div className="modal__field">
@@ -171,7 +232,7 @@ export default function AddProductModal({ onClose, onSaved }) {
           />
         </div>
 
-        <div className="modal__field" style={{ gridColumn: "span 2" }}>
+        <div className="modal__field modal__field--wide">
           <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600 }}>Description</label>
           <Input
             value={form.description}
@@ -180,26 +241,24 @@ export default function AddProductModal({ onClose, onSaved }) {
           />
         </div>
 
-        <div className="modal__field" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+        <div className="modal__field modal__field--toggle">
           <input
             type="checkbox"
             id="addReturnable"
             checked={form.isReturnable}
             onChange={(e) => update("isReturnable", e.target.checked)}
-            style={{ width: 16, height: 16, cursor: "pointer" }}
           />
-          <label htmlFor="addReturnable" style={{ fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Is Returnable</label>
+          <label htmlFor="addReturnable">Is Returnable</label>
         </div>
 
-        <div className="modal__field" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+        <div className="modal__field modal__field--toggle">
           <input
             type="checkbox"
             id="addActive"
             checked={form.isActive}
             onChange={(e) => update("isActive", e.target.checked)}
-            style={{ width: 16, height: 16, cursor: "pointer" }}
           />
-          <label htmlFor="addActive" style={{ fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Is Active</label>
+          <label htmlFor="addActive">Is Active</label>
         </div>
       </div>
 

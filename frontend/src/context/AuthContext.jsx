@@ -27,6 +27,13 @@ export function AuthProvider({ children }) {
             setUser(data.data);
             setIsAuthenticated(true);
             localStorage.setItem("dental_user", JSON.stringify(data.data));
+          } else {
+            // A saved token can be expired, revoked, or signed with an older
+            // server secret. Do not leave the app in an authenticated state.
+            localStorage.removeItem("dental_token");
+            localStorage.removeItem("dental_user");
+            setUser(null);
+            setIsAuthenticated(false);
           }
         })
         .catch(() => {})

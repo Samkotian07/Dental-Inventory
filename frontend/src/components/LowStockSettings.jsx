@@ -142,7 +142,7 @@ export default function LowStockSettings() {
 
   const getThresholdValue = (item) => {
     const itemId = item.refNo || item.id;
-    if (thresholdEdits[itemId] !== undefined && thresholdEdits[itemId] !== "") {
+    if (Object.prototype.hasOwnProperty.call(thresholdEdits, itemId)) {
       return thresholdEdits[itemId];
     }
     return item.lowStockThreshold ?? defaultThreshold;
@@ -326,15 +326,19 @@ export default function LowStockSettings() {
                         </td>
                         <td className="lss-threshold-cell">
                           <input
-                            type="number"
-                            min="0"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            aria-label={`Low stock threshold for ${item.productName || item.refNo}`}
                             value={getThresholdValue(item)}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const nextValue = e.target.value;
+                              if (!/^\d*$/.test(nextValue)) return;
                               setThresholdEdits({
                                 ...thresholdEdits,
-                                [itemId]: e.target.value,
-                              })
-                            }
+                                [itemId]: nextValue,
+                              });
+                            }}
                             className={`lss-threshold-input ${isEdited ? "lss-threshold-edited" : ""}`}
                           />
                         </td>
