@@ -98,6 +98,9 @@ export default function LowStockSettings() {
     const map = {};
     
     (stock || []).forEach((item) => {
+      // Rule: only show products with lotNo present (qty=0 allowed for threshold config)
+      if (!item.lotNo || String(item.lotNo).trim() === "") return;
+
       const key = item.refNo || item.id;
       
       if (!map[key]) {
@@ -111,11 +114,12 @@ export default function LowStockSettings() {
           units: [],
           lowStockThreshold: item.lowStockThreshold ?? defaultThreshold,
           status: item.status,
+          lotNo: item.lotNo,
         };
       }
       
       if (item.status === "active" || !item.status) {
-        const unitQty = item.quantity || item.qty || 1;
+        const unitQty = Number(item.quantity ?? item.qty ?? 0);
         map[key].quantity += unitQty;
         map[key].qty += unitQty;
         map[key].units.push(item.id);

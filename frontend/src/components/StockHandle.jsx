@@ -36,6 +36,9 @@ export default function StockHandle() {
   const groupedStock = useMemo(() => {
     const groupedMap = {};
     (stock || []).forEach((r) => {
+      // Must have lotNo present
+      if (!r.lotNo || String(r.lotNo).trim() === "") return;
+
       const key = r.refNo || r.id;
       if (!groupedMap[key]) {
         groupedMap[key] = {
@@ -56,7 +59,7 @@ export default function StockHandle() {
           unitIds: [],
         };
       }
-      const unitQty = r.quantity || 1;
+      const unitQty = Number(r.quantity ?? 0);
       groupedMap[key].quantity += unitQty;
       groupedMap[key].qty += unitQty;
       if (r.isReturned === true) {
@@ -65,7 +68,8 @@ export default function StockHandle() {
       groupedMap[key].units.push(r);
       groupedMap[key].unitIds.push(r.id);
     });
-    return Object.values(groupedMap);
+    // Only show products with quantity > 0
+    return Object.values(groupedMap).filter((item) => Number(item.quantity ?? 0) > 0);
   }, [stock]);
 
   const handleSearch = () => {

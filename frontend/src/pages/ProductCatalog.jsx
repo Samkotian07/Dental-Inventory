@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Plus, Upload, Download, Search, Edit, PackagePlus, Check, XCircle } from "lucide-react";
 import * as XLSX from "xlsx";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
@@ -11,20 +11,21 @@ import { useInventory } from "../context/InventoryContext.jsx";
 import AddProductModal from "../components/product/AddProductModal.jsx";
 import AddLotModal from "../components/product/AddLotModal.jsx";
 import EditProductModal from "../components/product/EditProductModal.jsx";
+import { normalizeCategory } from "../components/utils/constants.js";
 import { toast } from "sonner";
 import "./css/ProductCatalog.css";
 
 const PAGE_SIZE = 10;
 
 const BULK_COLUMNS = [
-  "refNo", "category", "companyName", "productName", "size",
-  "freshLocation", "returnedLocation",
+  "refNo", "groupCode", "productName", "category", "companyName", "size", "description",
+  "freshLocation", "returnedLocation", "lowStockThreshold", "isReturnable",
   "lotNo", "quantity", "invoiceNo", "creditNoteNo", "expiryDate",
 ];
 
 export default function ProductCatalog() {
   const onMenuClick = useMenuClick();
-  const { stock, createProduct, bulkCreateProducts, receiveStock } = useInventory();
+  const { products, fetchProducts, createProduct, bulkCreateProducts, receiveStock } = useInventory();
 
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -36,16 +37,28 @@ export default function ProductCatalog() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef(null);
 
+  useEffect(() => {
+    if (fetchProducts) {
+      fetchProducts();
+    }
+  }, [fetchProducts]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return stock || [];
-    return (stock || []).filter(
+    if (!q) return products || [];
+    return (products || []).filter(
       (s) =>
         (s.refNo || "").toLowerCase().includes(q) ||
+        (s.groupCode || "").toLowerCase().includes(q) ||
         (s.product || s.productName || "").toLowerCase().includes(q) ||
-        (s.company || s.companyName || "").toLowerCase().includes(q)
+        (s.company || s.companyName || "").toLowerCase().includes(q) ||
+        (s.category || "").toLowerCase().includes(q) ||
+        (s.size || "").toLowerCase().includes(q) ||
+        (s.description || "").toLowerCase().includes(q) ||
+        (s.freshLocation || "").toLowerCase().includes(q) ||
+        (s.returnedLocation || "").toLowerCase().includes(q)
     );
-  }, [stock, query]);
+  }, [products, query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -56,9 +69,22 @@ export default function ProductCatalog() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet([
       {
-        refNo: "", category: "", companyName: "", productName: "", size: "",
-        freshLocation: "", returnedLocation: "",
-        lotNo: "", quantity: "", invoiceNo: "", creditNoteNo: "", expiryDate: "",
+        refNo: "",
+        groupCode: "",
+        productName: "",
+        category: "",
+        companyName: "",
+        size: "",
+        description: "",
+        freshLocation: "",
+        returnedLocation: "",
+        lowStockThreshold: 10,
+        isReturnable: "Yes",
+        lotNo: "",
+        quantity: "",
+        invoiceNo: "",
+        creditNoteNo: "",
+        expiryDate: "",
       },
     ]);
     ws["!cols"] = BULK_COLUMNS.map(() => ({ wch: 18 }));
@@ -122,16 +148,26 @@ export default function ProductCatalog() {
     const errors = [];
 
     for (const row of valid) {
+      const isRet =
+        row.isReturnable === false ||
+        String(row.isReturnable).trim().toLowerCase() === "no" ||
+        String(row.isReturnable).trim().toLowerCase() === "false"
+          ? false
+          : true;
+
       // 1. Create the product
       const prodRes = await createProduct({
         ref_no: row.refNo,
+        group_code: row.groupCode ? String(row.groupCode).trim() : undefined,
         product_name: row.productName,
-        category: row.category || "other",
+        category: (row.category || "other").toLowerCase(),
         company_name: row.companyName || "Unknown",
         size: row.size || "",
+        description: row.description || "",
         fresh_location: row.freshLocation || "",
         returned_location: row.returnedLocation || "",
-        low_stock_threshold: 10,
+        low_stock_threshold: Number(row.lowStockThreshold) || 10,
+        is_returnable: isRet,
       });
 
       if (!prodRes.success && !String(prodRes.message || "").toLowerCase().includes("exists")) {
@@ -187,7 +223,7 @@ export default function ProductCatalog() {
               <Search size={14} strokeWidth={2.2} />
               <input
                 type="text"
-                placeholder="Search by ref, product, or company..."
+                placeholder="Search by ref, product, company, category..."
                 value={query}
                 onChange={(e) => { setQuery(e.target.value); setPage(1); }}
               />
@@ -225,30 +261,32 @@ export default function ProductCatalog() {
                   <th>Size</th>
                   <th>Fresh Loc</th>
                   <th>Returned Loc</th>
+                  <th>Threshold</th>
                   <th className="stock__actions-head">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {pageRows.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="stock__empty">
+                    <td colSpan={9} className="stock__empty">
                       No products found.
                     </td>
                   </tr>
                 )}
                 {pageRows.map((row) => (
-                  <tr key={row.refNo}>
+                  <tr key={row.refNo} className={row.isActive === false ? "stock__row--inactive" : ""}>
                     <td className="stock__mono">{row.refNo}</td>
                     <td className="stock__strong">{row.product || row.productName}</td>
                     <td>
                       <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>
-                        {row.category || "—"}
+                        {normalizeCategory(row.category)}
                       </span>
                     </td>
-                    <td>{row.company || row.companyName}</td>
+                    <td>{row.company || row.companyName || "—"}</td>
                     <td>{row.size || "—"}</td>
                     <td className="stock__mono">{row.freshLocation || "—"}</td>
                     <td className="stock__mono">{row.returnedLocation || "—"}</td>
+                    <td style={{ textAlign: "center", fontWeight: 600 }}>{row.lowStockThreshold ?? 10}</td>
                     <td>
                       <div className="stock__row-actions">
                         <button
@@ -297,15 +335,15 @@ export default function ProductCatalog() {
       </main>
 
       {addOpen && (
-        <AddProductModal onClose={() => setAddOpen(false)} onSaved={() => {}} />
+        <AddProductModal onClose={() => setAddOpen(false)} onSaved={() => fetchProducts?.()} />
       )}
 
       {lotProduct && (
-        <AddLotModal product={lotProduct} onClose={() => setLotProduct(null)} onSaved={() => {}} />
+        <AddLotModal product={lotProduct} onClose={() => setLotProduct(null)} onSaved={() => fetchProducts?.()} />
       )}
 
       {editProduct && (
-        <EditProductModal product={editProduct} onClose={() => setEditProduct(null)} onSaved={() => {}} />
+        <EditProductModal product={editProduct} onClose={() => setEditProduct(null)} onSaved={() => fetchProducts?.()} />
       )}
 
       {bulkPreview && (
@@ -329,9 +367,11 @@ export default function ProductCatalog() {
                 <tr>
                   <th>Status</th>
                   <th>Ref No</th>
+                  <th>Group Code</th>
                   <th>Product</th>
                   <th>Category</th>
                   <th>Company</th>
+                  <th>Size</th>
                   <th>Lot No</th>
                   <th>Qty</th>
                 </tr>
@@ -345,9 +385,11 @@ export default function ProductCatalog() {
                         : <XCircle size={14} color="#DC2626" title={r._errors.join(", ")} />}
                     </td>
                     <td style={{ padding: 6 }}>{r.refNo}</td>
+                    <td style={{ padding: 6 }}>{r.groupCode || "—"}</td>
                     <td style={{ padding: 6 }}>{r.productName}</td>
                     <td style={{ padding: 6 }}>{r.category}</td>
                     <td style={{ padding: 6 }}>{r.companyName}</td>
+                    <td style={{ padding: 6 }}>{r.size || "—"}</td>
                     <td style={{ padding: 6 }}>{r.lotNo || "—"}</td>
                     <td style={{ padding: 6 }}>{r.quantity || "—"}</td>
                   </tr>

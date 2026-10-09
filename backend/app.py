@@ -57,5 +57,5 @@ def internal_error(error):
     return jsonify({'success': False, 'error': {'message': 'Internal server error'}}), 500
 
 if __name__ == '__main__':
-    # ⭐ Set debug=True so you can see errors
+    # ⭐ Set debug=True so you can see errors (auto-reload enabled)
     app.run(host='0.0.0.0', port=Config.PORT, debug=True)

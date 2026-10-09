@@ -193,6 +193,7 @@ function normalizeFailed(item) {
 
 export function InventoryProvider({ children }) {
   const { isAuthenticated, user } = useAuth();
+  const [products, setProducts] = useState([]);
   const [stock, setStock] = useState([]);
   const [failed, setFailed] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -200,6 +201,20 @@ export function InventoryProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   // ---------- FETCHERS ----------
+
+  const fetchProducts = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/products`, { headers: getAuthHeaders() });
+      if (!res.ok) return [];
+      const data = await res.json();
+      const list = data.success ? data.data : data;
+      if (Array.isArray(list)) {
+        setProducts(list);
+        return list;
+      }
+    } catch (err) { console.error("Products fetch error:", err); }
+    return [];
+  }, []);
 
   const fetchStock = useCallback(async () => {
     try {
@@ -269,17 +284,18 @@ export function InventoryProvider({ children }) {
     }
     setLoading(true);
     try {
-      await Promise.all([fetchStock(), fetchFailed(), fetchIssues(), fetchReturns()]);
+      await Promise.all([fetchProducts(), fetchStock(), fetchFailed(), fetchIssues(), fetchReturns()]);
       console.log("✅ Inventory data loaded!");
     } catch (e) {
       console.error("Load error:", e);
     } finally {
       setLoading(false);
     }
-  }, [fetchStock, fetchFailed, fetchIssues, fetchReturns]);
+  }, [fetchProducts, fetchStock, fetchFailed, fetchIssues, fetchReturns]);
 
   useEffect(() => {
     if (!isAuthenticated) {
+      setProducts([]);
       setStock([]);
       setFailed([]);
       setIssues([]);
@@ -619,7 +635,7 @@ export function InventoryProvider({ children }) {
       });
       const json = await res.json();
       if (json.success) {
-        await fetchStock();
+        await Promise.all([fetchStock(), fetchProducts()]);
         return { success: true, message: json.message };
       }
       return { success: false, message: json.message || "Failed" };
@@ -637,7 +653,7 @@ export function InventoryProvider({ children }) {
       });
       const json = await res.json();
       if (json.success) {
-        await fetchStock();
+        await Promise.all([fetchStock(), fetchProducts()]);
         return {
           success: true,
           imported: json.imported,
@@ -716,7 +732,7 @@ export function InventoryProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        await fetchStock();
+        await Promise.all([fetchStock(), fetchProducts()]);
         return { success: true, data: data.data };
       }
       return { success: false, message: data.message || "Failed to create product" };
@@ -734,7 +750,7 @@ export function InventoryProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        await fetchStock();
+        await Promise.all([fetchStock(), fetchProducts()]);
         return { success: true, data: data.data };
       }
       return { success: false, message: data.message || "Failed to update product" };
@@ -752,7 +768,7 @@ export function InventoryProvider({ children }) {
       });
       const data = await res.json();
       if (data.success) {
-        await fetchStock();
+        await Promise.all([fetchStock(), fetchProducts()]);
         return { success: true, imported: data.imported, failed: data.failed, errors: data.errors || [] };
       }
       return { success: false, message: data.message || "Bulk create failed" };
@@ -764,6 +780,8 @@ export function InventoryProvider({ children }) {
   // ---------- CONTEXT VALUE ----------
 
   const value = {
+    products,
+    fetchProducts,
     stock,
     failed,
     issues,

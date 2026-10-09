@@ -32,7 +32,8 @@ export default function IssueItemModal({ onClose, onConfirm }) {
   const groupedStock = useMemo(() => {
     const groupedMap = {};
     (stock || []).forEach((r) => {
-      if (r.quantity <= 0) return;
+      if (!r.lotNo || String(r.lotNo).trim() === "") return;
+      if (Number(r.quantity ?? 0) <= 0) return;
       
       const key = r.refNo || r.id;
       if (!groupedMap[key]) {
@@ -54,7 +55,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           hasReturned: false,
         };
       }
-      groupedMap[key].totalQuantity += r.quantity || 1;
+      groupedMap[key].totalQuantity += Number(r.quantity ?? 0);
       groupedMap[key].freshStock += (r.freshStock || 0);
       groupedMap[key].returnedStock += (r.returnedStock || 0);
       groupedMap[key].units.push(r);

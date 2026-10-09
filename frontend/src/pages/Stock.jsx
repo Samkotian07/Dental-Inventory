@@ -80,7 +80,9 @@ export default function Stock() {
       if (c && c !== "All Categories") set.add(c);
     });
     (rows || []).forEach((r) => {
-      if (r.category) set.add(normalizeCategory(r.category));
+      if (r.category && r.lotNo && String(r.lotNo).trim() !== "" && Number(r.quantity ?? r.qty ?? 0) > 0) {
+        set.add(normalizeCategory(r.category));
+      }
     });
     return ["All Categories", ...Array.from(set)];
   }, [rows]);
@@ -95,6 +97,7 @@ export default function Stock() {
     }
 
     let filteredItems = (rows || []).filter((r) => {
+      if (!r.lotNo || String(r.lotNo).trim() === "") return false;
       const available = Number(r.quantity ?? r.qty ?? 0);
       if (available <= 0) return false;
       const matchesCategory = isCategoryMatch(r.category, category);
@@ -202,7 +205,7 @@ export default function Stock() {
     if (!lots || lots.length === 0) {
       const match = rows.find(r => (r.refNo || r.id) === refNo);
       if (match?.lotId) {
-        lots = [{ lotId: match.lotId, qtyAvailable: match.quantity || match.qty || 1 }];
+        lots = [{ lotId: match.lotId, qtyAvailable: Number(match.quantity ?? match.qty ?? 0) }];
       }
     }
 

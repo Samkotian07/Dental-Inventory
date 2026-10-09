@@ -178,7 +178,7 @@ export default function UnitHistory() {
           returnedLocation: prod.returned_location || prod.returnedLocation || "—",
           isReturned: isRet,
           status: uStatus,
-          quantity: prod.quantity || 1,
+          quantity: Number(prod.quantity ?? prod.totalAvailable ?? 0),
         });
 
         const historyList = (successData.history || []).map((c, idx) => ({

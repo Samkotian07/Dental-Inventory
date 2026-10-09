@@ -198,8 +198,66 @@ def get_unit_history(identifier):
 @inventory_bp.route('/products', methods=['GET'])
 @token_required
 def get_products():
-    products = Product.find_all()
-    return jsonify({'success': True, 'data': [p.to_dict() for p in products]}), 200
+    db = StockLot.get_db()
+    rows = db.execute_query("""
+        SELECT p.ref_no, p.group_id, p.vendor_id, p.fresh_location, p.returned_location,
+               p.low_stock_threshold, p.is_active, p.created_at, p.updated_at,
+               pg.group_code, pg.product_name, pg.category, pg.size, pg.is_returnable, pg.description,
+               v.vendor_name AS company_name,
+               COALESCE(SUM(sl.qty_available), 0) AS total_available,
+               COALESCE(SUM(sl.qty_fresh), 0) AS fresh_stock,
+               COALESCE(SUM(sl.qty_returned), 0) AS returned_stock,
+               COUNT(sl.lot_id) AS lot_count
+        FROM products p
+        LEFT JOIN product_groups pg ON pg.group_id = p.group_id
+        LEFT JOIN vendors v ON v.vendor_id = p.vendor_id
+        LEFT JOIN stock_lots sl ON sl.ref_no = p.ref_no
+        GROUP BY p.ref_no, p.group_id, p.vendor_id, p.fresh_location, p.returned_location,
+                 p.low_stock_threshold, p.is_active, p.created_at, p.updated_at,
+                 pg.group_code, pg.product_name, pg.category, pg.size, pg.is_returnable, pg.description,
+                 v.vendor_name
+        ORDER BY p.ref_no
+    """)
+
+    def fmt(v):
+        if v is None:
+            return None
+        if hasattr(v, 'isoformat'):
+            return v.isoformat()
+        return str(v)
+
+    data = []
+    for r in rows:
+        prod_name = r.get('product_name') or r.get('ref_no')
+        comp_name = r.get('company_name') or ''
+        data.append({
+            'refNo': r.get('ref_no'),
+            'groupId': r.get('group_id'),
+            'vendorId': r.get('vendor_id'),
+            'product': prod_name,
+            'productName': prod_name,
+            'category': r.get('category') or 'general',
+            'company': comp_name,
+            'companyName': comp_name,
+            'size': r.get('size') or '',
+            'description': r.get('description') or '',
+            'isReturnable': bool(r.get('is_returnable', 1)),
+            'groupCode': r.get('group_code') or '',
+            'freshLocation': r.get('fresh_location') or '',
+            'returnedLocation': r.get('returned_location') or '',
+            'stockQty': int(r.get('total_available') or 0),
+            'quantity': int(r.get('total_available') or 0),
+            'totalAvailable': int(r.get('total_available') or 0),
+            'freshStock': int(r.get('fresh_stock') or 0),
+            'returnedStock': int(r.get('returned_stock') or 0),
+            'lotCount': int(r.get('lot_count') or 0),
+            'lowStockThreshold': r.get('low_stock_threshold', 10),
+            'isActive': bool(r.get('is_active', 1)),
+            'createdAt': fmt(r.get('created_at')),
+            'updatedAt': fmt(r.get('updated_at')),
+        })
+
+    return jsonify({'success': True, 'data': data}), 200
 
 
 # ---------- Stock list (from view) ----------
@@ -207,8 +265,10 @@ def get_products():
 @inventory_bp.route('/', methods=['GET'])
 @token_required
 def get_inventory():
+    include_all = request.args.get('include_all', 'false').lower() == 'true'
     db = StockLot.get_db()
-    rows = db.execute_query("""
+    where_clause = "" if include_all else "WHERE EXISTS (SELECT 1 FROM stock_lots l WHERE l.ref_no = v.ref_no)"
+    rows = db.execute_query(f"""
         SELECT v.*,
                (SELECT l.lot_no FROM stock_lots l 
                 WHERE l.ref_no = v.ref_no 
@@ -217,6 +277,7 @@ def get_inventory():
                 WHERE l.ref_no = v.ref_no 
                 ORDER BY (l.status = 'open') DESC, l.created_at DESC LIMIT 1) AS expiry_date
         FROM v_available_stock v 
+        {where_clause}
         ORDER BY v.product_name
     """)
     data = []
@@ -256,7 +317,11 @@ def get_inventory():
 @token_required
 def get_low_stock():
     db = StockLot.get_db()
-    rows = db.execute_query("SELECT * FROM v_low_stock ORDER BY product_name")
+    rows = db.execute_query("""
+        SELECT v.* FROM v_low_stock v
+        WHERE EXISTS (SELECT 1 FROM stock_lots l WHERE l.ref_no = v.ref_no)
+        ORDER BY v.product_name
+    """)
     return jsonify({'success': True, 'data': rows}), 200
 
 
@@ -488,12 +553,27 @@ def bulk_receive_stock():
 # ---------- Helper to auto-create product ----------
 
 def _auto_create_product(data):
-    """Create product_groups + products row if missing."""
-    ref_no = data.get('ref_no')
-    product_name = data.get('product_name')
-    category = data.get('category') or 'prosthetic'
-    size = data.get('size') or ''
-    company_name = data.get('company_name') or 'Unknown'
+    """Create product_groups + products row if missing, or update if exists."""
+    ref_no = str(data.get('ref_no') or data.get('refNo') or '').strip()
+    product_name = str(data.get('product_name') or data.get('productName') or '').strip()
+    category = str(data.get('category') or 'prosthetic').strip().lower()
+    if category not in ('implant', 'abutment', 'prosthetic', 'tool', 'consumable', 'other'):
+        category = 'other'
+    size = str(data.get('size') or '').strip()
+    company_name = str(data.get('company_name') or data.get('companyName') or data.get('company') or 'Unknown').strip()
+    description = str(data.get('description') or '').strip()
+
+    group_code = data.get('group_code') or data.get('groupCode')
+    if group_code:
+        group_code = str(group_code).strip()
+    else:
+        group_code = f"{category[:3].upper()}-{ref_no}"[:45]
+
+    is_returnable = data.get('is_returnable') if 'is_returnable' in data else data.get('isReturnable')
+    if is_returnable is not None:
+        is_returnable = 1 if is_returnable else 0
+    else:
+        is_returnable = 0 if category in ('implant', 'abutment') else 1
 
     if not ref_no or not product_name:
         return False
@@ -522,21 +602,25 @@ def _auto_create_product(data):
         return False
 
     # Find or create product_group
-    group_code = f"{category[:3].upper()}-{ref_no}"[:45]
     groups = db.execute_query(
         "SELECT group_id FROM product_groups WHERE group_code = %s",
         (group_code,)
     )
     if groups:
         group_id = groups[0]['group_id']
+        db.execute_query("""
+            UPDATE product_groups
+            SET product_name = %s, category = %s, size = %s, is_returnable = %s, description = %s, updated_at = NOW()
+            WHERE group_id = %s
+        """, (product_name, category, size, is_returnable, description, group_id))
     else:
         db.execute_query("""
             INSERT INTO product_groups
-              (group_code, product_name, category, size, is_returnable)
-            VALUES (%s, %s, %s, %s, %s)
+              (group_code, product_name, category, size, is_returnable, description)
+            VALUES (%s, %s, %s, %s, %s, %s)
         """, (
             group_code, product_name, category, size,
-            0 if category in ('implant', 'abutment') else 1
+            is_returnable, description
         ))
         groups = db.execute_query(
             "SELECT group_id FROM product_groups WHERE group_code = %s",
@@ -547,17 +631,33 @@ def _auto_create_product(data):
     if not group_id:
         return False
 
+    fresh_loc = data.get('fresh_location') or data.get('freshLocation') or ''
+    ret_loc = data.get('returned_location') or data.get('returnedLocation') or ''
+    raw_thresh = data.get('low_stock_threshold') if 'low_stock_threshold' in data else data.get('lowStockThreshold', 10)
+    try:
+        thresh = int(raw_thresh)
+    except (ValueError, TypeError):
+        thresh = 10
+    raw_act = data.get('is_active') if 'is_active' in data else data.get('isActive', 1)
+    act = 1 if raw_act else 0
+
     # Create product
     try:
         db.execute_query("""
             INSERT INTO products
-              (ref_no, group_id, vendor_id, is_active)
-            VALUES (%s, %s, %s, 1)
-        """, (ref_no, group_id, vendor_id))
+              (ref_no, group_id, vendor_id, fresh_location, returned_location, low_stock_threshold, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (ref_no, group_id, vendor_id, fresh_loc, ret_loc, thresh, act))
     except Exception as e:
-        # Already exists — fine
         if 'Duplicate' not in str(e) and 'duplicate' not in str(e):
             return False
+        # If exists, update
+        db.execute_query("""
+            UPDATE products
+            SET group_id = %s, vendor_id = %s, fresh_location = %s, returned_location = %s,
+                low_stock_threshold = %s, is_active = %s, updated_at = NOW()
+            WHERE ref_no = %s
+        """, (group_id, vendor_id, fresh_loc, ret_loc, thresh, act, ref_no))
 
     return True
 
@@ -810,33 +910,73 @@ def bulk_create_products():
 @inventory_bp.route('/products/<ref_no>', methods=['PUT'])
 @token_required
 def update_product(ref_no):
+    db = StockLot.get_db()
     product = Product.find_by_ref_no(ref_no)
     if not product:
         return jsonify({'success': False, 'message': f'Product {ref_no} not found'}), 404
 
     data = request.get_json() or {}
-    allowed_keys = {'fresh_location', 'returned_location', 'low_stock_threshold'}
-    if not data or any(key not in allowed_keys for key in data):
-        return jsonify({'success': False, 'message': 'Only fresh_location, returned_location, and low_stock_threshold can be updated'}), 400
 
-    threshold = data.get('low_stock_threshold')
-    if 'low_stock_threshold' in data:
+    product_updates = {}
+    if 'fresh_location' in data or 'freshLocation' in data:
+        product_updates['fresh_location'] = data.get('fresh_location') or data.get('freshLocation') or ''
+    if 'returned_location' in data or 'returnedLocation' in data:
+        product_updates['returned_location'] = data.get('returned_location') or data.get('returnedLocation') or ''
+    if 'low_stock_threshold' in data or 'lowStockThreshold' in data:
+        raw_t = data.get('low_stock_threshold') if 'low_stock_threshold' in data else data.get('lowStockThreshold')
         try:
-            threshold = int(threshold)
-        except (TypeError, ValueError):
-            return jsonify({'success': False, 'message': 'Threshold must be a valid number'}), 400
-        if threshold < 0:
-            return jsonify({'success': False, 'message': 'Threshold must be non-negative'}), 400
+            val = int(raw_t)
+            if val >= 0:
+                product_updates['low_stock_threshold'] = val
+        except (ValueError, TypeError):
+            pass
+    if 'is_active' in data or 'isActive' in data:
+        act = data.get('is_active') if 'is_active' in data else data.get('isActive')
+        product_updates['is_active'] = 1 if act else 0
 
-    updates = {
-        key: threshold if key == 'low_stock_threshold' else value
-        for key, value in data.items()
-    }
-    set_clause = ', '.join(f'{column} = %s' for column in updates)
-    StockLot.get_db().execute_query(
-        f"UPDATE products SET {set_clause}, updated_at = NOW() WHERE ref_no = %s",
-        (*updates.values(), ref_no)
-    )
+    company_name = data.get('company_name') or data.get('company') or data.get('companyName')
+    if company_name:
+        company_name = str(company_name).strip()
+        vendors = db.execute_query("SELECT vendor_id FROM vendors WHERE vendor_name = %s", (company_name,))
+        if vendors:
+            product_updates['vendor_id'] = vendors[0]['vendor_id']
+        else:
+            db.execute_query("INSERT INTO vendors (vendor_name, vendor_code) VALUES (%s, %s)",
+                             (company_name, company_name[:20].upper().replace(' ', '-')))
+            v_rows = db.execute_query("SELECT vendor_id FROM vendors WHERE vendor_name = %s", (company_name,))
+            if v_rows:
+                product_updates['vendor_id'] = v_rows[0]['vendor_id']
+
+    if product_updates:
+        set_clause = ', '.join(f'{k} = %s' for k in product_updates)
+        db.execute_query(f"UPDATE products SET {set_clause}, updated_at = NOW() WHERE ref_no = %s",
+                         (*product_updates.values(), ref_no))
+
+    group_updates = {}
+    if 'group_code' in data or 'groupCode' in data:
+        gc = data.get('group_code') or data.get('groupCode')
+        if gc:
+            group_updates['group_code'] = str(gc).strip()
+    if 'product_name' in data or 'productName' in data:
+        pname = data.get('product_name') or data.get('productName')
+        if pname:
+            group_updates['product_name'] = str(pname).strip()
+    if 'category' in data:
+        cat = str(data['category']).strip().lower()
+        if cat in ('implant', 'abutment', 'prosthetic', 'tool', 'consumable', 'other'):
+            group_updates['category'] = cat
+    if 'size' in data:
+        group_updates['size'] = str(data['size']).strip()
+    if 'description' in data:
+        group_updates['description'] = str(data.get('description') or '').strip()
+    if 'is_returnable' in data or 'isReturnable' in data:
+        ret = data.get('is_returnable') if 'is_returnable' in data else data.get('isReturnable')
+        group_updates['is_returnable'] = 1 if ret else 0
+
+    if group_updates and product.group_id:
+        set_clause = ', '.join(f'{k} = %s' for k in group_updates)
+        db.execute_query(f"UPDATE product_groups SET {set_clause}, updated_at = NOW() WHERE group_id = %s",
+                         (*group_updates.values(), product.group_id))
 
     updated_product = Product.find_by_ref_no(ref_no)
     return jsonify({

@@ -42,7 +42,10 @@ export default function Reports() {
 
   // Filtered data
   const filteredData = useMemo(() => {
-    let filtered = [...stock];
+    // Only show products with lotNo present AND quantity > 0
+    let filtered = (stock || []).filter(
+      (s) => s.lotNo && String(s.lotNo).trim() !== "" && Number(s.quantity ?? s.qty ?? 0) > 0
+    );
     
     if (category !== "All Categories") {
       filtered = filtered.filter(s => s.category?.toLowerCase() === category.toLowerCase());
@@ -70,7 +73,7 @@ export default function Reports() {
           threshold: item.lowStockThreshold || 10,
         };
       }
-      const qty = item.quantity || item.qty || 1;
+      const qty = Number(item.quantity ?? item.qty ?? 0);
       grouped[key].totalQuantity += qty;
       if (item.isReturned || item.isReturnedFromStudent) {
         grouped[key].returnedCount += qty;

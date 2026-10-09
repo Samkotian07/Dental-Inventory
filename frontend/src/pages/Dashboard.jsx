@@ -62,6 +62,9 @@ export default function Dashboard() {
   const productsList = useMemo(() => {
     const map = new Map();
     (stock || []).forEach((item) => {
+      // Rule: only show products with lotNo present
+      if (!item.lotNo || String(item.lotNo).trim() === "") return;
+
       const key = item.refNo || item.ref_no || item.id;
       if (!key) return;
       if (!map.has(key)) {
@@ -77,9 +80,10 @@ export default function Dashboard() {
         });
       }
       const p = map.get(key);
-      p.totalQty += Number(item.quantity ?? item.qty ?? 1);
+      p.totalQty += Number(item.quantity ?? item.qty ?? 0);
     });
-    return Array.from(map.values());
+    // Rule: Dashboard hides qty=0 products (treat like Stock) - only show products with lotNo present AND quantity > 0
+    return Array.from(map.values()).filter((p) => p.totalQty > 0);
   }, [stock]);
 
   const uniqueProductsCount = productsList.length;

@@ -98,14 +98,21 @@ class Product:
             return str(v)
 
         g = self.get_group()
+        vendor_name = self.get_vendor_name()
+        product_name = g.product_name if g else self.ref_no
+        category = (g.category if g else None) or self.get_category() or 'general'
 
         return {
             'refNo': self.ref_no,
             'groupId': self.group_id,
             'vendorId': self.vendor_id,
-            'productName': g.product_name if g else self.ref_no,
-            'category': g.category if g else None,
+            'product': product_name,
+            'productName': product_name,
+            'category': category,
+            'company': vendor_name,
+            'companyName': vendor_name,
             'size': g.size if g else None,
+            'description': (g.description if g else None) or '',
             'isReturnable': bool(g.is_returnable) if g else True,
             'groupCode': g.group_code if g else None,
             'freshLocation': self.fresh_location,

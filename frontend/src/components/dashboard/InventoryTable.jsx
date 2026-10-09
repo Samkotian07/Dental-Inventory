@@ -43,6 +43,9 @@ export default function InventoryTable({ items = [], activeCategory, onCategoryC
   const groupedStock = useMemo(() => {
     const groups = {};
     (items || []).forEach((item) => {
+      // Rule: only show products with lotNo present
+      if (!item.lotNo || String(item.lotNo).trim() === "") return;
+
       const key = item.refNo || item.ref_no || item.id;
       if (!groups[key]) {
         groups[key] = {
@@ -54,11 +57,12 @@ export default function InventoryTable({ items = [], activeCategory, onCategoryC
           totalQty: 0,
         };
       }
-      const itemQty = Number(item.quantity ?? item.qty ?? 1);
+      const itemQty = Number(item.quantity ?? item.qty ?? 0);
       groups[key].quantity += itemQty;
       groups[key].totalQty += itemQty;
     });
-    return Object.values(groups);
+    // Rule: Dashboard hides qty=0 products (treat like Stock)
+    return Object.values(groups).filter((g) => Number(g.quantity ?? g.totalQty ?? 0) > 0);
   }, [items]);
 
   const categoryOptions = useMemo(() => {
@@ -67,7 +71,9 @@ export default function InventoryTable({ items = [], activeCategory, onCategoryC
       if (c && c !== "All Categories") set.add(c);
     });
     (items || []).forEach((r) => {
-      if (r.category) set.add(normalizeCategory(r.category));
+      if (r.category && r.lotNo && String(r.lotNo).trim() !== "" && Number(r.quantity ?? r.qty ?? 0) > 0) {
+        set.add(normalizeCategory(r.category));
+      }
     });
     return ["All Categories", ...Array.from(set)];
   }, [items]);
