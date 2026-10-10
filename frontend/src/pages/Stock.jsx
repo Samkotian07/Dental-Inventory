@@ -21,10 +21,8 @@ const CSV_COLUMNS = [
   { key: "company", label: "Company" },
   { key: "product", label: "Product" },
   { key: "size", label: "Size" },
-  { key: "lotNo", label: "Lot No" },
-  { key: "qty", label: "Qty" },
-  { key: "expiry", label: "Expiry" },
-  { key: "returnedCount", label: "Returned" },
+  { key: "quantity", label: "Quantity" },
+  { key: "returnedDisplay", label: "Returned" },
 ];
 
 export default function Stock() {
@@ -72,7 +70,7 @@ export default function Stock() {
     return ["All Categories", ...Array.from(set)];
   }, [rows]);
 
-  // ⭐ Group by base ref_no and count returned units
+  // ⭐ Group by base ref_no (one row per product) and aggregate lots + total quantity
   const filtered = useMemo(() => {
     let q = query.trim().toLowerCase();
     if (q.includes("/unit-history/")) {
@@ -81,30 +79,18 @@ export default function Stock() {
       q = q.split("/scan/").pop().split("?")[0].split("#")[0];
     }
 
-    let filteredItems = (rows || []).filter((r) => {
-      if (!r.lotNo || String(r.lotNo).trim() === "") return false;
-      const available = Number(r.quantity ?? r.qty ?? 0);
-      if (available <= 0) return false;
-      const matchesCategory = isCategoryMatch(r.category, category);
-      const matchesQuery =
-        !q ||
-        (r.product || "").toLowerCase().includes(q) ||
-        (r.company || "").toLowerCase().includes(q) ||
-        (r.refNo || "").toLowerCase().includes(q) ||
-        (r.size || "").toLowerCase().includes(q) ||
-        (r.lotNo || "").toLowerCase().includes(q);
-      return matchesCategory && matchesQuery;
-    });
-
-    // Group by base ref_no
+    // 1. Group active stock lots by product (refNo)
     const groupedMap = {};
-    filteredItems.forEach((r) => {
-      const baseRef = r.refNo || "";
-      // A product may have multiple lots, so the lot id must be the group key.
-      const key = r.lotId || r.id || `${baseRef}-${r.lotNo || ""}`;
+    (rows || []).forEach((r) => {
+      if (!r.lotNo || String(r.lotNo).trim() === "") return;
+      const unitQty = Number(r.quantity ?? r.qty ?? 0);
+      if (unitQty <= 0) return;
 
-      if (!groupedMap[key]) {
-        groupedMap[key] = {
+      const baseRef = r.refNo || r.id || "";
+      if (!baseRef) return;
+
+      if (!groupedMap[baseRef]) {
+        groupedMap[baseRef] = {
           ...r,
           refNo: baseRef,
           quantity: 0,
@@ -112,22 +98,62 @@ export default function Stock() {
           freshStock: 0,
           returnedStock: 0,
           returnedCount: 0,
-          units: []
+          units: [],
+          lots: [],
+          lotNumbers: [],
         };
       }
-      const unitQty = Number(r.quantity ?? r.qty ?? 0);
-      groupedMap[key].quantity += unitQty;
-      groupedMap[key].qty += unitQty;
-      // ⭐ Count returned units
+
+      groupedMap[baseRef].quantity += unitQty;
+      groupedMap[baseRef].qty += unitQty;
+
+      // Count returned units
       const retQty = Number(r.returnedStock ?? r.qtyReturned ?? r.returnedCount ?? (r.isReturned === true ? unitQty : 0));
-      groupedMap[key].returnedCount += retQty;
-      groupedMap[key].returnedStock = groupedMap[key].returnedCount;
-      groupedMap[key].freshStock += Number(r.freshStock ?? Math.max(0, unitQty - retQty));
-      groupedMap[key].units.push(r.id);
+      groupedMap[baseRef].returnedCount += retQty;
+      groupedMap[baseRef].returnedStock = groupedMap[baseRef].returnedCount;
+      groupedMap[baseRef].freshStock += Number(r.freshStock ?? Math.max(0, unitQty - retQty));
+      groupedMap[baseRef].units.push(r.id);
+
+      const lotNoStr = String(r.lotNo || "").trim();
+      if (lotNoStr && !groupedMap[baseRef].lotNumbers.includes(lotNoStr)) {
+        groupedMap[baseRef].lotNumbers.push(lotNoStr);
+      }
+
+      groupedMap[baseRef].lots.push({
+        ...r,
+        lotId: r.lotId || r.id,
+        lotNo: lotNoStr,
+        quantity: unitQty,
+        qty: unitQty,
+      });
     });
 
-    let list = Object.values(groupedMap).filter((item) => Number(item.quantity ?? item.qty ?? 0) > 0);
+    // 2. Filter by Category and Search Query
+    let list = Object.values(groupedMap)
+      .map((item) => {
+        const retCount = Number(item.returnedCount ?? item.returnedStock ?? 0);
+        return {
+          ...item,
+          lotNo: item.lotNumbers.join(", "),
+          returnedDisplay: retCount > 0 ? retCount : "Fresh",
+        };
+      })
+      .filter((item) => {
+        if (Number(item.quantity ?? item.qty ?? 0) <= 0) return false;
+        if (!isCategoryMatch(item.category, category)) return false;
+        if (!q) return true;
 
+        return (
+          (item.product || "").toLowerCase().includes(q) ||
+          (item.company || "").toLowerCase().includes(q) ||
+          (item.refNo || "").toLowerCase().includes(q) ||
+          (item.size || "").toLowerCase().includes(q) ||
+          (item.lotNo || "").toLowerCase().includes(q) ||
+          item.lotNumbers.some((lot) => lot.toLowerCase().includes(q))
+        );
+      });
+
+    // 3. Sort
     if (sort.key) {
       list = [...list].sort((a, b) => {
         const va = a[sort.key] ?? "";
@@ -205,9 +231,11 @@ export default function Stock() {
     else if (rLower.includes("qualit")) failureType = "quality_fail";
     else if (rLower.includes("condemn")) failureType = "condemned";
 
-    let lots = item?.lotId
-      ? [{ lotId: item.lotId, qtyAvailable: Number(item.quantity ?? item.qty ?? 0) }]
-      : await getLotsForRef(item?.refNo || item?.id);
+    let lots = (item?.lots && item.lots.length > 0)
+      ? item.lots.map(l => ({ lotId: l.lotId, qtyAvailable: Number(l.quantity ?? l.qty ?? 0) }))
+      : (item?.lotId
+          ? [{ lotId: item.lotId, qtyAvailable: Number(item.quantity ?? item.qty ?? 0) }]
+          : await getLotsForRef(item?.refNo || item?.id));
 
     if (!lots || lots.length === 0) {
       toast.error("No active lots found for this product to move to failed");
@@ -259,12 +287,13 @@ export default function Stock() {
   };
 
   const columns = [
-    { key: "refNo", label: "Ref No" },
-    { key: "category", label: "Category" },
-    { key: "company", label: "Company" },
-    { key: "product", label: "Product" },
-    { key: "size", label: "Size" },
-    { key: "lotNo", label: "Lot No" },
+    { key: "refNo", label: "Ref No", align: "left" },
+    { key: "category", label: "Category", align: "left" },
+    { key: "company", label: "Company", align: "left" },
+    { key: "product", label: "Product", align: "left" },
+    { key: "size", label: "Size", align: "left" },
+    { key: "quantity", label: "Quantity", align: "center" },
+    { key: "returnedCount", label: "Returned", align: "center" },
   ];
 
   return (
@@ -327,8 +356,15 @@ export default function Stock() {
               <thead>
                 <tr>
                   {columns.map((c) => (
-                    <th key={c.key}>
-                      <button className="stock__sort" onClick={() => toggleSort(c.key)}>
+                    <th
+                      key={c.key}
+                      className={c.align === "center" ? "stock__th--center" : c.align === "right" ? "stock__th--right" : ""}
+                    >
+                      <button
+                        className={`stock__sort ${c.align === "center" ? "stock__sort--center" : c.align === "right" ? "stock__sort--right" : ""}`}
+                        onClick={() => toggleSort(c.key)}
+                        title={c.key === "returnedCount" ? "Shows how many returned units" : undefined}
+                      >
                         {c.label}
                         <ArrowUpDown size={11} strokeWidth={2.5} />
                       </button>
@@ -348,10 +384,10 @@ export default function Stock() {
 
                 {pageRows.map((row) => (
                   <tr
-                    key={row.lotId || row.id}
+                    key={row.refNo || row.lotId || row.id}
                     className={row.status === "inactive" || row.isActive === false ? "stock__row--inactive" : ""}
                   >
-                    <td className="stock__mono" data-label="Ref no">{row.refNo}</td>
+                    <td className="stock__mono" data-label="Ref No">{row.refNo}</td>
                     <td data-label="Category">
                       <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>
                         {row.category || "General"}
@@ -360,8 +396,21 @@ export default function Stock() {
                     <td data-label="Company">{row.company}</td>
                     <td className="stock__strong" data-label="Product">{row.product}</td>
                     <td data-label="Size">{row.size || "—"}</td>
-                    <td className="stock__mono" data-label="Lot no">{row.lotNo}</td>
-                    <td data-label="Actions">
+                    <td data-label="Quantity" className="stock__qty stock__td--center">
+                      {row.quantity ?? row.qty ?? 0}
+                    </td>
+                    <td data-label="Returned" className="stock__td--center">
+                      {Number(row.returnedCount ?? row.returnedStock ?? 0) > 0 ? (
+                        <span className="returned-badge" title={`${row.returnedCount ?? row.returnedStock} returned unit(s)`}>
+                          🔄 {row.returnedCount ?? row.returnedStock}
+                        </span>
+                      ) : (
+                        <span className="fresh-badge" title="All units are fresh">
+                          Fresh
+                        </span>
+                      )}
+                    </td>
+                    <td data-label="Actions" className="stock__td--actions">
                       <div className="stock__row-actions">
                         <button
                           className="stock__icon-btn"

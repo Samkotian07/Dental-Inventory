@@ -93,9 +93,16 @@ def issue_unit():
     student_id = data.get('student_id')
     ref_no = data.get('ref_no')
     lot_id = data.get('lot_id')
+    try:
+        quantity = int(data.get('quantity') or data.get('qty') or 1)
+    except (ValueError, TypeError):
+        quantity = 1
 
     if not student_id or not ref_no or not lot_id:
         return jsonify({'success': False, 'message': 'student_id, ref_no, lot_id required'}), 400
+
+    if quantity < 1:
+        return jsonify({'success': False, 'message': 'Quantity must be at least 1'}), 400
 
     student = Student.find_by_id(student_id)
     if not student:
@@ -105,24 +112,131 @@ def issue_unit():
     user_name = user.name if user else 'Admin'
     issue_date = data.get('issue_date') or date.today().isoformat()
 
-    try:
-        _, outs = _call_procedure(
-            'sp_issue_unit',
-            (ref_no, lot_id, student_id, user_name, issue_date),
-            2
-        )
-        unit_serial, issue_id = outs[0], outs[1]
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
+    if quantity == 1:
+        try:
+            _, outs = _call_procedure(
+                'sp_issue_unit',
+                (ref_no, lot_id, student_id, user_name, issue_date),
+                2
+            )
+            unit_serial, issue_id = outs[0], outs[1]
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 400
 
-    if not issue_id:
-        return jsonify({'success': False, 'message': 'Issue failed. Verify lot is open and has stock.'}), 400
+        if not issue_id:
+            return jsonify({'success': False, 'message': 'Issue failed. Verify lot is open and has stock.'}), 400
+
+        AuditLog.create(
+            action='ISSUE',
+            entity_type='ISSUED',
+            entity_id=issue_id,
+            details=f'Issued {unit_serial} ({ref_no}) to {student.name}',
+            user_id=user.id if user else None,
+            user_name=user_name,
+        )
+
+        obj = Issue.find_by_id(issue_id)
+        return jsonify({'success': True, 'data': obj.to_dict()}), 201
+
+    # Multi-quantity issue transaction
+    db = Issue.get_db()
+    conn = db.get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT qty_available, qty_fresh, lot_no, status
+            FROM stock_lots
+            WHERE lot_id = %s
+            FOR UPDATE
+        """, (lot_id,))
+        lot = cursor.fetchone()
+        if not lot:
+            return jsonify({'success': False, 'message': 'Lot not found'}), 404
+        if lot['status'] != 'open':
+            return jsonify({'success': False, 'message': 'Lot is not open for issuing'}), 400
+        if (lot['qty_available'] or 0) < quantity:
+            return jsonify({'success': False, 'message': f"Lot has only {lot['qty_available']} available units (requested {quantity})"}), 400
+        if (lot['qty_fresh'] or 0) < quantity:
+            return jsonify({'success': False, 'message': f"Lot has only {lot['qty_fresh']} fresh units available (requested {quantity})"}), 400
+
+        cursor.execute("""
+            SELECT pg.product_name, pg.category, pg.is_returnable
+            FROM products p
+            JOIN product_groups pg ON pg.group_id = p.group_id
+            WHERE p.ref_no = %s
+        """, (ref_no,))
+        prod = cursor.fetchone() or {}
+        prod_name = prod.get('product_name') or ref_no
+        cat = prod.get('category') or 'other'
+        is_implant = 1 if cat in ('implant', 'abutment') else 0
+        lot_no = lot.get('lot_no') or ''
+
+        cursor.execute("SELECT status, name FROM students WHERE campus_id = %s", (student_id,))
+        st_row = cursor.fetchone()
+        if not st_row:
+            return jsonify({'success': False, 'message': 'Student not found'}), 404
+        if st_row['status'] != 'active':
+            return jsonify({'success': False, 'message': 'Student is not active'}), 400
+        student_name = st_row['name']
+
+        cursor.execute("SELECT COALESCE(MAX(CAST(SUBSTRING(issue_id, 5) AS UNSIGNED)), 0) + 1 AS next_id FROM issue_events")
+        next_issue_num = cursor.fetchone()['next_id']
+        issue_id = f"ISS-{next_issue_num:03d}"
+
+        cursor.execute("""
+            INSERT INTO issue_events (issue_id, student_id, student_name, issue_date, issued_by)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (issue_id, student_id, student_name, issue_date, user_name))
+
+        cursor.execute("""
+            SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(unit_serial, '-', -1) AS UNSIGNED)), 0) AS max_serial
+            FROM issued_units
+            WHERE lot_id = %s
+        """, (lot_id,))
+        max_serial = cursor.fetchone()['max_serial']
+
+        for i in range(1, quantity + 1):
+            serial_num = max_serial + i
+            seq_str = f"{serial_num:02d}"
+            unit_serial = f"{ref_no}-L{lot_no}-{seq_str}"
+
+            cursor.execute("""
+                INSERT INTO issued_units (
+                    unit_serial, lot_id, issue_id, ref_no, lot_no, product_name, category,
+                    is_implant_abutment, status, issued_date
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'issued', %s)
+            """, (unit_serial, lot_id, issue_id, ref_no, lot_no, prod_name, cat, is_implant, issue_date))
+
+            cursor.execute("""
+                INSERT INTO stock_movements (
+                    unit_serial, lot_id, ref_no, movement_type, from_status, to_status,
+                    quantity_change, reference_id, moved_by
+                ) VALUES (%s, %s, %s, 'issue', 'in_stock', 'issued', -1, %s, %s)
+            """, (unit_serial, lot_id, ref_no, issue_id, user_name))
+
+        cursor.execute("""
+            UPDATE stock_lots
+            SET qty_available    = qty_available - %s,
+                qty_fresh        = GREATEST(qty_fresh - %s, 0),
+                qty_issued_total = qty_issued_total + %s,
+                status           = IF(qty_available - %s <= 0, 'depleted', status),
+                version          = version + 1
+            WHERE lot_id = %s
+        """, (quantity, quantity, quantity, quantity, lot_id))
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+    finally:
+        cursor.close()
+        conn.close()
 
     AuditLog.create(
         action='ISSUE',
         entity_type='ISSUED',
         entity_id=issue_id,
-        details=f'Issued {unit_serial} ({ref_no}) to {student.name}',
+        details=f'Issued {quantity} units of {ref_no} to {student.name}',
         user_id=user.id if user else None,
         user_name=user_name,
     )
@@ -184,7 +298,6 @@ def issue_returned_unit():
 @issued_bp.route('/<unit_serial>/return', methods=['POST'])
 @token_required
 def return_unit(unit_serial):
-    unit_serial = _resolve_unit_serial(unit_serial)
     data = request.get_json() or {}
     condition = data.get('condition', 'Good')
     return_date = data.get('return_date') or date.today().isoformat()
@@ -192,10 +305,48 @@ def return_unit(unit_serial):
     user = getattr(request, 'current_user', None)
     user_name = user.name if user else 'Admin'
 
+    # Check if identifier is an issue_id with active units
+    issue_units = IssuedUnit.find_by_issue_id(unit_serial)
+    active_issue_units = [u for u in issue_units if u.status == 'issued']
+    if active_issue_units:
+        qr_json = None
+        for u in active_issue_units:
+            try:
+                _, outs = _call_procedure(
+                    'sp_return_unit',
+                    (u.unit_serial, return_date, condition, user_name),
+                    1
+                )
+                if not qr_json and outs:
+                    qr_json = outs[0]
+                    if isinstance(qr_json, str):
+                        try:
+                            qr_json = json.loads(qr_json)
+                        except Exception:
+                            pass
+            except Exception as e:
+                return jsonify({'success': False, 'message': str(e)}), 400
+
+            AuditLog.create(
+                action='RETURN',
+                entity_type='ISSUED',
+                entity_id=u.unit_serial,
+                details=f'Returned {u.unit_serial}, condition: {condition}',
+                user_id=user.id if user else None,
+                user_name=user_name,
+            )
+
+        return jsonify({
+            'success': True,
+            'data': active_issue_units[0].to_dict(),
+            'qr_data': qr_json,
+        }), 200
+
+    resolved_serial = _resolve_unit_serial(unit_serial)
     try:
         _, outs = _call_procedure(
             'sp_return_unit',
-            (unit_serial, return_date, condition, user_name),
+            (resolved_serial, return_date, condition, user_name),
             1
         )
         qr_json = outs[0] if outs else None
@@ -210,13 +361,13 @@ def return_unit(unit_serial):
     AuditLog.create(
         action='RETURN',
         entity_type='ISSUED',
-        entity_id=unit_serial,
-        details=f'Returned {unit_serial}, condition: {condition}',
+        entity_id=resolved_serial,
+        details=f'Returned {resolved_serial}, condition: {condition}',
         user_id=user.id if user else None,
         user_name=user_name,
     )
 
-    unit = IssuedUnit.find_by_serial(unit_serial)
+    unit = IssuedUnit.find_by_serial(resolved_serial)
     return jsonify({
         'success': True,
         'data': unit.to_dict() if unit else {},
@@ -329,3 +480,53 @@ def mark_used_in_patient(unit_serial):
     )
 
     return jsonify({'success': True}), 200
+
+
+# ---------- Bulk Issue (Loop) ----------
+
+@issued_bp.route('/bulk', methods=['POST'])
+@token_required
+def issue_bulk():
+    data = request.get_json() or {}
+    student_id = data.get('student_id')
+    ref_no = data.get('ref_no')
+    lot_id = data.get('lot_id')
+    quantity = int(data.get('quantity') or 0)
+    issue_date = data.get('issue_date') or date.today().isoformat()
+
+    if not student_id or not ref_no or not lot_id or quantity < 1:
+        return jsonify({'success': False, 'message': 'student_id, ref_no, lot_id, quantity required'}), 400
+
+    student = Student.find_by_id(student_id)
+    if not student:
+        return jsonify({'success': False, 'message': 'Student not found'}), 404
+
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
+    issued = []
+    for _ in range(quantity):
+        try:
+            _, outs = _call_procedure(
+                'sp_issue_unit',
+                (ref_no, lot_id, student_id, user_name, issue_date),
+                2
+            )
+            issued.append({'unitSerial': outs[0], 'issueId': outs[1]})
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'Failed at unit {len(issued)+1}: {str(e)}',
+                'issued': issued
+            }), 400
+
+    AuditLog.create(
+        action='ISSUE_BULK',
+        entity_type='ISSUED',
+        entity_id=issued[-1]['issueId'] if issued else '',
+        details=f'Issued {len(issued)} x {ref_no} to {student.name}',
+        user_id=user.id if user else None,
+        user_name=user_name,
+    )
+
+    return jsonify({'success': True, 'data': {'count': len(issued), 'units': issued}}), 201

@@ -66,9 +66,15 @@ export default function ItemDetailsModal({ item, onClose }) {
     const baseRef = /^[A-Z0-9]+-[0-9]+[A-Z]$/i.test(rawRef) ? rawRef.slice(0, -1) : rawRef;
     return baseRef === item.refNo || s.refNo === item.refNo;
   });
-  const totalQuantity = productUnits.reduce((sum, row) => sum + Number(row.quantity ?? row.qty ?? 0), 0);
-  const freshCount = productUnits.reduce((sum, row) => sum + Number(row.freshStock ?? 0), 0);
-  const returnedCount = productUnits.reduce((sum, row) => sum + Number(row.returnedStock ?? 0), 0);
+  const totalQuantity = productUnits.length > 0
+    ? productUnits.reduce((sum, row) => sum + Number(row.quantity ?? row.qty ?? 0), 0)
+    : Number(item.quantity ?? item.qty ?? 0);
+  const freshCount = productUnits.length > 0
+    ? productUnits.reduce((sum, row) => sum + Number(row.freshStock ?? 0), 0)
+    : Number(item.freshStock ?? 0);
+  const returnedCount = productUnits.length > 0
+    ? productUnits.reduce((sum, row) => sum + Number(row.returnedStock ?? 0), 0)
+    : Number(item.returnedStock ?? 0);
 
   const invoice =
     item.invoiceNo ||
@@ -119,8 +125,8 @@ export default function ItemDetailsModal({ item, onClose }) {
             <p>{invoice}</p>
           </div>
           <div>
-            <span>Lot Quantity</span>
-            <p>{item.qty ?? item.quantity ?? "—"}</p>
+            <span>{item.lots && item.lots.length > 1 ? "Total Quantity" : "Quantity"}</span>
+            <p>{totalQuantity ?? item.quantity ?? item.qty ?? "—"}</p>
           </div>
           <div>
             <span>Expiry Date</span>

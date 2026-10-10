@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { useAuth } from "../context/AuthContext.jsx";
 import "./css/IssuedItems.css";
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 10 ;
 
 const CSV_COLUMNS = [
   { key: "issueId", label: "Issue ID" },
@@ -54,7 +54,7 @@ export default function IssuedItems() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const canWrite = user?.role !== 'readonly';
-  const { issues: issuedItems, issueFreshUnit, issueReturnedUnit, returnUnit, condemnUnit, exchangeWithVendor, stock } = useInventory();
+  const { issues: issuedItems, issueFreshUnit, issueBulkUnits, issueReturnedUnit, returnUnit, condemnUnit, exchangeWithVendor, stock } = useInventory();
   const { students } = useData();
 
   const [query, setQuery] = useState("");
@@ -62,6 +62,7 @@ export default function IssuedItems() {
   const [status, setStatus] = useState("Active");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [detailItem, setDetailItem] = useState(null);
   const [returnItem, setReturnItem] = useState(null);
@@ -127,11 +128,11 @@ export default function IssuedItems() {
     return list;
   }, [issuedItems, query, status, sort]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageRows = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   const toggleSort = (key) => {
@@ -208,12 +209,14 @@ export default function IssuedItems() {
     }
   };
 
-  const handleIssueNew = async ({ studentId, refNo, lotId, qty, unitIds, stockType }) => {
+  const handleIssueNew = async ({ studentId, refNo, lotId, qty, quantity, unitIds, stockType }) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) {
       toast.error("Student not found");
       return;
     }
+
+    const issueQty = Math.max(1, parseInt(quantity ?? qty ?? 1, 10) || 1);
 
     let result;
     if (stockType === "returned" || (!lotId && unitIds?.length > 0)) {
@@ -227,16 +230,31 @@ export default function IssuedItems() {
         toast.error("Please select a lot to issue from");
         return;
       }
-      result = await issueFreshUnit({
-        studentId,
-        refNo,
-        lotId,
-        issueDate: new Date().toISOString().slice(0, 10),
-      });
+      if (issueQty > 1) {
+        result = await issueBulkUnits({
+          studentId,
+          refNo,
+          lotId,
+          quantity: issueQty,
+          issueDate: new Date().toISOString().slice(0, 10),
+        });
+      } else {
+        result = await issueFreshUnit({
+          studentId,
+          refNo,
+          lotId,
+          quantity: 1,
+          issueDate: new Date().toISOString().slice(0, 10),
+        });
+      }
     }
 
     if (result.success) {
-      toast.success(`Issued to ${student?.name || studentId}`);
+      toast.success(
+        issueQty > 1
+          ? `Issued ${issueQty} units to ${student?.name || studentId}`
+          : `Issued to ${student?.name || studentId}`
+      );
       setIssueModalOpen(false);
       setPage(1);
     } else {
@@ -250,15 +268,15 @@ export default function IssuedItems() {
   };
 
   const columns = [
-    { key: "issueId", label: "Issue ID" },
-    { key: "student", label: "Student" },
-    { key: "studentId", label: "Student ID" },
-    { key: "product", label: "Product" },
-    { key: "lotNo", label: "Lot No" },
-    { key: "refNo", label: "Ref No" },
-    { key: "qty", label: "Qty" },
-    { key: "date", label: "Date" },
-    { key: "status", label: "Status" },
+    { key: "issueId", label: "Issue ID", align: "left" },
+    { key: "student", label: "Student", align: "left" },
+    { key: "studentId", label: "Student ID", align: "left" },
+    { key: "product", label: "Product", align: "left" },
+    { key: "lotNo", label: "Lot No", align: "left" },
+    { key: "refNo", label: "Ref No", align: "left" },
+    { key: "qty", label: "Qty", align: "center" },
+    { key: "date", label: "Date", align: "left" },
+    { key: "status", label: "Status", align: "center" },
   ];
 
   return (
@@ -332,9 +350,12 @@ export default function IssuedItems() {
               <thead>
                 <tr>
                   {columns.map((c) => (
-                    <th key={c.key}>
+                    <th
+                      key={c.key}
+                      className={c.align === "center" ? "issued__th--center" : c.align === "right" ? "issued__th--right" : ""}
+                    >
                       <button
-                        className="issued__sort"
+                        className={`issued__sort ${c.align === "center" ? "issued__sort--center" : c.align === "right" ? "issued__sort--right" : ""}`}
                         onClick={() => toggleSort(c.key)}
                       >
                         {c.label}
@@ -368,9 +389,9 @@ export default function IssuedItems() {
                         {row.refNo}
                       </Link>
                     </td>
-                    <td>{row.qty ?? row.quantity}</td>
-                    <td>{row.date || row.issuedDate || row.issueDate}</td>
-                    <td>
+                    <td className="issued__td--center stock__qty">{row.qty ?? row.quantity}</td>
+                    <td>{formatDate(row.date || row.issuedDate || row.issueDate)}</td>
+                    <td className="issued__td--center">
                       {row.status?.toLowerCase() === "vendor exchange" ? (
                         <span className="status-pill" style={{ background: "rgba(139, 92, 246, 0.18)", color: "#A78BFA", fontWeight: "600" }}>
                           🔄 Vendor Exchange
@@ -383,7 +404,7 @@ export default function IssuedItems() {
                         <span className="status-pill status-pill--active">Active</span>
                       )}
                     </td>
-                    <td>
+                    <td className="issued__td--actions">
                       <div className="issued__row-actions">
                         <button
                           className="issued__icon-btn"
@@ -415,8 +436,12 @@ export default function IssuedItems() {
             page={currentPage}
             totalPages={totalPages}
             totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
           />
         </section>
       </main>
