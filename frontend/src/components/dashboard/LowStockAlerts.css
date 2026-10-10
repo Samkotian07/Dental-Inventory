@@ -40,7 +40,7 @@
   display: flex;
   width: max-content;
   gap: 12px;
-  animation: alerts-marquee 25n0s linear infinite;
+  animation: 10s linear infinite alerts-marquee;
 }
 
 .alerts-card__viewport:hover .alerts-card__track {
