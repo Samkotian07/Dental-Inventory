@@ -155,8 +155,8 @@ export default function ItemDetailsModal({ item, onClose }) {
                         </span>
                       </td>
                       <td>
-                        <span>{Number(unit.freshStock || 0)} fresh</span>
-                        <span> · {Number(unit.returnedStock || 0)} returned</span>
+                        <span>{Number(unit.freshStock ?? Math.max(0, Number(unit.quantity ?? unit.qty ?? 0) - Number(unit.returnedStock ?? unit.qtyReturned ?? unit.returnedCount ?? (unit.isReturned ? (unit.quantity ?? unit.qty ?? 1) : 0))))} fresh</span>
+                        <span> · {Number(unit.returnedStock ?? unit.qtyReturned ?? unit.returnedCount ?? (unit.isReturned ? (unit.quantity ?? unit.qty ?? 1) : 0))} returned</span>
                       </td>
                       <td>
                         <UnitHistoryPreview unitId={unit.unitId || unit.id} />

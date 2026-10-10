@@ -74,10 +74,11 @@ export default function Reports() {
         };
       }
       const qty = Number(item.quantity ?? item.qty ?? 0);
-      const returnedCount = Number(item.returnedStock ?? 0);
       grouped[key].totalQuantity += qty;
-      grouped[key].freshCount += Number(item.freshStock ?? Math.max(qty - returnedCount, 0));
-      grouped[key].returnedCount += returnedCount;
+      const retQty = Number(item.returnedStock ?? item.qtyReturned ?? item.returnedCount ?? (item.isReturned || item.isReturnedFromStudent ? qty : 0));
+      const freshQty = Number(item.freshStock ?? Math.max(0, qty - retQty));
+      grouped[key].returnedCount += retQty;
+      grouped[key].freshCount += freshQty;
     });
     return Object.values(grouped);
   }, [filteredData]);

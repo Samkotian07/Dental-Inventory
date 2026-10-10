@@ -168,6 +168,7 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLo
                   <input value={lot.lotNo} onChange={(e) => updateLot(index, "lotNo", e.target.value)} placeholder="Lot no *" />
                   <input type="number" min="1" value={lot.quantity} onChange={(e) => updateLot(index, "quantity", e.target.value)} placeholder="Quantity *" />
                   <input value={lot.invoiceNo} onChange={(e) => updateLot(index, "invoiceNo", e.target.value)} placeholder="Invoice no" />
+                  <input value={lot.creditNoteNo} onChange={(e) => updateLot(index, "creditNoteNo", e.target.value)} placeholder="Credit no" />
                   <input type="date" value={lot.expiryDate} onChange={(e) => updateLot(index, "expiryDate", e.target.value)} />
                   <button type="button" onClick={() => setNewLots((lots) => lots.filter((_, i) => i !== index))} aria-label="Remove item">×</button>
                 </div>
