@@ -11,7 +11,7 @@ import { useMenuClick } from "../components/Layout.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
 import "./css/TrackExchange.css";
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 10;
 
 const CSV_COLUMNS = [
   { key: "returnId", label: "Return ID" },
@@ -38,6 +38,7 @@ export default function TrackReturns() {
   const [status, setStatus] = useState("All Status");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [detailItem, setDetailItem] = useState(null);
   const [statusItem, setStatusItem] = useState(null);
@@ -70,9 +71,9 @@ export default function TrackReturns() {
     return list;
   }, [returns, query, status, sort]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleSort = (key) => {
     setSort((prev) => (prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 }));
@@ -254,8 +255,12 @@ export default function TrackReturns() {
             page={currentPage}
             totalPages={totalPages}
             totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
           />
         </section>
       </main>

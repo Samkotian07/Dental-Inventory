@@ -11,7 +11,7 @@ import { useInventory } from "../context/InventoryContext.jsx";
 import { toast } from "sonner";
 import "./css/FailedInventory.css";
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 10;
 
 const CSV_COLUMNS = [
   { key: "refNo", label: "Ref No" },
@@ -40,6 +40,7 @@ export default function FailedInventory() {
   const [reason, setReason] = useState("All Reasons");
   const [sort, setSort] = useState({ key: null, dir: 1 });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [disposeItem, setDisposeItem] = useState(null);
   const [restoreItem, setRestoreItem] = useState(null);
@@ -104,9 +105,9 @@ export default function FailedInventory() {
     return groupedList;
   }, [rows, query, category, reason, sort]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleSort = (key) => {
     setSort((prev) => (prev.key === key ? { key, dir: -prev.dir } : { key, dir: 1 }));
@@ -316,8 +317,12 @@ export default function FailedInventory() {
             page={currentPage}
             totalPages={totalPages}
             totalItems={filtered.length}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             onPageChange={setPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
           />
         </section>
       </main>
