@@ -442,7 +442,19 @@ export default function StockInsertion() {
               <Input label="Product Name *" value={form.productName} onChange={(e) => setForm({ ...form, productName: e.target.value })} className="si-new-input" />
               <Input label="Size" value={form.size} onChange={(e) => setForm({ ...form, size: e.target.value })} className="si-new-input" />
               <Input label="Lot No *" value={form.lotNo} onChange={(e) => setForm({ ...form, lotNo: e.target.value })} className="si-new-input" />
-              <Input label="Quantity *" type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="si-new-input" />
+              <Input
+                label="Quantity *"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={form.quantity}
+                onChange={(e) => {
+                  if (/^\d*$/.test(e.target.value)) {
+                    setForm({ ...form, quantity: e.target.value });
+                  }
+                }}
+                className="si-new-input"
+              />
               <Input label="Expiry Date *" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="si-new-input" />
 
               <div className="si-new-field">

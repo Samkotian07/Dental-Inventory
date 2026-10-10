@@ -59,7 +59,17 @@ export default function AddLotModal({ product, onClose, onSaved }) {
 
       <div className="modal__field">
         <label>Quantity *</label>
-        <Input type="number" min="1" value={form.quantity} onChange={(e) => update("quantity", e.target.value)} />
+        <Input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={form.quantity}
+          onChange={(e) => {
+            if (/^\d*$/.test(e.target.value)) {
+              update("quantity", e.target.value);
+            }
+          }}
+        />
       </div>
 
       <div className="modal__field">
