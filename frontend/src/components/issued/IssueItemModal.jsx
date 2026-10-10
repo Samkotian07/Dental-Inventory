@@ -134,11 +134,13 @@ export default function IssueItemModal({ onClose, onConfirm }) {
     });
   }, [selectedItem, stockSource, apiReturnedUnits, issuedItems]);
 
+  const selectedLot = availableLots.find((l) => l.lotId === selectedLotId);
+
   const maxQty = stockSource === "returned" 
-    ? returnedUnits.length 
-    : (selectedItem?.totalQuantity || 0);
+    ? (selectedUnitId ? 1 : returnedUnits.length)
+    : (selectedLot ? Number(selectedLot.qtyAvailable || 0) : (selectedItem?.totalQuantity || 0));
     
-  const canSubmit = studentId && itemId && qty > 0 && qty <= maxQty &&
+  const canSubmit = studentId && itemId && Number(qty) > 0 && Number(qty) <= maxQty &&
     // For fresh/all stock, a lot must be selected
     (stockSource === "returned" || selectedLotId !== "");
 
@@ -147,66 +149,33 @@ export default function IssueItemModal({ onClose, onConfirm }) {
 
   const handleSubmit = () => {
     if (!canSubmit || !selectedItem) return;
-    
-    let unitIds = [];
-    let isImplantAbutment = false;
-    
+
+    const requestedQty = Math.max(1, parseInt(qty, 10) || 1);
     const isReturned = stockSource === "returned" || Boolean(selectedUnitId);
 
-    // ⭐ CRITICAL: For implants/abutments, we DON'T use unit_id
-    if (isNonReturnable) {
-      // Implant/Abutment - use ref_no directly (no unit)
-      isImplantAbutment = true;
-      
-      // Check if there's a unit for this product (should not happen for implants)
-      const availableUnits = selectedItem.units.filter(u => {
-        const isActive = issuedItems.some(i => i.inventoryId === u.id && i.status === 'Active');
-        return !isActive && u.quantity > 0;
-      });
-      
-      if (availableUnits.length > 0) {
-        // If units exist, use them (but this shouldn't happen for implants)
-        unitIds = availableUnits.slice(0, qty).map(u => u.id);
-      } else {
-        // No units - use ref_no (this is correct for implants)
-        toast.info(`Issuing ${selectedItem.product} (${selectedItem.refNo}) as implant/abutment`);
-      }
-    } else if (isReturned) {
-      // Returned stock - use returned units
+    let unitIds = [];
+    if (isReturned) {
       if (selectedUnitId) {
         unitIds = [selectedUnitId];
       } else {
-        const availableUnits = returnedUnits.map(u => u.id);
-        unitIds = availableUnits.slice(0, qty);
+        unitIds = returnedUnits.slice(0, requestedQty).map((u) => u.id);
       }
-    } else {
-      // Fresh stock - use available units
-      const availableUnits = selectedItem.units.filter(u => {
-        const isActive = issuedItems.some(i => i.inventoryId === u.id && i.status === 'Active');
-        return !isActive && u.quantity > 0;
-      });
-      unitIds = availableUnits.slice(0, qty).map(u => u.id);
     }
 
-    if (unitIds.length === 0 && !isImplantAbutment) {
-      toast.error("No available units found");
-      return;
-    }
-
-    const returnedUnitObj = returnedUnits.find(u => u.id === (selectedUnitId || unitIds[0]));
+    const returnedUnitObj = returnedUnits.find((u) => u.id === (selectedUnitId || unitIds[0]));
     const effectiveLotId = isReturned ? (returnedUnitObj?.lotId || null) : (selectedLotId || null);
 
-    // ⭐ Pass isImplantAbutment flag to backend
     onConfirm({
       studentId,
       refNo: selectedItem.refNo,
       lotId: effectiveLotId,
-      qty: isImplantAbutment ? 1 : unitIds.length,
-      unitIds: isImplantAbutment ? [] : unitIds,
-      lotNo: isReturned ? (returnedUnitObj?.lotNo || selectedItem.lotNo) : selectedItem.lotNo,
+      qty: isReturned ? (selectedUnitId ? 1 : unitIds.length) : requestedQty,
+      quantity: isReturned ? (selectedUnitId ? 1 : unitIds.length) : requestedQty,
+      unitIds: isReturned ? unitIds : [],
+      lotNo: isReturned ? (returnedUnitObj?.lotNo || selectedItem.lotNo) : (selectedLot?.lotNo || selectedItem.lotNo),
       stockType: isReturned ? "returned" : "fresh",
       isNonReturnable: isNonReturnable,
-      isImplantAbutment: isImplantAbutment,
+      isImplantAbutment: isNonReturnable,
     });
   };
 
@@ -436,11 +405,11 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           max={maxQty || undefined}
           value={qty}
           onChange={(e) => {
-            const val = parseInt(e.target.value);
-            if (val >= 1 && val <= maxQty) {
-              setQty(val);
-            } else if (e.target.value === '') {
+            const val = parseInt(e.target.value, 10);
+            if (Number.isNaN(val)) {
               setQty('');
+            } else {
+              setQty(val);
             }
           }}
           disabled={stockSource === "returned" && selectedUnitId !== null}
@@ -448,6 +417,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
         {itemId && maxQty > 0 && (
           <small style={{ display: "block", marginTop: "4px" }}>
             Available: <strong>{maxQty} units</strong>
+            {selectedLot && ` in Lot ${selectedLot.lotNo}`}
           </small>
         )}
         {itemId && qty > maxQty && (

@@ -11,7 +11,10 @@ const PRESET_REASONS = [
 ];
 
 export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLots }) {
-  const currentQty = Number(item?.qty || item?.quantity || 0);
+  const lots = item?.lots && item.lots.length > 0 ? item.lots : [item];
+  const [selectedLotId, setSelectedLotId] = useState(lots[0]?.lotId || lots[0]?.id || "");
+  const selectedLot = lots.find((l) => (l.lotId || l.id) === selectedLotId) || lots[0] || item;
+  const currentQty = Number(selectedLot?.qty || selectedLot?.quantity || 0);
   const [qty, setQty] = useState(currentQty);
   const [reason, setReason] = useState("");
   const [newLots, setNewLots] = useState([]);
@@ -28,6 +31,14 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLo
   const canAdjust = numQty >= 1 && reason.trim().length > 0 && !unchanged;
   const canSave = !submitting && (!hasLots || hasValidLots) && (canAdjust || hasValidLots);
   const delta = numQty - currentQty;
+
+  const handleSelectLot = (lotId) => {
+    setSelectedLotId(lotId);
+    const chosen = lots.find((l) => (l.lotId || l.id) === lotId);
+    if (chosen) {
+      setQty(Number(chosen.qty || chosen.quantity || 0));
+    }
+  };
 
   const handleStep = (step) => {
     setQty((prev) => Math.max(1, (Number(prev) || 0) + step));
@@ -47,7 +58,7 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLo
     if (!canSave) return;
     setSubmitting(true);
     let success = true;
-    if (canAdjust) success = await onSave(item, { qty: numQty, reason: reason.trim() });
+    if (canAdjust) success = await onSave(selectedLot, { qty: numQty, reason: reason.trim() });
     if (success && hasValidLots) success = await onAddLots?.(item, newLots);
     setSubmitting(false);
     if (success) onClose();
@@ -56,10 +67,29 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLo
   return (
     <Modal title="Edit Inventory Item" onClose={onClose} width={780}>
       <div className="edit-stock">
+        {lots.length > 1 && (
+          <div className="edit-stock__lot-selector-group">
+            <label className="edit-stock__section-label">Select Lot to Adjust Quantity</label>
+            <select
+              className="edit-stock__lot-select"
+              value={selectedLotId}
+              onChange={(e) => handleSelectLot(e.target.value)}
+            >
+              {lots.map((lot) => (
+                <option key={lot.lotId || lot.id} value={lot.lotId || lot.id}>
+                  Lot: {lot.lotNo || "Standard"} — ({Number(lot.quantity ?? lot.qty ?? 0)} units available)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="edit-stock__lot-summary">
           <span>Lot Number</span>
-          <strong>{item.lotNo || "Standard"}</strong>
-          <span className="edit-stock__lot-total">Current total: {currentQty} units</span>
+          <strong>{selectedLot?.lotNo || item.lotNo || "Standard"}</strong>
+          <span className="edit-stock__lot-total">
+            Current lot: {currentQty} units
+            {lots.length > 1 && ` · Product total: ${item.quantity ?? item.qty ?? 0} units`}
+          </span>
         </div>
         {/* Quantity Stepper & Delta Card */}
         <div className="edit-stock__qty-card">

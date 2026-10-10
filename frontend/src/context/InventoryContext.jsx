@@ -355,8 +355,12 @@ export function InventoryProvider({ children }) {
 
   // ---------- MUTATIONS ----------
 
-  const issueFreshUnit = async ({ studentId, refNo, lotId, issueDate }) => {
+  const issueFreshUnit = async ({ studentId, refNo, lotId, quantity, qty, issueDate }) => {
     try {
+      const issueQty = Math.max(1, parseInt(quantity ?? qty ?? 1, 10) || 1);
+      if (issueQty > 1) {
+        return await issueBulkUnits({ studentId, refNo, lotId, quantity: issueQty, issueDate });
+      }
       const res = await fetch(`${API_URL}/issued/`, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -364,6 +368,7 @@ export function InventoryProvider({ children }) {
           student_id: studentId,
           ref_no: refNo,
           lot_id: lotId,
+          quantity: 1,
           issue_date: issueDate,
         }),
       });
@@ -799,6 +804,30 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  const issueBulkUnits = async ({ studentId, refNo, lotId, quantity, issueDate }) => {
+    try {
+      const res = await fetch(`${API_URL}/issued/bulk`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          student_id: studentId,
+          ref_no: refNo,
+          lot_id: lotId,
+          quantity,
+          issue_date: issueDate,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchStock(), fetchIssues()]);
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.message || "Bulk issue failed" };
+    } catch {
+      return { success: false, message: "Network error" };
+    }
+  };
+
   // ---------- CONTEXT VALUE ----------
 
   const value = {
@@ -819,6 +848,7 @@ export function InventoryProvider({ children }) {
     getReturnedUnitsForRef,
     getUnitHistory,
     issueFreshUnit,
+    issueBulkUnits,
     issueReturnedUnit,
     issueItem: issueFreshUnit,
     returnUnit,
