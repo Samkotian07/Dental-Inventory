@@ -4,6 +4,42 @@
   gap: 16px;
 }
 
+/* The edit workflow is lot-focused; product information stays in the table/view. */
+.edit-stock__banner,
+.edit-stock__meta-grid {
+  display: none;
+}
+
+.edit-stock__lot-summary {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: 13px;
+}
+
+.edit-stock__lot-summary span { color: var(--ink-soft); font-size: 12px; }
+.edit-stock__lot-summary strong { color: var(--ink); }
+.edit-stock__lot-total { margin-left: auto; }
+
+.edit-stock__new-lots {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+.edit-stock__new-lots-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+.edit-stock__new-lots-header span { color: var(--ink-soft); font-size: 12px; }
+.edit-stock__new-lots-scroll { max-height: 176px; overflow-y: auto; display: grid; gap: 8px; padding-right: 3px; }
+.edit-stock__lot-fields { display: grid; grid-template-columns: 1.2fr .8fr 1fr 1fr auto; gap: 8px; }
+.edit-stock__lot-fields input { min-width: 0; height: 36px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); }
+.edit-stock__lot-fields button { width: 34px; border: 0; border-radius: 7px; background: #fee2e2; color: #b91c1c; font-size: 20px; cursor: pointer; }
+
 /* Banner */
 .edit-stock__banner {
   display: flex;
@@ -338,4 +374,6 @@
   .edit-stock__meta-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .edit-stock__lot-fields { grid-template-columns: 1fr 1fr; }
 }

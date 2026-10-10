@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Package, Plus, Minus, AlertCircle, ArrowUpRight, ArrowDownRight, Trash2 } from "lucide-react";
+import { Plus, Minus, ArrowUpRight, ArrowDownRight, Trash2 } from "lucide-react";
 import Modal from "./Modal.jsx";
 import "./EditItemModal.css";
 
@@ -10,83 +10,57 @@ const PRESET_REASONS = [
   "Shipment adjustment",
 ];
 
-export default function EditItemModal({ item, onClose, onSave, onDelete, onAdd }) {
-  if (!item) return null;
-
+export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLots }) {
   const currentQty = Number(item?.qty || item?.quantity || 0);
   const [qty, setQty] = useState(currentQty);
   const [reason, setReason] = useState("");
+  const [newLots, setNewLots] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!item) return null;
 
   const numQty = Number(qty);
   const unchanged = numQty === currentQty;
-  const canSave = numQty >= 1 && reason.trim().length > 0 && !unchanged;
+  const hasLots = newLots.length > 0;
+  const hasValidLots = newLots.length > 0 && newLots.every((lot) =>
+    lot.lotNo.trim() && Number.isFinite(Number(lot.quantity)) && Number(lot.quantity) >= 1
+  );
+  const canAdjust = numQty >= 1 && reason.trim().length > 0 && !unchanged;
+  const canSave = !submitting && (!hasLots || hasValidLots) && (canAdjust || hasValidLots);
   const delta = numQty - currentQty;
 
   const handleStep = (step) => {
     setQty((prev) => Math.max(1, (Number(prev) || 0) + step));
   };
 
-  const handleSave = () => {
+  const addLotRow = () => {
+    setNewLots((lots) => [...lots, {
+      lotNo: "", quantity: "", invoiceNo: "", creditNoteNo: "", expiryDate: "",
+    }]);
+  };
+
+  const updateLot = (index, key, value) => {
+    setNewLots((lots) => lots.map((lot, i) => i === index ? { ...lot, [key]: value } : lot));
+  };
+
+  const handleSave = async () => {
     if (!canSave) return;
-    onSave(item, { qty: numQty, reason: reason.trim() });
+    setSubmitting(true);
+    let success = true;
+    if (canAdjust) success = await onSave(item, { qty: numQty, reason: reason.trim() });
+    if (success && hasValidLots) success = await onAddLots?.(item, newLots);
+    setSubmitting(false);
+    if (success) onClose();
   };
 
   return (
     <Modal title="Edit Inventory Item" onClose={onClose} width={780}>
       <div className="edit-stock">
-        {/* Product Banner */}
-        <div className="edit-stock__banner">
-          <div className="edit-stock__icon">
-            <Package size={22} strokeWidth={2.2} />
-          </div>
-          <div className="edit-stock__info">
-            <h3 className="edit-stock__title">
-              {item.product || item.productName || "Unknown Product"}
-            </h3>
-            <div className="edit-stock__meta-tags">
-              <span className="edit-stock__ref-badge">
-                Ref: {item.refNo || item.id || "—"}
-              </span>
-              {item.category && (
-                <span className={`stock-tag stock-tag--${item.category.toLowerCase()}`}>
-                  {item.category}
-                </span>
-              )}
-            </div>
-          </div>
+        <div className="edit-stock__lot-summary">
+          <span>Lot Number</span>
+          <strong>{item.lotNo || "Standard"}</strong>
+          <span className="edit-stock__lot-total">Current total: {currentQty} units</span>
         </div>
-
-        {/* Read-only Specs Grid */}
-        <div className="edit-stock__meta-grid">
-          <div className="edit-stock__meta-cell">
-            <span className="edit-stock__meta-label">Company</span>
-            <span className="edit-stock__meta-val">
-              {item.company || item.companyName || "—"}
-            </span>
-          </div>
-
-          <div className="edit-stock__meta-cell">
-            <span className="edit-stock__meta-label">Size</span>
-            <span className="edit-stock__meta-val">
-              {item.size || "—"}
-            </span>
-          </div>
-
-          <div className="edit-stock__meta-cell">
-            <span className="edit-stock__meta-label">Current Stock</span>
-            <span className="edit-stock__meta-val">
-              {currentQty} unit{currentQty === 1 ? "" : "s"}
-            </span>
-          </div>
-
-          <div className="edit-stock__meta-cell">
-            <span className="edit-stock__meta-label">Lot Number</span>
-            <span className="edit-stock__meta-val">
-              {item.lotNo || "Standard"}
-            </span>
-          </div>
-        </div>
-
         {/* Quantity Stepper & Delta Card */}
         <div className="edit-stock__qty-card">
           <div className="edit-stock__qty-header">
@@ -182,6 +156,26 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAdd }
           )}
         </div>
 
+        {newLots.length > 0 && (
+          <div className="edit-stock__new-lots">
+            <div className="edit-stock__new-lots-header">
+              <label className="edit-stock__section-label">New Items</label>
+              <span>{newLots.length} lot{newLots.length === 1 ? "" : "s"}</span>
+            </div>
+            <div className="edit-stock__new-lots-scroll">
+              {newLots.map((lot, index) => (
+                <div className="edit-stock__lot-fields" key={index}>
+                  <input value={lot.lotNo} onChange={(e) => updateLot(index, "lotNo", e.target.value)} placeholder="Lot no *" />
+                  <input type="number" min="1" value={lot.quantity} onChange={(e) => updateLot(index, "quantity", e.target.value)} placeholder="Quantity *" />
+                  <input value={lot.invoiceNo} onChange={(e) => updateLot(index, "invoiceNo", e.target.value)} placeholder="Invoice no" />
+                  <input type="date" value={lot.expiryDate} onChange={(e) => updateLot(index, "expiryDate", e.target.value)} />
+                  <button type="button" onClick={() => setNewLots((lots) => lots.filter((_, i) => i !== index))} aria-label="Remove item">×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="modal__actions">
           {onDelete && (
@@ -194,11 +188,11 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAdd }
               Move to Failed
             </button>
           )}
-          {onAdd && (
+          {onAddLots && (
             <button
               type="button"
               className="modal__btn edit-stock__add-btn"
-              onClick={onAdd}
+              onClick={addLotRow}
             >
               <Plus size={15} strokeWidth={2.2} />
               Add Item
@@ -213,7 +207,7 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAdd }
             onClick={handleSave}
             disabled={!canSave}
           >
-            Save Changes
+            {submitting ? "Saving..." : "Save Changes"}
           </button>
         </div>
       </div>

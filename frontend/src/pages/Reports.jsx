@@ -20,7 +20,7 @@ function formatDate(iso) {
 
 export default function Reports() {
   const onMenuClick = useMenuClick();
-  const { stock = [], issuedItems = [], returns = [] } = useInventory();
+  const { stock = [], issuedItems = [] } = useInventory();
   const { students = [] } = useData();
   const reportRef = useRef(null);
 
@@ -74,12 +74,10 @@ export default function Reports() {
         };
       }
       const qty = Number(item.quantity ?? item.qty ?? 0);
+      const returnedCount = Number(item.returnedStock ?? 0);
       grouped[key].totalQuantity += qty;
-      if (item.isReturned || item.isReturnedFromStudent) {
-        grouped[key].returnedCount += qty;
-      } else {
-        grouped[key].freshCount += qty;
-      }
+      grouped[key].freshCount += Number(item.freshStock ?? Math.max(qty - returnedCount, 0));
+      grouped[key].returnedCount += returnedCount;
     });
     return Object.values(grouped);
   }, [filteredData]);

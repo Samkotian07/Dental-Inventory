@@ -5,7 +5,6 @@ import Pagination from "../components/Pagination.jsx";
 import ItemDetailsModal from "../components/stock/ItemDetailsModal.jsx";
 import EditItemModal from "../components/stock/EditItemModal.jsx";
 import DeleteItemModal from "../components/stock/DeleteItemModal.jsx";
-import AddLotModal from "../components/product/AddLotModal.jsx";
 import ToggleSwitch from "../components/common/ToggleSwitch.jsx";
 import { CATEGORIES as categories, normalizeCategory, isCategoryMatch } from "../components/utils/constants.js";
 import { exportToCsv } from "../utils/csv.js";
@@ -15,9 +14,6 @@ import { useInventory } from "../context/InventoryContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { toast } from "sonner";
 import "./css/Stock.css";
-
-const PAGE_SIZE = 8;
-const EXPIRY_WARNING_DAYS = 365;
 
 const CSV_COLUMNS = [
   { key: "refNo", label: "Ref No" },
@@ -31,21 +27,6 @@ const CSV_COLUMNS = [
   { key: "returnedCount", label: "Returned" },
 ];
 
-function formatDisplayDate(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-}
-
-function isExpiringSoon(iso) {
-  if (!iso) return false;
-  const expiry = new Date(iso);
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() + EXPIRY_WARNING_DAYS);
-  return expiry <= cutoff;
-}
-
 export default function Stock() {
   const navigate = useNavigate();
   const onMenuClick = useMenuClick();
@@ -57,6 +38,7 @@ export default function Stock() {
     stock: rows,
     moveToFailed,
     getLotsForRef,
+    receiveStock,
     updateLotQuantity,
     toggleStockStatus,
   } = useInventory();
@@ -71,7 +53,6 @@ export default function Stock() {
   const [detailItem, setDetailItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
-  const [lotProduct, setLotProduct] = useState(null);
 
   useEffect(() => {
     setQuery(searchParams.get("search") || "");
@@ -135,10 +116,7 @@ export default function Stock() {
       const unitQty = Number(r.quantity ?? r.qty ?? 0);
       groupedMap[key].quantity += unitQty;
       groupedMap[key].qty += unitQty;
-      // ⭐ Count returned units
-      if (r.isReturned === true) {
-        groupedMap[key].returnedCount += unitQty;
-      }
+      groupedMap[key].returnedCount += Number(r.returnedStock ?? 0);
       groupedMap[key].units.push(r.id);
     });
 
@@ -168,14 +146,6 @@ export default function Stock() {
     exportToCsv(`stock-${new Date().toISOString().slice(0, 10)}`, CSV_COLUMNS, filtered);
   };
 
-  const getProductUnits = (refNo) => {
-    return rows.filter(r => {
-      const rawRef = r.refNo || r.id || "";
-      const baseRef = /^[A-Z0-9]+-[0-9]+[A-Z]$/i.test(rawRef) ? rawRef.slice(0, -1) : rawRef;
-      return baseRef === refNo || r.refNo === refNo || r.id === refNo;
-    });
-  };
-
   const handleSaveEdit = async (item, patch) => {
     const newQty = Number(patch.qty);
     if (!newQty || newQty < 1) {
@@ -189,10 +159,34 @@ export default function Stock() {
     const result = await updateLotQuantity(item.lotId || item.id, newQty, patch.reason.trim());
     if (result.success) {
       toast.success(result.data?.delta === 0 ? "No change" : `Quantity updated to ${newQty}`);
-      setEditItem(null);
+      return true;
     } else {
       toast.error(result.message || "Failed to update quantity");
+      return false;
     }
+  };
+
+  const handleAddLots = async (product, lots) => {
+    for (const lot of lots) {
+      const result = await receiveStock({
+        ref_no: product.refNo,
+        lot_no: lot.lotNo.trim(),
+        quantity: Number(lot.quantity),
+        invoice_no: lot.invoiceNo.trim() || null,
+        credit_note_no: lot.creditNoteNo.trim() || null,
+        expiry_date: lot.expiryDate || null,
+        product_name: product.productName || product.product,
+        category: product.category,
+        size: product.size,
+        company_name: product.companyName || product.company,
+      });
+      if (!result.success) {
+        toast.error(result.message || "Failed to add stock");
+        return false;
+      }
+    }
+    toast.success(`${lots.length} lot${lots.length === 1 ? "" : "s"} added`);
+    return true;
   };
 
   const handleConfirmDelete = async (item, options) => {
@@ -265,9 +259,6 @@ export default function Stock() {
     { key: "product", label: "Product" },
     { key: "size", label: "Size" },
     { key: "lotNo", label: "Lot No" },
-    { key: "qty", label: "QTY" },
-    { key: "expiry", label: "Expiry" },
-    { key: "returnedCount", label: "Returned" },
   ];
 
   return (
@@ -364,19 +355,6 @@ export default function Stock() {
                     <td className="stock__strong" data-label="Product">{row.product}</td>
                     <td data-label="Size">{row.size || "—"}</td>
                     <td className="stock__mono" data-label="Lot no">{row.lotNo}</td>
-                    <td data-label="Quantity">{row.qty}</td>
-                    <td data-label="Expiry" className={isExpiringSoon(row.expiry) ? "stock__expiry-warning" : "stock__expiry"}>
-                      {formatDisplayDate(row.expiry)}
-                    </td>
-                    <td data-label="Returned">
-                      {row.returnedCount > 0 ? (
-                        <span className="returned-badge">
-                          🔄 {row.returnedCount} unit{row.returnedCount > 1 ? 's' : ''}
-                        </span>
-                      ) : (
-                        <span className="fresh-badge">📦 Fresh</span>
-                      )}
-                    </td>
                     <td data-label="Actions">
                       <div className="stock__row-actions">
                         <button
@@ -438,10 +416,7 @@ export default function Stock() {
             setDeleteItem(editItem);
             setEditItem(null);
           } : undefined}
-          onAdd={canWrite ? () => {
-            setLotProduct(editItem);
-            setEditItem(null);
-          } : undefined}
+          onAddLots={canWrite ? handleAddLots : undefined}
         />
       )}
 
@@ -453,13 +428,6 @@ export default function Stock() {
         />
       )}
 
-      {lotProduct && (
-        <AddLotModal
-          product={lotProduct}
-          onClose={() => setLotProduct(null)}
-          onSaved={() => setLotProduct(null)}
-        />
-      )}
     </>
   );
 }
