@@ -62,9 +62,10 @@ export default function StockHandle() {
       const unitQty = Number(r.quantity ?? 0);
       groupedMap[key].quantity += unitQty;
       groupedMap[key].qty += unitQty;
-      if (r.isReturned === true) {
-        groupedMap[key].returnedCount += unitQty;
-      }
+      const retQty = Number(r.returnedStock ?? r.qtyReturned ?? r.returnedCount ?? (r.isReturned === true ? unitQty : 0));
+      groupedMap[key].returnedCount += retQty;
+      groupedMap[key].returnedStock = groupedMap[key].returnedCount;
+      groupedMap[key].freshStock = (groupedMap[key].freshStock || 0) + Number(r.freshStock ?? Math.max(0, unitQty - retQty));
       groupedMap[key].units.push(r);
       groupedMap[key].unitIds.push(r.id);
     });
@@ -219,8 +220,8 @@ export default function StockHandle() {
                           <tr key={unit.id}>
                             <td className="sd-mono">{unit.id}</td>
                             <td>
-                              {unit.isReturned ? (
-                                <span className="stock-type-badge returned">🔄 Returned</span>
+                              {(unit.returnedStock > 0 || unit.isReturned) ? (
+                                <span className="stock-type-badge returned">🔄 Returned{unit.returnedStock > 0 ? ` (${unit.returnedStock})` : ""}</span>
                               ) : (
                                 <span className="stock-type-badge fresh">📦 Fresh</span>
                               )}
@@ -369,8 +370,8 @@ export default function StockHandle() {
                                         <tr key={unit.id}>
                                           <td className="sd-mono">{unit.id}</td>
                                           <td>
-                                            {unit.isReturned ? (
-                                              <span className="stock-type-badge returned">🔄 Returned</span>
+                                            {(unit.returnedStock > 0 || unit.isReturned) ? (
+                                              <span className="stock-type-badge returned">🔄 Returned{unit.returnedStock > 0 ? ` (${unit.returnedStock})` : ""}</span>
                                             ) : (
                                               <span className="stock-type-badge fresh">📦 Fresh</span>
                                             )}

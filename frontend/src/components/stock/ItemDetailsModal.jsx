@@ -128,7 +128,12 @@ export default function ItemDetailsModal({ item, onClose }) {
           </div>
           <div>
             <span>Returned Units</span>
-            <p>{productUnits.filter(u => u.isReturned === true).length}</p>
+            <p>
+              {productUnits.reduce(
+                (sum, u) => sum + Number(u.returnedStock ?? u.qtyReturned ?? u.returnedCount ?? (u.isReturned ? (u.quantity ?? u.qty ?? 1) : 0)),
+                0
+              )}
+            </p>
           </div>
         </div>
 
@@ -156,8 +161,10 @@ export default function ItemDetailsModal({ item, onClose }) {
                         </span>
                       </td>
                       <td>
-                        {unit.isReturned ? (
-                          <span className="stock-type-badge returned">🔄 Returned</span>
+                        {(Number(unit.returnedStock ?? unit.qtyReturned ?? unit.returnedCount ?? 0) > 0 || unit.isReturned) ? (
+                          <span className="stock-type-badge returned">
+                            🔄 Returned{Number(unit.returnedStock ?? unit.qtyReturned ?? unit.returnedCount ?? 0) > 0 ? ` (${Number(unit.returnedStock ?? unit.qtyReturned ?? unit.returnedCount)})` : ""}
+                          </span>
                         ) : (
                           <span className="stock-type-badge fresh">📦 Fresh</span>
                         )}

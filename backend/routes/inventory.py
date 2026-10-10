@@ -306,6 +306,8 @@ def get_inventory():
             'lowStockThreshold': r.get('low_stock_threshold'),
             'freshStock': int(r.get('qty_fresh') or 0),
             'returnedStock': int(r.get('qty_returned') or 0),
+            'returnedCount': int(r.get('qty_returned') or 0),
+            'isReturned': bool(int(r.get('qty_returned') or 0) > 0 and int(r.get('qty_fresh') or 0) == 0),
             'totalAvailable': int(r.get('qty_available') or 0),
             'quantity': int(r.get('qty_available') or 0),
             'stockStatus': r.get('lot_status'),

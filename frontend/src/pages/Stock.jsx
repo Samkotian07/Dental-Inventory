@@ -128,6 +128,8 @@ export default function Stock() {
           refNo: baseRef,
           quantity: 0,
           qty: 0,
+          freshStock: 0,
+          returnedStock: 0,
           returnedCount: 0,
           units: []
         };
@@ -136,9 +138,10 @@ export default function Stock() {
       groupedMap[key].quantity += unitQty;
       groupedMap[key].qty += unitQty;
       // ⭐ Count returned units
-      if (r.isReturned === true) {
-        groupedMap[key].returnedCount += unitQty;
-      }
+      const retQty = Number(r.returnedStock ?? r.qtyReturned ?? r.returnedCount ?? (r.isReturned === true ? unitQty : 0));
+      groupedMap[key].returnedCount += retQty;
+      groupedMap[key].returnedStock = groupedMap[key].returnedCount;
+      groupedMap[key].freshStock += Number(r.freshStock ?? Math.max(0, unitQty - retQty));
       groupedMap[key].units.push(r.id);
     });
 
