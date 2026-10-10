@@ -205,7 +205,7 @@ export default function StockInsertion() {
 
   // ---------- Single Add ----------
   const handleNewSubmit = async () => {
-    const required = ["refNo", "invoiceNumber", "companyName", "productName", "lotNo", "quantity", "expiryDate"];
+    const required = ["refNo", "invoiceNumber", "companyName", "productName", "lotNo", "quantity"];
     const missing = required.filter((k) => !form[k]);
     if (missing.length > 0) {
       toast.error(`Missing required: ${missing.join(", ")}`);
@@ -455,7 +455,7 @@ export default function StockInsertion() {
                 }}
                 className="si-new-input"
               />
-              <Input label="Expiry Date *" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="si-new-input" />
+              <Input label="Expiry Date" type="date" value={form.expiryDate} onChange={(e) => setForm({ ...form, expiryDate: e.target.value })} className="si-new-input" />
 
               <div className="si-new-field">
                 <label className="si-new-label">Fresh Location</label>
