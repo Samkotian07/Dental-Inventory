@@ -10,7 +10,7 @@ const PRESET_REASONS = [
   "Shipment adjustment",
 ];
 
-export default function EditItemModal({ item, onClose, onSave, onDelete }) {
+export default function EditItemModal({ item, onClose, onSave, onDelete, onAdd }) {
   if (!item) return null;
 
   const currentQty = Number(item?.qty || item?.quantity || 0);
@@ -28,7 +28,7 @@ export default function EditItemModal({ item, onClose, onSave, onDelete }) {
 
   const handleSave = () => {
     if (!canSave) return;
-    onSave(item.refNo || item.id, { qty: numQty, reason: reason.trim() });
+    onSave(item, { qty: numQty, reason: reason.trim() });
   };
 
   return (
@@ -192,6 +192,16 @@ export default function EditItemModal({ item, onClose, onSave, onDelete }) {
             >
               <Trash2 size={15} strokeWidth={2.2} />
               Move to Failed
+            </button>
+          )}
+          {onAdd && (
+            <button
+              type="button"
+              className="modal__btn edit-stock__add-btn"
+              onClick={onAdd}
+            >
+              <Plus size={15} strokeWidth={2.2} />
+              Add Item
             </button>
           )}
           <button type="button" className="modal__btn" onClick={onClose}>

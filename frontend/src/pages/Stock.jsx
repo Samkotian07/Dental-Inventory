@@ -5,6 +5,7 @@ import Pagination from "../components/Pagination.jsx";
 import ItemDetailsModal from "../components/stock/ItemDetailsModal.jsx";
 import EditItemModal from "../components/stock/EditItemModal.jsx";
 import DeleteItemModal from "../components/stock/DeleteItemModal.jsx";
+import AddLotModal from "../components/product/AddLotModal.jsx";
 import ToggleSwitch from "../components/common/ToggleSwitch.jsx";
 import { CATEGORIES as categories, normalizeCategory, isCategoryMatch } from "../components/utils/constants.js";
 import { exportToCsv } from "../utils/csv.js";
@@ -56,7 +57,7 @@ export default function Stock() {
     stock: rows,
     moveToFailed,
     getLotsForRef,
-    updateStockQuantity,
+    updateLotQuantity,
     toggleStockStatus,
   } = useInventory();
 
@@ -70,6 +71,7 @@ export default function Stock() {
   const [detailItem, setDetailItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
+  const [lotProduct, setLotProduct] = useState(null);
 
   useEffect(() => {
     setQuery(searchParams.get("search") || "");
@@ -116,9 +118,9 @@ export default function Stock() {
     // Group by base ref_no
     const groupedMap = {};
     filteredItems.forEach((r) => {
-      const rawRef = r.refNo || r.id || "";
-      const baseRef = /^[A-Z0-9]+-[0-9]+[A-Z]$/i.test(rawRef) ? rawRef.slice(0, -1) : rawRef;
-      const key = baseRef || (r.product || "").toLowerCase();
+      const baseRef = r.refNo || "";
+      // A product may have multiple lots, so the lot id must be the group key.
+      const key = r.lotId || r.id || `${baseRef}-${r.lotNo || ""}`;
 
       if (!groupedMap[key]) {
         groupedMap[key] = {
@@ -174,7 +176,7 @@ export default function Stock() {
     });
   };
 
-  const handleSaveEdit = async (refNo, patch) => {
+  const handleSaveEdit = async (item, patch) => {
     const newQty = Number(patch.qty);
     if (!newQty || newQty < 1) {
       toast.error("Quantity must be at least 1");
@@ -184,7 +186,7 @@ export default function Stock() {
       toast.error("Reason is required");
       return;
     }
-    const result = await updateStockQuantity(refNo, newQty, patch.reason.trim());
+    const result = await updateLotQuantity(item.lotId || item.id, newQty, patch.reason.trim());
     if (result.success) {
       toast.success(result.data?.delta === 0 ? "No change" : `Quantity updated to ${newQty}`);
       setEditItem(null);
@@ -193,7 +195,7 @@ export default function Stock() {
     }
   };
 
-  const handleConfirmDelete = async (refNo, options) => {
+  const handleConfirmDelete = async (item, options) => {
     const qtyRequested = Number(options?.quantity ?? 1);
     const reason = options?.reason || "Damaged";
 
@@ -203,13 +205,9 @@ export default function Stock() {
     else if (rLower.includes("qualit")) failureType = "quality_fail";
     else if (rLower.includes("condemn")) failureType = "condemned";
 
-    let lots = await getLotsForRef(refNo);
-    if (!lots || lots.length === 0) {
-      const match = rows.find(r => (r.refNo || r.id) === refNo);
-      if (match?.lotId) {
-        lots = [{ lotId: match.lotId, qtyAvailable: Number(match.quantity ?? match.qty ?? 0) }];
-      }
-    }
+    let lots = item?.lotId
+      ? [{ lotId: item.lotId, qtyAvailable: Number(item.quantity ?? item.qty ?? 0) }]
+      : await getLotsForRef(item?.refNo || item?.id);
 
     if (!lots || lots.length === 0) {
       toast.error("No active lots found for this product to move to failed");
@@ -353,7 +351,7 @@ export default function Stock() {
 
                 {pageRows.map((row) => (
                   <tr
-                    key={row.refNo || row.id}
+                    key={row.lotId || row.id}
                     className={row.status === "inactive" || row.isActive === false ? "stock__row--inactive" : ""}
                   >
                     <td className="stock__mono" data-label="Ref no">{row.refNo}</td>
@@ -440,6 +438,10 @@ export default function Stock() {
             setDeleteItem(editItem);
             setEditItem(null);
           } : undefined}
+          onAdd={canWrite ? () => {
+            setLotProduct(editItem);
+            setEditItem(null);
+          } : undefined}
         />
       )}
 
@@ -448,6 +450,14 @@ export default function Stock() {
           item={deleteItem}
           onClose={() => setDeleteItem(null)}
           onConfirm={handleConfirmDelete}
+        />
+      )}
+
+      {lotProduct && (
+        <AddLotModal
+          product={lotProduct}
+          onClose={() => setLotProduct(null)}
+          onSaved={() => setLotProduct(null)}
         />
       )}
     </>

@@ -320,6 +320,12 @@
   gap: 6px;
 }
 
+.edit-stock__add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .edit-stock .modal__actions {
   grid-column: 1 / -1;
 }

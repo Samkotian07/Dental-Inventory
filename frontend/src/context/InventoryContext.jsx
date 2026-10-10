@@ -16,10 +16,11 @@ const getAuthHeaders = () => {
 // ---------- NORMALIZERS ----------
 
 function normalizeStock(item) {
-  // item comes from v_available_stock
+  // Each inventory row is one stock lot, so quantities remain lot-specific.
   return {
-    id: item.refNo || item.ref_no,
-    unitId: item.refNo || item.ref_no,
+    id: item.lotId || item.lot_id || item.refNo || item.ref_no,
+    lotId: item.lotId || item.lot_id || "",
+    unitId: item.lotId || item.lot_id || item.refNo || item.ref_no,
     refNo: item.refNo || item.ref_no,
     product: item.product || item.productName || "Product",
     productName: item.productName || item.product || "Product",
@@ -40,6 +41,7 @@ function normalizeStock(item) {
     returnedLocation: item.returnedLocation || "",
     lotNo: item.lotNo || item.lot_no || "",
     expiry: item.expiry || item.expiryDate || item.expiry_date || "",
+    invoiceNo: item.invoiceNo || item.invoice_no || "",
     size: item.size || item.groupSize || "",
     lowStockThreshold: item.lowStockThreshold ?? 10,
     isActive: item.isActive !== undefined ? Boolean(item.isActive) : (item.is_active !== undefined ? Boolean(item.is_active) : (item.status !== "inactive")),
@@ -703,6 +705,24 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  const updateLotQuantity = async (lotId, newQuantity, reason) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/lot/${encodeURIComponent(lotId)}/quantity`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ new_quantity: Number(newQuantity), reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, data: data.data };
+      }
+      return { success: false, message: data.message || "Update failed" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
   const updateStockItem = async (refNo, updates) => {
     try {
       const res = await fetch(`${API_URL}/inventory/${encodeURIComponent(refNo)}`, {
@@ -818,6 +838,7 @@ export function InventoryProvider({ children }) {
     bulkReceiveStock,
     toggleStockStatus,
     updateStockQuantity,
+    updateLotQuantity,
     updateStockItem,
     createProduct,
     updateProduct,

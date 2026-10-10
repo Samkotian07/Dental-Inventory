@@ -15,7 +15,7 @@ export default function DeleteItemModal({ item, onClose, onConfirm }) {
 
   const handleMove = () => {
     const qty = Math.min(Math.max(1, Number(moveQty) || 1), maxQty);
-    onConfirm(item.refNo || item.id, { reason, quantity: qty });
+    onConfirm(item, { reason, quantity: qty });
   };
 
   return (

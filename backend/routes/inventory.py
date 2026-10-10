@@ -267,24 +267,30 @@ def get_products():
 def get_inventory():
     include_all = request.args.get('include_all', 'false').lower() == 'true'
     db = StockLot.get_db()
-    where_clause = "" if include_all else "WHERE EXISTS (SELECT 1 FROM stock_lots l WHERE l.ref_no = v.ref_no)"
+    # Stock is displayed and adjusted at lot level.  The previous query read the
+    # product summary view and then selected one arbitrary/latest lot number,
+    # which made multiple lots of the same product appear as one shared count.
+    where_clause = "" if include_all else "WHERE sl.qty_available > 0"
     rows = db.execute_query(f"""
-        SELECT v.*,
-               (SELECT l.lot_no FROM stock_lots l 
-                WHERE l.ref_no = v.ref_no 
-                ORDER BY (l.status = 'open') DESC, l.created_at DESC LIMIT 1) AS lot_no,
-               (SELECT l.expiry_date FROM stock_lots l 
-                WHERE l.ref_no = v.ref_no 
-                ORDER BY (l.status = 'open') DESC, l.created_at DESC LIMIT 1) AS expiry_date
-        FROM v_available_stock v 
+        SELECT sl.lot_id, sl.ref_no, sl.lot_no, sl.invoice_no, sl.expiry_date,
+               sl.qty_available, sl.qty_fresh, sl.qty_returned, sl.status AS lot_status,
+               sl.created_at AS lot_created_at,
+               p.fresh_location, p.returned_location, p.low_stock_threshold, p.is_active,
+               pg.group_code, pg.product_name, pg.category, pg.size, pg.is_returnable,
+               v.vendor_name AS company_name
+        FROM stock_lots sl
+        JOIN products p ON p.ref_no = sl.ref_no
+        LEFT JOIN product_groups pg ON pg.group_id = p.group_id
+        LEFT JOIN vendors v ON v.vendor_id = p.vendor_id
         {where_clause}
-        ORDER BY v.product_name
+        ORDER BY pg.product_name, sl.created_at DESC
     """)
     data = []
     for r in rows:
         exp = r.get('expiry_date')
         data.append({
             'refNo': r.get('ref_no'),
+            'lotId': r.get('lot_id'),
             'groupCode': r.get('group_code'),
             'product': r.get('product_name'),
             'productName': r.get('product_name'),
@@ -292,18 +298,17 @@ def get_inventory():
             'company': r.get('company_name'),
             'companyName': r.get('company_name'),
             'lotNo': r.get('lot_no') or '',
+            'invoiceNo': r.get('invoice_no') or '',
             'expiry': exp.isoformat() if hasattr(exp, 'isoformat') else (str(exp) if exp else ''),
             'isReturnable': bool(r.get('is_returnable')),
             'freshLocation': r.get('fresh_location'),
             'returnedLocation': r.get('returned_location'),
             'lowStockThreshold': r.get('low_stock_threshold'),
-            'freshStock': int(r.get('fresh_stock') or 0),
-            'returnedStock': int(r.get('returned_stock') or 0),
-            'totalAvailable': int(r.get('total_available') or 0),
-            'quantity': int(r.get('total_available') or 0),
-            'issuedCount': int(r.get('issued_count') or 0),
-            'failedCount': int(r.get('failed_count') or 0),
-            'stockStatus': r.get('stock_status'),
+            'freshStock': int(r.get('qty_fresh') or 0),
+            'returnedStock': int(r.get('qty_returned') or 0),
+            'totalAvailable': int(r.get('qty_available') or 0),
+            'quantity': int(r.get('qty_available') or 0),
+            'stockStatus': r.get('lot_status'),
             'size': r.get('size') or '',
             'isActive': bool(r.get('is_active', 1)),
             'status': 'active' if r.get('is_active', 1) else 'inactive',
@@ -334,6 +339,66 @@ def get_lot(lot_id):
     if not lot:
         return jsonify({'success': False, 'message': 'Lot not found'}), 404
     return jsonify({'success': True, 'data': lot.to_dict()}), 200
+
+
+@inventory_bp.route('/lot/<lot_id>/quantity', methods=['PUT'])
+@token_required
+@admin_required
+def update_lot_quantity(lot_id):
+    """Adjust one lot only, without changing counts in other lots of the product."""
+    data = request.get_json() or {}
+    reason = (data.get('reason') or '').strip()
+    try:
+        new_qty = int(data.get('new_quantity'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'new_quantity must be a number'}), 400
+    if new_qty < 1:
+        return jsonify({'success': False, 'message': 'Quantity must be at least 1'}), 400
+    if not reason:
+        return jsonify({'success': False, 'message': 'Reason is required'}), 400
+
+    db = StockLot.get_db()
+    conn = db.get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("""
+            SELECT lot_id, ref_no, qty_available
+            FROM stock_lots WHERE lot_id = %s FOR UPDATE
+        """, (lot_id,))
+        lot = cursor.fetchone()
+        if not lot:
+            return jsonify({'success': False, 'message': 'Lot not found'}), 404
+        current_qty = int(lot['qty_available'] or 0)
+        delta = new_qty - current_qty
+        user = getattr(request, 'current_user', None)
+        user_name = user.name if user else 'Admin'
+        if delta:
+            cursor.execute("""
+                UPDATE stock_lots
+                SET qty_received = GREATEST(qty_received + %s, 0),
+                    qty_available = %s,
+                    qty_fresh = GREATEST(qty_fresh + %s, 0),
+                    status = 'open', version = version + 1
+                WHERE lot_id = %s
+            """, (delta, new_qty, delta, lot_id))
+            cursor.execute("""
+                INSERT INTO stock_movements
+                  (unit_serial, lot_id, ref_no, movement_type, from_status, to_status,
+                   quantity_change, moved_by, remarks)
+                VALUES (NULL, %s, %s, 'status_change', 'in_stock', 'in_stock',
+                        %s, %s, %s)
+            """, (lot_id, lot['ref_no'], delta, user_name, reason))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+    finally:
+        cursor.close()
+        conn.close()
+
+    return jsonify({'success': True, 'data': {
+        'lotId': lot_id, 'newQuantity': new_qty, 'delta': delta
+    }}), 200
 
 
 # ---------- Lots by ref ----------
