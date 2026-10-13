@@ -22,7 +22,7 @@ const CSV_COLUMNS = [
   { key: "product", label: "Product" },
   { key: "size", label: "Size" },
   { key: "quantity", label: "Quantity" },
-  { key: "returnedDisplay", label: "Returned" },
+  { key: "returnedDisplay", label: "In Use" },
 ];
 
 export default function Stock() {
@@ -37,6 +37,7 @@ export default function Stock() {
     moveToFailed,
     getLotsForRef,
     receiveStock,
+    receiveReturnedStock,
     updateLotQuantity,
     toggleStockStatus,
   } = useInventory();
@@ -200,7 +201,8 @@ export default function Stock() {
 
   const handleAddLots = async (product, lots) => {
     for (const lot of lots) {
-      const result = await receiveStock({
+      const fn = lot.stockType === "returned" ? receiveReturnedStock : receiveStock;
+      const result = await fn({
         ref_no: product.refNo,
         lot_no: lot.lotNo.trim(),
         quantity: Number(lot.quantity),
@@ -293,7 +295,7 @@ export default function Stock() {
     { key: "product", label: "Product", align: "left" },
     { key: "size", label: "Size", align: "left" },
     { key: "quantity", label: "Quantity", align: "center" },
-    { key: "returnedCount", label: "Returned", align: "center" },
+    { key: "returnedCount", label: "In Use", align: "center" },
   ];
 
   return (
@@ -363,7 +365,7 @@ export default function Stock() {
                       <button
                         className={`stock__sort ${c.align === "center" ? "stock__sort--center" : c.align === "right" ? "stock__sort--right" : ""}`}
                         onClick={() => toggleSort(c.key)}
-                        title={c.key === "returnedCount" ? "Shows how many returned units" : undefined}
+                        title={c.key === "returnedCount" ? "Shows how many in use units" : undefined}
                       >
                         {c.label}
                         <ArrowUpDown size={11} strokeWidth={2.5} />

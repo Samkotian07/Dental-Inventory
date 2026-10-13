@@ -6,8 +6,9 @@ import { toast } from "sonner";
 import { useInventory } from "../../context/InventoryContext.jsx";
 
 export default function AddLotModal({ product, onClose, onSaved }) {
-  const { receiveStock } = useInventory();
+  const { receiveStock, receiveReturnedStock } = useInventory();
   const [submitting, setSubmitting] = useState(false);
+  const [stockType, setStockType] = useState("fresh"); // "fresh" | "returned"
   const [form, setForm] = useState({
     lotNo: "",
     quantity: "",
@@ -24,7 +25,8 @@ export default function AddLotModal({ product, onClose, onSaved }) {
   const handleSave = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
-    const result = await receiveStock({
+    const fn = stockType === "returned" ? receiveReturnedStock : receiveStock;
+    const result = await fn({
       ref_no: product.refNo,
       lot_no: form.lotNo.trim(),
       quantity: Number(form.quantity),
@@ -50,6 +52,36 @@ export default function AddLotModal({ product, onClose, onSaved }) {
     <Modal isOpen={true} onClose={onClose} title={`Add Stock — ${product.refNo}`} width={520}>
       <div style={{ marginBottom: 12, color: "#64748B", fontSize: 13 }}>
         {product.productName}
+      </div>
+
+      <div className="modal__field">
+        <label>Stock Type</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => setStockType("fresh")}
+            style={{
+              flex: 1, padding: "8px", borderRadius: 6,
+              border: stockType === "fresh" ? "2px solid #2563EB" : "1px solid #D1D5DB",
+              background: stockType === "fresh" ? "#EFF6FF" : "white",
+              cursor: "pointer", fontWeight: 600,
+            }}
+          >
+            📦 Fresh Stock
+          </button>
+          <button
+            type="button"
+            onClick={() => setStockType("returned")}
+            style={{
+              flex: 1, padding: "8px", borderRadius: 6,
+              border: stockType === "returned" ? "2px solid #D97706" : "1px solid #D1D5DB",
+              background: stockType === "returned" ? "#FEF3C7" : "white",
+              cursor: "pointer", fontWeight: 600,
+            }}
+          >
+            🔄 In Use
+          </button>
+        </div>
       </div>
 
       <div className="modal__field">

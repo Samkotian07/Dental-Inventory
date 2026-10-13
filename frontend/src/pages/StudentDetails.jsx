@@ -324,6 +324,8 @@ export default function StudentDetails() {
                                 >
                                   <Pencil size={15} strokeWidth={2} />
                                 </button>
+                                {/* Delete button commented out / hidden for time being */}
+                                {/*
                                 <button
                                   className="students__icon-btn students__icon-btn--danger"
                                   onClick={() => setDeleteTarget(row)}
@@ -332,6 +334,7 @@ export default function StudentDetails() {
                                 >
                                   <Trash2 size={15} strokeWidth={2} />
                                 </button>
+                                */}
                               </>
                             )}
                           </div>

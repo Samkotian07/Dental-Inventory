@@ -46,7 +46,7 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLo
 
   const addLotRow = () => {
     setNewLots((lots) => [...lots, {
-      lotNo: "", quantity: "", invoiceNo: "", creditNoteNo: "", expiryDate: "",
+      lotNo: "", quantity: "", invoiceNo: "", creditNoteNo: "", expiryDate: "", stockType: "fresh",
     }]);
   };
 
@@ -195,6 +195,18 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLo
             <div className="edit-stock__new-lots-scroll">
               {newLots.map((lot, index) => (
                 <div className="edit-stock__lot-fields" key={index}>
+                  <select
+                    value={lot.stockType || "fresh"}
+                    onChange={(e) => updateLot(index, "stockType", e.target.value)}
+                    style={{
+                      border: (lot.stockType || "fresh") === "returned" ? "1.5px solid #D97706" : "1.5px solid #2563EB",
+                      background: (lot.stockType || "fresh") === "returned" ? "#FEF3C7" : "#EFF6FF",
+                      color: (lot.stockType || "fresh") === "returned" ? "#92400E" : "#1E40AF",
+                    }}
+                  >
+                    <option value="fresh">📦 Fresh</option>
+                    <option value="returned">🔄 In Use</option>
+                  </select>
                   <input value={lot.lotNo} onChange={(e) => updateLot(index, "lotNo", e.target.value)} placeholder="Lot no *" />
                   <input type="text" min="1" value={lot.quantity} onChange={(e) => updateLot(index, "quantity", e.target.value)} placeholder="Quantity *" />
                   <input value={lot.invoiceNo} onChange={(e) => updateLot(index, "invoiceNo", e.target.value)} placeholder="Invoice no" />

@@ -28,7 +28,6 @@ export default function AddProductModal({ onClose, onSaved }) {
     invoiceNo: "",
     creditNoteNo: "",
     expiryDate: "",
-    isReturnable: false, // implants usually false by default
     isActive: true,
   });
 
@@ -38,7 +37,6 @@ export default function AddProductModal({ onClose, onSaved }) {
     setForm((prev) => ({
       ...prev,
       category: cat,
-      isReturnable: !["implant", "abutment"].includes(cat),
     }));
   };
 
@@ -69,7 +67,6 @@ export default function AddProductModal({ onClose, onSaved }) {
       fresh_location: form.freshLocation.trim(),
       returned_location: form.returnedLocation.trim(),
       low_stock_threshold: Number(form.lowStockThreshold) || 10,
-      is_returnable: form.isReturnable,
       is_active: form.isActive,
     });
     if (result.success && hasAnyLotValue) {
@@ -239,16 +236,6 @@ export default function AddProductModal({ onClose, onSaved }) {
             onChange={(e) => update("description", e.target.value)}
             placeholder="Optional product notes or description"
           />
-        </div>
-
-        <div className="modal__field modal__field--toggle">
-          <input
-            type="checkbox"
-            id="addReturnable"
-            checked={form.isReturnable}
-            onChange={(e) => update("isReturnable", e.target.checked)}
-          />
-          <label htmlFor="addReturnable">Is Returnable</label>
         </div>
 
         <div className="modal__field modal__field--toggle">

@@ -60,9 +60,10 @@ class Student:
                 AND u.status IN ('issued', 'awaiting_vendor')
               GROUP BY e.student_id
             ) p ON p.student_id = s.campus_id
+            WHERE s.campus_id != 'MIGRATED'
         """
         if active_only:
-            query += " WHERE s.status = 'active'"
+            query += " AND s.status = 'active'"
         query += " ORDER BY s.created_at DESC"
         result = db.execute_query(query)
         return [cls(row) for row in result]
@@ -92,7 +93,7 @@ class Student:
                 AND u.status IN ('issued', 'awaiting_vendor')
               GROUP BY e.student_id
             ) p ON p.student_id = s.campus_id
-            WHERE s.batch = %s
+            WHERE s.batch = %s AND s.campus_id != 'MIGRATED'
             ORDER BY s.name
         """, (batch,))
         return [cls(row) for row in results]
@@ -112,7 +113,8 @@ class Student:
                 AND u.status IN ('issued', 'awaiting_vendor')
               GROUP BY e.student_id
             ) p ON p.student_id = s.campus_id
-            WHERE s.name LIKE %s OR s.campus_id LIKE %s OR s.course LIKE %s OR s.email LIKE %s
+            WHERE (s.name LIKE %s OR s.campus_id LIKE %s OR s.course LIKE %s OR s.email LIKE %s)
+              AND s.campus_id != 'MIGRATED'
             ORDER BY s.name
         """, (pattern, pattern, pattern, pattern))
         return [cls(row) for row in result]
@@ -192,7 +194,7 @@ class Student:
     @classmethod
     def get_pending_return_count(cls, student_id):
         """Compute live count of open tool/returnable issues."""
-        if not student_id:
+        if not student_id or student_id == 'MIGRATED':
             return 0
         db = cls.get_db()
         rows = db.execute_query("""
@@ -208,6 +210,8 @@ class Student:
     @classmethod
     def update_pending_returns(cls, student_id):
         """Backward-compat shim: return live count (no DB write)."""
+        if not student_id or student_id == 'MIGRATED':
+            return {'pending_return_count': 0}
         return {
             'pending_return_count': cls.get_pending_return_count(student_id)
         }

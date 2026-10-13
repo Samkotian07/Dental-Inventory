@@ -455,7 +455,7 @@ export default function UnitHistory() {
               </div>
               <div className="unit-info-badges">
                 {productInfo?.isReturned ? (
-                  <span className="unit-type-badge returned">🔄 Returned Stock</span>
+                  <span className="unit-type-badge returned">🔄 In Use Stock</span>
                 ) : (
                   <span className="unit-type-badge fresh">📦 Fresh Stock</span>
                 )}

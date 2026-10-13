@@ -155,7 +155,9 @@ function BeautifiedCreditNoteDropdown({ value, onChange, onSelect, availableRetu
 // ---------- Main Component ----------
 export default function StockInsertion() {
   const onMenuClick = useMenuClick();
-  const { receiveStock, bulkReceiveStock, returns } = useInventory();
+  const { receiveStock, receiveReturnedStock, bulkReceiveStock, returns } = useInventory();
+  const [stockType, setStockType] = useState("fresh");
+  const [bulkStockType, setBulkStockType] = useState("fresh");
   const [csvPreview, setCsvPreview] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -213,22 +215,25 @@ export default function StockInsertion() {
     }
 
     setIsSubmitting(true);
-    const result = await receiveStock({
+    const fn = stockType === "returned" ? receiveReturnedStock : receiveStock;
+    const result = await fn({
       ref_no: form.refNo,
       lot_no: form.lotNo,
       quantity: Number(form.quantity),
       invoice_no: form.invoiceNumber,
       credit_note_no: form.creditNoteNumber || null,
-      expiry_date: form.expiryDate,
+      expiry_date: form.expiryDate || null,
       product_name: form.productName,
       category: form.category,
       size: form.size,
       company_name: form.companyName,
+      fresh_location: form.freshLocation || null,
+      returned_location: form.returnedLocation || null,
     });
     setIsSubmitting(false);
 
     if (result.success) {
-      toast.success(`Added ${form.quantity} unit(s) of ${form.productName}`);
+      toast.success(`Added ${form.quantity} unit(s) of ${form.productName} as ${stockType === "returned" ? "in use" : "fresh"} stock`);
       setForm(emptyForm);
       setShowCreditNoteField(false);
     } else {
@@ -244,7 +249,11 @@ export default function StockInsertion() {
       try {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: "array" });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const firstSheet = workbook.SheetNames[0] ? workbook.Sheets[workbook.SheetNames[0]] : null;
+        if (!firstSheet) {
+          toast.error("Excel sheet is empty");
+          return;
+        }
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
 
         const validated = jsonData.map((row) => {
@@ -291,10 +300,33 @@ export default function StockInsertion() {
       category: r.category,
       size: r.size,
       company_name: r.companyName,
+      fresh_location: r.freshLocation || null,
+      returned_location: r.returnedLocation || null,
     }));
 
     setIsSubmitting(true);
-    const result = await bulkReceiveStock(rows);
+    let result;
+    if (bulkStockType === "returned") {
+      let imported = 0;
+      const errors = [];
+      for (let i = 0; i < rows.length; i++) {
+        const res = await receiveReturnedStock(rows[i]);
+        if (res.success) {
+          imported++;
+        } else {
+          errors.push({ row: i + 1, error: res.message });
+        }
+      }
+      result = {
+        success: errors.length === 0,
+        imported,
+        failed: errors.length,
+        errors,
+        message: errors.length > 0 ? "Some rows failed" : undefined,
+      };
+    } else {
+      result = await bulkReceiveStock(rows);
+    }
     setIsSubmitting(false);
 
     if (result.success) {
@@ -401,6 +433,36 @@ export default function StockInsertion() {
               </div>
             </div>
 
+            <div className="si-stock-type-toggle" style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: 13, color: "#374151" }}>Stock Type</label>
+              <div style={{ display: "flex", gap: 8, maxWidth: 360 }}>
+                <button
+                  type="button"
+                  onClick={() => setStockType("fresh")}
+                  style={{
+                    flex: 1, padding: "8px", borderRadius: 6,
+                    border: stockType === "fresh" ? "2px solid #2563EB" : "1px solid #D1D5DB",
+                    background: stockType === "fresh" ? "#EFF6FF" : "white",
+                    cursor: "pointer", fontWeight: 600,
+                  }}
+                >
+                  📦 Fresh Stock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockType("returned")}
+                  style={{
+                    flex: 1, padding: "8px", borderRadius: 6,
+                    border: stockType === "returned" ? "2px solid #D97706" : "1px solid #D1D5DB",
+                    background: stockType === "returned" ? "#FEF3C7" : "white",
+                    cursor: "pointer", fontWeight: 600,
+                  }}
+                >
+                  🔄 In Use
+                </button>
+              </div>
+            </div>
+
             <div className="si-new-grid">
               <div className="si-new-field">
                 <label className="si-new-label">Ref No *</label>
@@ -481,8 +543,38 @@ export default function StockInsertion() {
             </div>
           </div>
 
-          {/* ---------- Bulk Import ---------- 
+          {/* ---------- Bulk Import ---------- */}
           <div className="si-bulk-section-wrapper">
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: 13, color: "#374151" }}>Bulk Stock Type</label>
+              <div style={{ display: "flex", gap: 8, maxWidth: 360 }}>
+                <button
+                  type="button"
+                  onClick={() => setBulkStockType("fresh")}
+                  style={{
+                    flex: 1, padding: "8px", borderRadius: 6,
+                    border: bulkStockType === "fresh" ? "2px solid #2563EB" : "1px solid #D1D5DB",
+                    background: bulkStockType === "fresh" ? "#EFF6FF" : "white",
+                    cursor: "pointer", fontWeight: 600,
+                  }}
+                >
+                  📦 Fresh Stock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBulkStockType("returned")}
+                  style={{
+                    flex: 1, padding: "8px", borderRadius: 6,
+                    border: bulkStockType === "returned" ? "2px solid #D97706" : "1px solid #D1D5DB",
+                    background: bulkStockType === "returned" ? "#FEF3C7" : "white",
+                    cursor: "pointer", fontWeight: 600,
+                  }}
+                >
+                  🔄 In Use
+                </button>
+              </div>
+            </div>
+
             <div className="si-bulk-header">
               <h3 className="si-section-title">Bulk Import Inventory</h3>
               <Button variant="secondary" onClick={downloadTemplate} className="si-download-btn">
@@ -510,7 +602,7 @@ export default function StockInsertion() {
                 <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="si-hidden-input" onChange={(e) => handleFile(e.target.files[0])} />
               </div>
             </div>
-          </div>*/}
+          </div>
 
           {/* ---------- Preview Modal ---------- */}
           <Modal

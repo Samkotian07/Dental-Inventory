@@ -25,8 +25,9 @@ const BULK_COLUMNS = [
 
 export default function ProductCatalog() {
   const onMenuClick = useMenuClick();
-  const { products, fetchProducts, createProduct, bulkCreateProducts, receiveStock } = useInventory();
+  const { products, fetchProducts, createProduct, bulkCreateProducts, receiveStock, receiveReturnedStock } = useInventory();
 
+  const [bulkStockType, setBulkStockType] = useState("fresh");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [addOpen, setAddOpen] = useState(false);
@@ -177,7 +178,8 @@ export default function ProductCatalog() {
 
       // 2. If lot fields present, add stock
       if (row._hasLot) {
-        const lotRes = await receiveStock({
+        const fn = bulkStockType === "returned" ? receiveReturnedStock : receiveStock;
+        const lotRes = await fn({
           ref_no: row.refNo,
           lot_no: row.lotNo,
           quantity: Number(row.quantity),
@@ -322,6 +324,36 @@ export default function ProductCatalog() {
             onPageChange={setPage}
           />
         </section>
+
+        <div style={{ margin: "16px 0 8px 0" }}>
+          <label style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: 13, color: "#374151" }}>Bulk Stock Type</label>
+          <div style={{ display: "flex", gap: 8, maxWidth: 360 }}>
+            <button
+              type="button"
+              onClick={() => setBulkStockType("fresh")}
+              style={{
+                flex: 1, padding: "8px", borderRadius: 6,
+                border: bulkStockType === "fresh" ? "2px solid #2563EB" : "1px solid #D1D5DB",
+                background: bulkStockType === "fresh" ? "#EFF6FF" : "white",
+                cursor: "pointer", fontWeight: 600,
+              }}
+            >
+              📦 Fresh Stock
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkStockType("returned")}
+              style={{
+                flex: 1, padding: "8px", borderRadius: 6,
+                border: bulkStockType === "returned" ? "2px solid #D97706" : "1px solid #D1D5DB",
+                background: bulkStockType === "returned" ? "#FEF3C7" : "white",
+                cursor: "pointer", fontWeight: 600,
+              }}
+            >
+              🔄 In Use
+            </button>
+          </div>
+        </div>
 
         <div
           className={`catalog-bulk-dropzone ${isDragging ? "is-dragging" : ""}`}

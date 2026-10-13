@@ -4,7 +4,8 @@ from models.stock_lot import StockLot
 from models.issued_unit import IssuedUnit
 from models.issue import Issue
 from models.product import Product
-from datetime import datetime
+from datetime import datetime, date
+from models.audit_log import AuditLog
 from middleware.auth import admin_required
 
 
@@ -885,6 +886,9 @@ def create_product():
         if threshold < 0:
             return jsonify({'success': False, 'message': 'Threshold must be non-negative'}), 400
 
+    category = str(data.get('category') or '').strip().lower()
+    data['is_returnable'] = 0 if category in ('implant', 'abutment') else 1
+
     if not _auto_create_product(data):
         return jsonify({'success': False, 'message': 'Failed to create product'}), 400
 
@@ -946,6 +950,9 @@ def bulk_create_products():
             if threshold < 0:
                 errors.append({'row': index, 'error': 'Threshold must be non-negative'})
                 continue
+
+        category = str(row.get('category') or '').strip().lower()
+        row['is_returnable'] = 0 if category in ('implant', 'abutment') else 1
 
         if not _auto_create_product(row):
             errors.append({'row': index, 'error': f'Product {ref_no} could not be created'})
@@ -1032,13 +1039,11 @@ def update_product(ref_no):
         cat = str(data['category']).strip().lower()
         if cat in ('implant', 'abutment', 'prosthetic', 'tool', 'consumable', 'other'):
             group_updates['category'] = cat
+            group_updates['is_returnable'] = 0 if cat in ('implant', 'abutment') else 1
     if 'size' in data:
         group_updates['size'] = str(data['size']).strip()
     if 'description' in data:
         group_updates['description'] = str(data.get('description') or '').strip()
-    if 'is_returnable' in data or 'isReturnable' in data:
-        ret = data.get('is_returnable') if 'is_returnable' in data else data.get('isReturnable')
-        group_updates['is_returnable'] = 1 if ret else 0
 
     if group_updates and product.group_id:
         set_clause = ', '.join(f'{k} = %s' for k in group_updates)
@@ -1051,3 +1056,158 @@ def update_product(ref_no):
         'message': f'Product {ref_no} updated successfully',
         'data': updated_product.to_dict() if updated_product else {'refNo': ref_no},
     }), 200
+
+
+# ---------- Receive stock as RETURNED (migration) ----------
+
+@inventory_bp.route('/receive-returned', methods=['POST'])
+@token_required
+def receive_returned_stock():
+    data = request.get_json() or {}
+    ref_no = data.get('ref_no')
+    lot_no = data.get('lot_no')
+    qty = data.get('quantity')
+    invoice_no = data.get('invoice_no')
+    credit_note_no = data.get('credit_note_no')
+    expiry = data.get('expiry_date') or None
+
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
+    if not ref_no or not lot_no or not qty:
+        return jsonify({'success': False, 'message': 'ref_no, lot_no, quantity required'}), 400
+
+    try:
+        qty = int(qty)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'quantity must be a number'}), 400
+
+    if qty < 1:
+        return jsonify({'success': False, 'message': 'quantity must be >= 1'}), 400
+
+    product = Product.find_by_ref_no(ref_no)
+    if not product:
+        created = _auto_create_product(data)
+        if not created:
+            return jsonify({'success': False, 'message': f'Product {ref_no} not found and could not be created'}), 400
+        product = Product.find_by_ref_no(ref_no)
+
+    db = StockLot.get_db()
+    conn = db.get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("START TRANSACTION")
+
+        # 1. Ensure stock_lot exists with returned qty
+        v_date_str = date.today().strftime('%Y%m%d')
+        lot_id = f"LOT-{ref_no}-{lot_no}-{v_date_str}"
+
+        cursor.execute("""
+            INSERT INTO stock_lots
+              (lot_id, ref_no, lot_no, invoice_no, credit_note_no, expiry_date,
+               qty_received, qty_available, qty_fresh, qty_returned, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, %s, 'open')
+            ON DUPLICATE KEY UPDATE
+              qty_received  = qty_received  + VALUES(qty_received),
+              qty_available = qty_available + VALUES(qty_available),
+              qty_returned  = qty_returned  + VALUES(qty_returned),
+              status        = IF(status = 'depleted', 'open', status)
+        """, (lot_id, ref_no, lot_no, invoice_no, credit_note_no, expiry,
+              qty, qty, qty))
+
+        # Ensure synthetic student exists
+        cursor.execute("""
+            INSERT INTO students (campus_id, name, course, batch, status)
+            VALUES ('MIGRATED', 'Historical Migration', 'System Migration', 'SYSTEM', 'inactive')
+            ON DUPLICATE KEY UPDATE name = VALUES(name)
+        """)
+
+        # 2. Ensure synthetic issue_event exists for this lot
+        cursor.execute("""
+            SELECT issue_id FROM issue_events
+            WHERE issue_id LIKE 'ISS-MIG-%' AND student_id = 'MIGRATED'
+            LIMIT 1
+        """)
+        existing = cursor.fetchone()
+        if existing:
+            issue_id = existing['issue_id']
+        else:
+            cursor.execute("""
+                SELECT COALESCE(MAX(CAST(SUBSTRING(issue_id, 9) AS UNSIGNED)), 0) + 1 AS next_num
+                FROM issue_events WHERE issue_id LIKE 'ISS-MIG-%'
+            """)
+            row = cursor.fetchone()
+            next_num = row['next_num'] if row else 1
+            issue_id = f"ISS-MIG-{str(next_num).zfill(3)}"
+
+            cursor.execute("""
+                INSERT INTO issue_events
+                  (issue_id, student_id, student_name, issue_date, issued_by)
+                VALUES (%s, 'MIGRATED', 'Historical Migration', CURDATE(), %s)
+            """, (issue_id, user_name))
+
+        # 3. Create N issued_units rows with status returned_good
+        for i in range(1, qty + 1):
+            # Find next available sequence for this lot
+            cursor.execute("""
+                SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(unit_serial, '-', -1) AS UNSIGNED)), 0) + 1 AS next_seq
+                FROM issued_units WHERE lot_id = %s
+            """, (lot_id,))
+            seq_row = cursor.fetchone()
+            seq = seq_row['next_seq']
+            unit_serial = f"{ref_no}-L{lot_no}-{str(seq).zfill(2)}"
+
+            cursor.execute("""
+                INSERT INTO issued_units
+                  (unit_serial, lot_id, issue_id, ref_no, lot_no, product_name, category,
+                   is_implant_abutment, status, issued_date, returned_date, return_condition, returned_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'returned_good', CURDATE(), CURDATE(), 'Good', %s)
+            """, (
+                unit_serial, lot_id, issue_id, ref_no, lot_no,
+                product.get_product_name(), product.get_category(),
+                1 if product.get_category() in ('implant', 'abutment') else 0,
+                user_name
+            ))
+
+            # 4. Log movement
+            cursor.execute("""
+                INSERT INTO stock_movements
+                  (unit_serial, lot_id, ref_no, movement_type, from_status, to_status,
+                   quantity_change, moved_by, remarks)
+                VALUES (%s, %s, %s, 'return', 'migrated', 'returned_good',
+                        0, %s, 'Initial migration: added as returned stock')
+            """, (unit_serial, lot_id, ref_no, user_name))
+
+        cursor.execute("COMMIT")
+
+    except Exception as e:
+        try:
+            cursor.execute("ROLLBACK")
+        except Exception:
+            pass
+        return jsonify({'success': False, 'message': str(e)}), 400
+    finally:
+        try:
+            cursor.close()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    AuditLog.create(
+        action='RECEIVE_RETURNED',
+        entity_type='INVENTORY',
+        entity_id=lot_id,
+        details=f'Added {qty} x {ref_no} as returned stock (lot {lot_no})',
+        user_id=user.id if user else None,
+        user_name=user_name,
+    )
+
+    return jsonify({
+        'success': True,
+        'message': f'Added {qty} unit(s) as returned stock',
+        'data': {'refNo': ref_no, 'lotNo': lot_no, 'quantity': qty, 'issueId': issue_id}
+    }), 201
+

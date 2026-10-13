@@ -221,7 +221,7 @@ export default function StockHandle() {
                             <td className="sd-mono">{unit.id}</td>
                             <td>
                               {(unit.returnedStock > 0 || unit.isReturned) ? (
-                                <span className="stock-type-badge returned">🔄 Returned{unit.returnedStock > 0 ? ` (${unit.returnedStock})` : ""}</span>
+                                <span className="stock-type-badge returned">🔄 In Use{unit.returnedStock > 0 ? ` (${unit.returnedStock})` : ""}</span>
                               ) : (
                                 <span className="stock-type-badge fresh">📦 Fresh</span>
                               )}
@@ -371,7 +371,7 @@ export default function StockHandle() {
                                           <td className="sd-mono">{unit.id}</td>
                                           <td>
                                             {(unit.returnedStock > 0 || unit.isReturned) ? (
-                                              <span className="stock-type-badge returned">🔄 Returned{unit.returnedStock > 0 ? ` (${unit.returnedStock})` : ""}</span>
+                                              <span className="stock-type-badge returned">🔄 In Use{unit.returnedStock > 0 ? ` (${unit.returnedStock})` : ""}</span>
                                             ) : (
                                               <span className="stock-type-badge fresh">📦 Fresh</span>
                                             )}

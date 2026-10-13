@@ -177,7 +177,7 @@ export default function ItemDetailsModal({ item, onClose }) {
 
         <div className="item-details__stock-counts">
           <div><span>Fresh stock</span><strong>{freshCount}</strong></div>
-          <div><span>Returned stock</span><strong>{returnedCount}</strong></div>
+          <div><span>In Use stock</span><strong>{returnedCount}</strong></div>
         </div>
       </div>
     </Modal>

@@ -20,7 +20,6 @@ export default function EditProductModal({ product, onClose, onSaved }) {
     freshLocation: product.freshLocation || "",
     returnedLocation: product.returnedLocation || "",
     lowStockThreshold: product.lowStockThreshold ?? 10,
-    isReturnable: product.isReturnable !== false,
     isActive: product.isActive !== false,
   });
 
@@ -38,7 +37,6 @@ export default function EditProductModal({ product, onClose, onSaved }) {
       fresh_location: form.freshLocation.trim(),
       returned_location: form.returnedLocation.trim(),
       low_stock_threshold: Number(form.lowStockThreshold) || 0,
-      is_returnable: form.isReturnable,
       is_active: form.isActive,
     });
     setSubmitting(false);
@@ -120,17 +118,6 @@ export default function EditProductModal({ product, onClose, onSaved }) {
         <div className="modal__field" style={{ gridColumn: "span 2" }}>
           <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600 }}>Description</label>
           <Input value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="Optional product description" />
-        </div>
-
-        <div className="modal__field" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-          <input
-            type="checkbox"
-            id="editReturnable"
-            checked={form.isReturnable}
-            onChange={(e) => update("isReturnable", e.target.checked)}
-            style={{ width: 16, height: 16, cursor: "pointer" }}
-          />
-          <label htmlFor="editReturnable" style={{ fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Is Returnable</label>
         </div>
 
         <div className="modal__field" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>

@@ -40,7 +40,8 @@
   display: flex;
   width: max-content;
   gap: 12px;
-  animation: 10s linear infinite alerts-marquee;
+  will-change: transform;
+  animation: var(--marquee-duration, 20s) linear infinite alerts-marquee;
 }
 
 .alerts-card__viewport:hover .alerts-card__track {
@@ -106,7 +107,7 @@
 
 @keyframes alerts-marquee {
   from { transform: translateX(0); }
-  to { transform: translateX(calc(-50% - 8px)); }
+  to { transform: translateX(calc(-50% - 6px)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

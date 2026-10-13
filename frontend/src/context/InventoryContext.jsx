@@ -828,6 +828,24 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  const receiveReturnedStock = async (data) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/receive-returned`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await Promise.all([fetchStock(), fetchIssues()]);
+        return { success: true, message: json.message, data: json.data };
+      }
+      return { success: false, message: json.message || "Failed" };
+    } catch {
+      return { success: false, message: "Network error" };
+    }
+  };
+
   // ---------- CONTEXT VALUE ----------
 
   const value = {
@@ -867,6 +885,7 @@ export function InventoryProvider({ children }) {
     discardReturn,
     addReturn,
     receiveStock,
+    receiveReturnedStock,
     bulkReceiveStock,
     toggleStockStatus,
     updateStockQuantity,

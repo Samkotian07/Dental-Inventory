@@ -19,7 +19,8 @@ export default function IssueItemModal({ onClose, onConfirm }) {
   const [studentId, setStudentId] = useState("");
   const [itemId, setItemId] = useState("");
   const [qty, setQty] = useState(1);
-  const [stockSource, setStockSource] = useState("all");
+  // const [stockSource, setStockSource] = useState("all"); // Commented All items for time being
+  const [stockSource, setStockSource] = useState("fresh");
   const [selectedUnitId, setSelectedUnitId] = useState(null);
   const [apiReturnedUnits, setApiReturnedUnits] = useState([]);
 
@@ -78,7 +79,8 @@ export default function IssueItemModal({ onClose, onConfirm }) {
   }, [stock, issuedItems]);
 
   const filteredGroupedStock = useMemo(() => {
-    if (stockSource === "all") return groupedStock;
+    // Commented out "All items" for time being
+    // if (stockSource === "all") return groupedStock;
     if (stockSource === "fresh") {
       return groupedStock.filter(g => g.hasFresh);
     }
@@ -187,6 +189,13 @@ export default function IssueItemModal({ onClose, onConfirm }) {
     setSelectedLotId("");
     setAvailableLots([]);
 
+    const prod = groupedStock.find((g) => g.refNo === newRefNo);
+    if (prod && !prod.hasFresh && (prod.hasReturned || prod.returnedStock > 0)) {
+      setStockSource("returned");
+    } else {
+      setStockSource("fresh");
+    }
+
     if (newRefNo) {
       setLotsLoading(true);
       getLotsForRef(newRefNo).then((lots) => {
@@ -228,14 +237,14 @@ export default function IssueItemModal({ onClose, onConfirm }) {
           onChange={handleItemChange}
         >
           <option value="">Select product...</option>
-          {filteredGroupedStock.map((group) => (
+          {groupedStock.map((group) => (
             <option key={group.refNo} value={group.refNo}>
               {group.product} ({group.refNo}) - {group.totalQuantity} available
               {group.isReturnable === false && " 🔒 Non-Returnable (Implant/Abutment)"}
             </option>
           ))}
         </select>
-        {filteredGroupedStock.length === 0 && (
+        {groupedStock.length === 0 && (
           <small style={{ color: '#dc3545', display: 'block', marginTop: '4px' }}>
             No products available in stock
           </small>
@@ -273,6 +282,8 @@ export default function IssueItemModal({ onClose, onConfirm }) {
         <div className="modal__field">
           <label>Stock Source</label>
           <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+            {/* Commented out All items / All Stock for time being */}
+            {/*
             <button
               type="button"
               onClick={() => setStockSource("all")}
@@ -290,6 +301,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
             >
               All Stock
             </button>
+            */}
             <button
               type="button"
               onClick={() => setStockSource("fresh")}
@@ -304,7 +316,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
                 color: stockSource === "fresh" ? "#059669" : "#374151",
                 cursor: "pointer",
               }}
-              disabled={!groupedStock.some(g => g.hasFresh)}
+              disabled={selectedItem ? !selectedItem.hasFresh : !groupedStock.some(g => g.hasFresh)}
             >
               📦 Fresh Stock
             </button>
@@ -324,7 +336,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
               }}
               disabled={!hasReturned}
             >
-              🔄 Returned Stock
+              🔄 In Use Stock
             </button>
           </div>
           {isNonReturnable && (
@@ -338,7 +350,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
       {/* Returned Stock - Show Individual Units */}
       {stockSource === "returned" && selectedItem && returnedUnits.length > 0 && (
         <div className="modal__field">
-          <label>Select Returned Unit</label>
+          <label>Select In-Use Unit</label>
           <div className="returned-units-list">
             {returnedUnits.map((unit) => {
               return (
@@ -368,7 +380,7 @@ export default function IssueItemModal({ onClose, onConfirm }) {
                       fontSize: "11px", 
                       fontWeight: "600" 
                     }}>
-                      🔄 Returned
+                      🔄 In Use
                     </span>
                   </div>
                   <div style={{ fontSize: "12.5px", color: "#4B5563", marginTop: "4px" }}>
