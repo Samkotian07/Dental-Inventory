@@ -1037,7 +1037,13 @@ def update_product(ref_no):
             group_updates['product_name'] = str(pname).strip()
     if 'category' in data:
         cat = str(data['category']).strip().lower()
-        if cat in ('implant', 'abutment', 'prosthetic', 'tool', 'consumable', 'other'):
+        if cat in (
+            'implant', 'abutment', 'prosthetic', 'tool', 'consumable', 'other',
+            'general', 'np implants', 'rp implants', 'universal bases',
+            'healing abutments', 'impression copings', 'implant replicas',
+            'snappy abutments', 'esthetic abutments', 'temporary abutments',
+            'instruments & tools', 'membrane',
+        ):
             group_updates['category'] = cat
             group_updates['is_returnable'] = 0 if cat in ('implant', 'abutment') else 1
     if 'size' in data:
@@ -1210,4 +1216,3 @@ def receive_returned_stock():
         'message': f'Added {qty} unit(s) as returned stock',
         'data': {'refNo': ref_no, 'lotNo': lot_no, 'quantity': qty, 'issueId': issue_id}
     }), 201
-

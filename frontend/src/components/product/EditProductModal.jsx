@@ -4,8 +4,9 @@ import Input from "../common/Input";
 import Button from "../common/Button";
 import { toast } from "sonner";
 import { useInventory } from "../../context/InventoryContext.jsx";
+import { CATEGORIES } from "../utils/constants.js";
 
-const CATEGORIES = ["implant", "abutment", "prosthetic", "tool", "consumable", "other"];
+const PRODUCT_CATEGORIES = CATEGORIES.filter((category) => category !== "All Categories");
 
 export default function EditProductModal({ product, onClose, onSaved }) {
   const { updateProduct } = useInventory();
@@ -26,6 +27,11 @@ export default function EditProductModal({ product, onClose, onSaved }) {
   const update = (k, v) => setForm((prev) => ({ ...prev, [k]: v }));
 
   const handleSave = async () => {
+    if (!form.category) {
+      toast.error("Category is required");
+      return;
+    }
+
     setSubmitting(true);
     const result = await updateProduct(product.refNo, {
       group_code: form.groupCode.trim(),
@@ -82,9 +88,13 @@ export default function EditProductModal({ product, onClose, onSaved }) {
               textTransform: "capitalize",
             }}
           >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c.charAt(0).toUpperCase() + c.slice(1)}
+            <option value="">-- Select Category --</option>
+            {form.category && !PRODUCT_CATEGORIES.some((category) => category.toLowerCase() === form.category) && (
+              <option value={form.category}>{product.category}</option>
+            )}
+            {PRODUCT_CATEGORIES.map((category) => (
+              <option key={category} value={category.toLowerCase()}>
+                {category}
               </option>
             ))}
           </select>

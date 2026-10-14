@@ -207,7 +207,7 @@ export default function StockInsertion() {
 
   // ---------- Single Add ----------
   const handleNewSubmit = async () => {
-    const required = ["refNo", "invoiceNumber", "companyName", "productName", "lotNo", "quantity"];
+    const required = ["refNo", "companyName", "productName", "lotNo", "quantity"];
     const missing = required.filter((k) => !form[k]);
     if (missing.length > 0) {
       toast.error(`Missing required: ${missing.join(", ")}`);
@@ -220,7 +220,7 @@ export default function StockInsertion() {
       ref_no: form.refNo,
       lot_no: form.lotNo,
       quantity: Number(form.quantity),
-      invoice_no: form.invoiceNumber,
+      invoice_no: form.invoiceNumber || null,
       credit_note_no: form.creditNoteNumber || null,
       expiry_date: form.expiryDate || null,
       product_name: form.productName,
@@ -470,7 +470,7 @@ export default function StockInsertion() {
               </div>
 
               <div className="si-new-field">
-                <label className="si-new-label">Invoice Number *</label>
+                <label className="si-new-label">Invoice Number</label>
                 <Input value={form.invoiceNumber} onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })} placeholder="INV-2024-XXX" className="si-new-input" />
               </div>
 
