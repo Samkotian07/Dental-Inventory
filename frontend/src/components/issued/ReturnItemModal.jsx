@@ -72,6 +72,8 @@ export default function ReturnItemModal({
   const handlePrint = () => {
     const batchVal = item.lotNo || item.batchNo || "—";
     const productName = item.product || item.productName || "Product";
+    const lastStudent = item.student || item.studentName || "—";
+    const cycleCount = unitHistory.length;
 
     let qrSvgHtml = "";
     const qrContainerEl = document.getElementById("modal-qr-container");
@@ -94,121 +96,80 @@ export default function ReturnItemModal({
         <head>
           <title>PRINT STICKER - ${productName}</title>
           <style>
-            @media print {
-              body { margin: 0; padding: 10px; background: white; color: #1F2937; }
-              .sticker { width: 100%; max-width: 380px; margin: 0 auto; border: 2px solid #E5E7EB; border-radius: 12px; padding: 20px; text-align: center; }
+            @page {
+              size: 50mm 25mm;
+              margin: 0;
             }
-            body { 
-              font-family: Arial, sans-serif; 
-              margin: 0; 
-              padding: 24px;
-              background: #F8FAFC;
-              color: #1F2937;
+            * { box-sizing: border-box; }
+            html, body {
+              margin: 0;
+              padding: 0;
+              width: 50mm;
+              height: 25mm;
+              font-family: Arial, sans-serif;
+              color: #000;
+            }
+            .sticker {
+              width: 50mm;
+              height: 25mm;
               display: flex;
-              justify-content: center;
               align-items: center;
-              min-height: 90vh;
-            }
-            .sticker { 
-              width: 100%;
-              max-width: 380px;
-              margin: 0 auto;
-              border: 2px solid #E5E7EB;
-              border-radius: 12px;
-              padding: 24px;
-              text-align: center;
+              gap: 2mm;
+              padding: 1.5mm;
               background: white;
-              box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+              border: none;
+              overflow: hidden;
             }
-            .header {
-              font-size: 11px;
-              letter-spacing: 1.5px;
-              color: #6B7280;
-              font-weight: bold;
-              margin-bottom: 12px;
-            }
-            .qr-box { 
-              display: inline-block; 
-              background: #F9FAFB; 
-              padding: 12px; 
-              border-radius: 10px; 
-              border: 1px solid #E5E7EB;
-              margin-bottom: 12px;
+            .qr-box {
+              width: 20mm;
+              height: 20mm;
+              flex-shrink: 0;
+              display: flex;
+              align-items: center;
+              justify-content: center;
             }
             .qr-box svg {
-              width: 160px;
-              height: 160px;
+              width: 100% !important;
+              height: 100% !important;
               display: block;
             }
-            .product-name { 
-              font-size: 15px; 
-              font-weight: bold;
-              color: #111827;
-              margin: 6px 0;
+            .info {
+              flex: 1;
+              font-size: 7pt;
+              line-height: 1.2;
+              overflow: hidden;
             }
-            .batch-info {
-              font-size: 12.5px;
-              color: #4B5563;
-              margin-bottom: 10px;
+            .info-line {
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
             }
-            .badge {
-              display: inline-block;
-              padding: 4px 14px;
-              border-radius: 20px;
-              font-size: 12.5px;
-              font-weight: bold;
-              background: #D1FAE5;
-              color: #059669;
-              margin-bottom: 10px;
-            }
-            .detail-line {
-              font-size: 12.5px;
-              color: #4B5563;
-              margin: 4px 0;
-            }
-            .scan-note {
-              margin-top: 14px;
-              padding: 8px 12px;
-              background: #F8FAFC;
-              border: 1px solid #E2E8F0;
-              border-radius: 6px;
-              font-size: 11.5px;
+            .info-line b {
               font-weight: 600;
-              color: #64748B;
             }
           </style>
         </head>
         <body>
           <div class="sticker">
-            <div class="header">Dental Inventry — RETURN STICKER</div>
             <div class="qr-box">${qrSvgHtml}</div>
-            <br/>
-            <div class="badge">✅ RETURNED</div>
-            <div class="product-name">Product: ${productName} (Unit: ${qrUnitId})</div>
-            <div class="batch-info">
-              <strong>Batch:</strong> ${batchVal} | <strong>Expiry Date:</strong> ${expiryDate}
-            </div>
-            <div class="detail-line">
-              Last Student: ${item.student || item.studentName || "Student"} | Returned: ${returnDate}
-            </div>
-            <div class="detail-line">
-              <strong>Restock Location:</strong> ${location}
-            </div>
-            <div class="scan-note">
-              📱 Scan QR code to view complete unit history
+            <div class="info">
+              <div class="info-line"><b>Ref:</b> ${item.refNo || qrUnitId || "—"}</div>
+              <div class="info-line"><b>Lot:</b> ${batchVal}</div>
+              <div class="info-line"><b>Returned:</b> ${returnDate}</div>
+              <div class="info-line"><b>Last:</b> ${lastStudent}</div>
+              <div class="info-line"><b>Cycle:</b> ${cycleCount}</div>
             </div>
           </div>
           <script>
-            setTimeout(() => {
-              window.focus();
+            window.onload = function() {
               window.print();
-            }, 300);
-          <\/script>
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
         </body>
       </html>
     `);
     printWindow.document.close();
-    printWindow.focus();
   };
 
   // ============================================================

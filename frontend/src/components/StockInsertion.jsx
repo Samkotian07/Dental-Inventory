@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { PlusCircle, Upload, Check, Download, FileText, FileCheck, MapPin, ChevronDown, XCircle } from "lucide-react";
+import { PlusCircle, Upload, Check, Download, FileText, FileCheck, MapPin, ChevronDown, XCircle, Package, RotateCcw } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useInventory } from "../context/InventoryContext.jsx";
 import Button from "./common/Button";
@@ -433,32 +433,24 @@ export default function StockInsertion() {
               </div>
             </div>
 
-            <div className="si-stock-type-toggle" style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: 13, color: "#374151" }}>Stock Type</label>
-              <div style={{ display: "flex", gap: 8, maxWidth: 360 }}>
+            <div className="si-stock-type-toggle" style={{ marginBottom: 18 }}>
+              <label style={{ display: "block", marginBottom: 8, fontWeight: 600, fontSize: 13, color: "#374151" }}>Stock Type</label>
+              <div className="stock-type-selector">
                 <button
                   type="button"
                   onClick={() => setStockType("fresh")}
-                  style={{
-                    flex: 1, padding: "8px", borderRadius: 6,
-                    border: stockType === "fresh" ? "2px solid #2563EB" : "1px solid #D1D5DB",
-                    background: stockType === "fresh" ? "#EFF6FF" : "white",
-                    cursor: "pointer", fontWeight: 600,
-                  }}
+                  className={`stock-type-option stock-type-option--fresh ${stockType === "fresh" ? "active" : ""}`}
                 >
-                  📦 Fresh Stock
+                  <Package size={16} strokeWidth={2.2} />
+                  <span>Fresh Stock</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setStockType("returned")}
-                  style={{
-                    flex: 1, padding: "8px", borderRadius: 6,
-                    border: stockType === "returned" ? "2px solid #D97706" : "1px solid #D1D5DB",
-                    background: stockType === "returned" ? "#FEF3C7" : "white",
-                    cursor: "pointer", fontWeight: 600,
-                  }}
+                  className={`stock-type-option stock-type-option--returned ${stockType === "returned" ? "active" : ""}`}
                 >
-                  🔄 In Use
+                  <RotateCcw size={16} strokeWidth={2.2} />
+                  <span>In Use</span>
                 </button>
               </div>
             </div>
@@ -545,32 +537,24 @@ export default function StockInsertion() {
 
           {/* ---------- Bulk Import ---------- */}
           <div className="si-bulk-section-wrapper">
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: 13, color: "#374151" }}>Bulk Stock Type</label>
-              <div style={{ display: "flex", gap: 8, maxWidth: 360 }}>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", marginBottom: 8, fontWeight: 600, fontSize: 13, color: "#374151" }}>Bulk Stock Type</label>
+              <div className="stock-type-selector">
                 <button
                   type="button"
                   onClick={() => setBulkStockType("fresh")}
-                  style={{
-                    flex: 1, padding: "8px", borderRadius: 6,
-                    border: bulkStockType === "fresh" ? "2px solid #2563EB" : "1px solid #D1D5DB",
-                    background: bulkStockType === "fresh" ? "#EFF6FF" : "white",
-                    cursor: "pointer", fontWeight: 600,
-                  }}
+                  className={`stock-type-option stock-type-option--fresh ${bulkStockType === "fresh" ? "active" : ""}`}
                 >
-                  📦 Fresh Stock
+                  <Package size={16} strokeWidth={2.2} />
+                  <span>Fresh Stock</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setBulkStockType("returned")}
-                  style={{
-                    flex: 1, padding: "8px", borderRadius: 6,
-                    border: bulkStockType === "returned" ? "2px solid #D97706" : "1px solid #D1D5DB",
-                    background: bulkStockType === "returned" ? "#FEF3C7" : "white",
-                    cursor: "pointer", fontWeight: 600,
-                  }}
+                  className={`stock-type-option stock-type-option--returned ${bulkStockType === "returned" ? "active" : ""}`}
                 >
-                  🔄 In Use
+                  <RotateCcw size={16} strokeWidth={2.2} />
+                  <span>In Use</span>
                 </button>
               </div>
             </div>

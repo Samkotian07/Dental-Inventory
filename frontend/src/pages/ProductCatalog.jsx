@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { Plus, Upload, Download, Search, Edit, PackagePlus, Check, XCircle } from "lucide-react";
+import { Plus, Upload, Download, Search, Edit, PackagePlus, Check, XCircle, Package, RotateCcw } from "lucide-react";
 import * as XLSX from "xlsx";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
@@ -11,7 +11,6 @@ import { useInventory } from "../context/InventoryContext.jsx";
 import AddProductModal from "../components/product/AddProductModal.jsx";
 import AddLotModal from "../components/product/AddLotModal.jsx";
 import EditProductModal from "../components/product/EditProductModal.jsx";
-import { normalizeCategory } from "../components/utils/constants.js";
 import { toast } from "sonner";
 import "./css/ProductCatalog.css";
 
@@ -281,7 +280,7 @@ export default function ProductCatalog() {
                     <td className="stock__mono">{row.refNo}</td>
                     <td>
                       <span className={`stock-tag stock-tag--${(row.category || "general").toLowerCase()}`}>
-                        {normalizeCategory(row.category)}
+                        {row.category || "General"}
                       </span>
                     </td>
                     <td className="stock__strong">{row.company || row.companyName || "—"}</td>
@@ -325,32 +324,24 @@ export default function ProductCatalog() {
           />
         </section>
 
-        <div style={{ margin: "16px 0 8px 0" }}>
-          <label style={{ display: "block", marginBottom: 6, fontWeight: 600, fontSize: 13, color: "#374151" }}>Bulk Stock Type</label>
-          <div style={{ display: "flex", gap: 8, maxWidth: 360 }}>
+        <div style={{ margin: "18px 0 12px 0" }}>
+          <label style={{ display: "block", marginBottom: 8, fontWeight: 600, fontSize: 13, color: "#374151" }}>Bulk Stock Type</label>
+          <div className="stock-type-selector">
             <button
               type="button"
               onClick={() => setBulkStockType("fresh")}
-              style={{
-                flex: 1, padding: "8px", borderRadius: 6,
-                border: bulkStockType === "fresh" ? "2px solid #2563EB" : "1px solid #D1D5DB",
-                background: bulkStockType === "fresh" ? "#EFF6FF" : "white",
-                cursor: "pointer", fontWeight: 600,
-              }}
+              className={`stock-type-option stock-type-option--fresh ${bulkStockType === "fresh" ? "active" : ""}`}
             >
-              📦 Fresh Stock
+              <Package size={16} strokeWidth={2.2} />
+              <span>Fresh Stock</span>
             </button>
             <button
               type="button"
               onClick={() => setBulkStockType("returned")}
-              style={{
-                flex: 1, padding: "8px", borderRadius: 6,
-                border: bulkStockType === "returned" ? "2px solid #D97706" : "1px solid #D1D5DB",
-                background: bulkStockType === "returned" ? "#FEF3C7" : "white",
-                cursor: "pointer", fontWeight: 600,
-              }}
+              className={`stock-type-option stock-type-option--returned ${bulkStockType === "returned" ? "active" : ""}`}
             >
-              🔄 In Use
+              <RotateCcw size={16} strokeWidth={2.2} />
+              <span>In Use</span>
             </button>
           </div>
         </div>

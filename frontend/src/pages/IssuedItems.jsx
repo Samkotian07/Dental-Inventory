@@ -54,7 +54,7 @@ export default function IssuedItems() {
   const onMenuClick = useMenuClick();
   const { user } = useAuth();
   const canWrite = user?.role !== 'readonly';
-  const { issues: issuedItems, issueFreshUnit, issueBulkUnits, issueReturnedUnit, returnUnit, condemnUnit, exchangeWithVendor, stock } = useInventory();
+  const { issues: issuedItems, issueFreshUnit, issueBulkUnits, issueReturnedUnit, returnUnit, condemnUnit, exchangeWithVendor, stock, getUnitHistory } = useInventory();
   const { students } = useData();
 
   const [query, setQuery] = useState("");
@@ -166,13 +166,28 @@ export default function IssuedItems() {
         }
         // Find the unit details to show in QR modal
         const unit = stock.find(s => s.refNo === qr?.ref_no || s.id === qr?.ref_no);
+        const unitId = qr?.unit_id || unit?.id;
+
+        let cycleCount = 1;
+        if (getUnitHistory && unitId) {
+          try {
+            const historyData = await getUnitHistory(unitId);
+            cycleCount = historyData?.history?.length || 1;
+          } catch (e) {
+            console.error("Failed to fetch unit history for cycle count", e);
+          }
+        }
+
         setQrData({
-          unitId: qr?.unit_id || unit?.id,
+          unitId: unitId,
           refNo: qr?.ref_no || unit?.refNo,
           productName: unit?.product || unit?.productName || "Product",
           location: unit?.freshLocation || unit?.location || "—",
           returnDate: returnDateISO ? formatDate(returnDateISO) : formatDate(new Date()),
           qrCode: qr,
+          lotNo: returnItem?.lotNo || qr?.lot_no || "—",
+          lastStudent: returnItem?.student || returnItem?.studentName || "—",
+          cycleCount: cycleCount,
         });
         setQrModalOpen(true);
       }
@@ -486,6 +501,9 @@ export default function IssuedItems() {
           productName={qrData.productName}
           location={qrData.location}
           returnDate={qrData.returnDate}
+          lotNo={qrData.lotNo}
+          lastStudent={qrData.lastStudent}
+          cycleCount={qrData.cycleCount}
         />
       )}
     </>

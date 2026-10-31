@@ -1,11 +1,11 @@
 import { useRef } from "react";
-import { Download, Printer, X, Package, MapPin, Calendar, Hash } from "lucide-react";
+import { Printer } from "lucide-react";
 import Modal from "./Modal.jsx";
 import { QRCodeSVG as QRCode } from "qrcode.react";
 import { toast } from "sonner";
 import "./QRCodeDisplayModal.css";
 
-function QRCodeSticker({ unitId, refNo, productName, location, returnDate }) {
+function QRCodeSticker({ unitId, refNo, lotNo, returnDate, lastStudent, cycleCount }) {
   const stickerRef = useRef(null);
 
   const handlePrint = () => {
@@ -15,77 +15,70 @@ function QRCodeSticker({ unitId, refNo, productName, location, returnDate }) {
       return;
     }
 
-    const content = stickerRef.current?.innerHTML || '';
+    const content = stickerRef.current?.outerHTML || '';
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>QR Code Sticker - ${unitId}</title>
+          <title>QR Code Sticker - ${refNo || unitId || "Sticker"}</title>
           <style>
+            @page {
+              size: 50mm 25mm;
+              margin: 0;
+            }
+            * {
+              box-sizing: border-box;
+            }
             body {
               margin: 0;
-              padding: 20px;
-              font-family: 'Courier New', monospace;
+              padding: 0;
+              width: 50mm;
+              height: 25mm;
+              font-family: Arial, sans-serif;
               background: white;
               display: flex;
-              justify-content: center;
               align-items: center;
-              min-height: 100vh;
-            }
-            .sticker {
-              width: 280px;
-              padding: 16px;
-              border: 2px dashed #4B5563;
-              border-radius: 8px;
-              background: white;
-              text-align: center;
-            }
-            .sticker-title {
-              font-size: 12px;
-              color: #6B7280;
-              text-transform: uppercase;
-              letter-spacing: 2px;
-              margin-bottom: 8px;
-            }
-            .sticker-qr {
-              display: flex;
               justify-content: center;
-              margin: 8px 0;
+              overflow: hidden;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
-            .sticker-qr img {
-              width: 120px;
-              height: 120px;
-            }
-            .sticker-divider {
-              border: none;
-              border-top: 1px dashed #E5E7EB;
-              margin: 8px 0;
-            }
-            .sticker-field {
+            .qr-sticker {
+              width: 50mm;
+              height: 25mm;
               display: flex;
-              justify-content: space-between;
-              font-size: 11px;
-              padding: 2px 0;
+              align-items: center;
+              gap: 2mm;
+              padding: 1.5mm;
+              border: 1px solid #ccc;
+              border-radius: 1mm;
+              background: white;
+              box-sizing: border-box;
+              font-family: Arial, sans-serif;
             }
-            .sticker-label {
-              color: #6B7280;
+            .qr-sticker-qr {
+              width: 2cm;
+              height: 2cm;
+              flex-shrink: 0;
+              display: flex;
+              align-items: center;
+              justify-content: center;
             }
-            .sticker-value {
-              font-weight: 600;
-              color: #111827;
+            .qr-sticker-qr svg {
+              width: 100% !important;
+              height: 100% !important;
             }
-            .sticker-footer {
-              margin-top: 8px;
-              font-size: 9px;
-              color: #9CA3AF;
-              border-top: 1px solid #F3F4F6;
-              padding-top: 6px;
+            .qr-sticker-info {
+              flex: 1;
+              font-size: 8pt;
+              line-height: 1.15;
+              color: #000;
+              overflow: hidden;
             }
-            .sticker-logo {
-              font-size: 10px;
-              font-weight: 700;
-              color: #2563EB;
-              letter-spacing: 3px;
+            .qr-sticker-line {
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
             }
           </style>
         </head>
@@ -96,7 +89,7 @@ function QRCodeSticker({ unitId, refNo, productName, location, returnDate }) {
               window.print();
               setTimeout(function() { window.close(); }, 1000);
             };
-          <\/script>
+          </script>
         </body>
       </html>
     `);
@@ -106,50 +99,22 @@ function QRCodeSticker({ unitId, refNo, productName, location, returnDate }) {
   return (
     <div className="qr-sticker-wrapper">
       <div className="qr-sticker" ref={stickerRef}>
-        <div className="qr-sticker-title">Dental Inventry</div>
         <div className="qr-sticker-qr">
           <QRCode
             value={`${window.location.origin}/unit-history/${encodeURIComponent(unitId || refNo || "")}`}
-            size={120}
-            level="H"
-            includeMargin={true}
+            size={70}
+            level="M"
+            includeMargin={false}
             bgColor="#FFFFFF"
-            fgColor="#111827"
+            fgColor="#000000"
           />
         </div>
-        <hr className="qr-sticker-divider" />
-        <div className="qr-sticker-fields">
-          <div className="qr-sticker-field">
-            <span className="qr-sticker-label">
-              <Hash size={12} /> Unit ID
-            </span>
-            <span className="qr-sticker-value">{unitId}</span>
-          </div>
-          <div className="qr-sticker-field">
-            <span className="qr-sticker-label">
-              <Package size={12} /> Product
-            </span>
-            <span className="qr-sticker-value">{productName}</span>
-          </div>
-          <div className="qr-sticker-field">
-            <span className="qr-sticker-label">Ref No</span>
-            <span className="qr-sticker-value">{refNo}</span>
-          </div>
-          <div className="qr-sticker-field">
-            <span className="qr-sticker-label">
-              <MapPin size={12} /> Location
-            </span>
-            <span className="qr-sticker-value">{location || '—'}</span>
-          </div>
-          <div className="qr-sticker-field">
-            <span className="qr-sticker-label">
-              <Calendar size={12} /> Return Date
-            </span>
-            <span className="qr-sticker-value">{returnDate}</span>
-          </div>
-        </div>
-        <div className="qr-sticker-footer">
-          Scan to view unit history
+        <div className="qr-sticker-info">
+          <div className="qr-sticker-line">Ref: {refNo || "—"}</div>
+          <div className="qr-sticker-line">Lot: {lotNo || "—"}</div>
+          <div className="qr-sticker-line">Returned: {returnDate || "—"}</div>
+          <div className="qr-sticker-line">Last Issued: {lastStudent || "—"}</div>
+          <div className="qr-sticker-line">Cycle: {cycleCount ?? 1}</div>
         </div>
       </div>
       <div className="qr-sticker-actions">
@@ -168,12 +133,15 @@ export default function QRCodeDisplayModal({
   refNo, 
   productName, 
   location, 
-  returnDate 
+  returnDate,
+  lotNo,
+  lastStudent,
+  cycleCount
 }) {
   if (!isOpen) return null;
 
   return (
-    <Modal title="QR Code Generated" onClose={onClose} width={400}>
+    <Modal title="QR Code Generated" onClose={onClose} width={420}>
       <div className="qr-display-modal">
         <div className="qr-display-success">
           <span className="qr-display-check">✅</span>
@@ -185,6 +153,9 @@ export default function QRCodeDisplayModal({
           productName={productName}
           location={location}
           returnDate={returnDate}
+          lotNo={lotNo}
+          lastStudent={lastStudent}
+          cycleCount={cycleCount}
         />
         <div className="qr-display-actions">
           <button className="qr-display-done-btn" onClick={onClose}>

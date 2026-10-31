@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Modal from "../common/Modal";
+import { Package, RotateCcw } from "lucide-react";
 import Input from "../common/Input";
 import Button from "../common/Button";
 import { toast } from "sonner";
@@ -55,31 +56,25 @@ export default function AddLotModal({ product, onClose, onSaved }) {
       </div>
 
       <div className="modal__field">
-        <label>Stock Type</label>
-        <div style={{ display: "flex", gap: 8 }}>
+        <label style={{ display: "block", marginBottom: 8, fontWeight: 600, fontSize: 13, color: "var(--ink, #374151)" }}>
+          Stock Type
+        </label>
+        <div className="stock-type-selector" style={{ maxWidth: "100%" }}>
           <button
             type="button"
             onClick={() => setStockType("fresh")}
-            style={{
-              flex: 1, padding: "8px", borderRadius: 6,
-              border: stockType === "fresh" ? "2px solid #2563EB" : "1px solid #D1D5DB",
-              background: stockType === "fresh" ? "#EFF6FF" : "white",
-              cursor: "pointer", fontWeight: 600,
-            }}
+            className={`stock-type-option stock-type-option--fresh ${stockType === "fresh" ? "active" : ""}`}
           >
-            📦 Fresh Stock
+            <Package size={16} strokeWidth={2.2} />
+            <span>Fresh Stock</span>
           </button>
           <button
             type="button"
             onClick={() => setStockType("returned")}
-            style={{
-              flex: 1, padding: "8px", borderRadius: 6,
-              border: stockType === "returned" ? "2px solid #D97706" : "1px solid #D1D5DB",
-              background: stockType === "returned" ? "#FEF3C7" : "white",
-              cursor: "pointer", fontWeight: 600,
-            }}
+            className={`stock-type-option stock-type-option--returned ${stockType === "returned" ? "active" : ""}`}
           >
-            🔄 In Use
+            <RotateCcw size={16} strokeWidth={2.2} />
+            <span>In Use</span>
           </button>
         </div>
       </div>
