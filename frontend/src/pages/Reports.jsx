@@ -8,8 +8,7 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import "./css/Reports.css";
-
-const CATEGORIES = ["All Categories", "implant", "abutment", "prosthetic", "general"];
+import { CATEGORIES } from "../components/utils/constants.js";
 
 function formatDate(iso) {
   if (!iso) return "—";

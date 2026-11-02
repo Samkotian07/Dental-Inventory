@@ -625,7 +625,13 @@ def _auto_create_product(data):
     ref_no = str(data.get('ref_no') or data.get('refNo') or '').strip()
     product_name = str(data.get('product_name') or data.get('productName') or '').strip()
     category = str(data.get('category') or 'prosthetic').strip().lower()
-    if category not in ('implant', 'abutment', 'prosthetic', 'tool', 'consumable', 'other'):
+    if category not in (
+        'implant', 'abutment', 'prosthetic', 'tool', 'consumable', 'other',
+        'general', 'np implants', 'rp implants', 'universal bases',
+        'healing abutments', 'impression copings', 'implant replicas',
+        'snappy abutments', 'esthetic abutments', 'temporary abutments',
+        'instruments & tools', 'membrane', 'analogues'
+    ):
         category = 'other'
     size = str(data.get('size') or '').strip()
     company_name = str(data.get('company_name') or data.get('companyName') or data.get('company') or 'Unknown').strip()
@@ -860,7 +866,8 @@ def update_stock_quantity(ref_no):
         'success': True,
         'message': f'Quantity updated to {new_qty}',
         'data': {'refNo': ref_no, 'newQuantity': new_qty, 'delta': delta}
-    }), 200
+    }), 200
+
 
 
 # ---------- Product catalog create/update ----------
@@ -1042,7 +1049,7 @@ def update_product(ref_no):
             'general', 'np implants', 'rp implants', 'universal bases',
             'healing abutments', 'impression copings', 'implant replicas',
             'snappy abutments', 'esthetic abutments', 'temporary abutments',
-            'instruments & tools', 'membrane',
+            'instruments & tools', 'membrane', 'analogues',
         ):
             group_updates['category'] = cat
             group_updates['is_returnable'] = 0 if cat in ('implant', 'abutment') else 1

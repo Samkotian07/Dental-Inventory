@@ -3,6 +3,9 @@ export const CATEGORIES = [
   "Implant",
   "Abutment",
   "Prosthetic",
+  "Analogues",
+  "Tool",
+  "Consumable",
   "General",
   "NP Implants",
   "RP Implants",
@@ -14,7 +17,8 @@ export const CATEGORIES = [
   "Esthetic Abutments",
   "Temporary Abutments",
   "Instruments & Tools",
-  "Membrane"
+  "Membrane",
+  "Other"
 ];
 
 export function normalizeCategory(cat) {
@@ -22,6 +26,7 @@ export function normalizeCategory(cat) {
   const str = String(cat).trim();
   const lower = str.toLowerCase();
   if (lower === "prosthetc" || lower === "prosthetic") return "Prosthetic";
+  if (lower === "analogues" || lower === "analogue" || lower === "analog") return "Analogues";
   if (lower === "implant" || lower.includes("implant")) return "Implant";
   if (lower === "abutment" || lower.includes("abutment")) return "Abutment";
   if (!str) return "General";

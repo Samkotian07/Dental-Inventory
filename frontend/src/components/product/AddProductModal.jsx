@@ -5,8 +5,8 @@ import Button from "../common/Button";
 import { toast } from "sonner";
 import { useInventory } from "../../context/InventoryContext.jsx";
 import "./AddProductModal.css";
+import { CATEGORIES as RAW_CATEGORIES } from "../utils/constants.js";
 
-const CATEGORIES = ["implant", "abutment", "prosthetic", "tool", "consumable", "other"];
 
 export default function AddProductModal({ onClose, onSaved }) {
   const { createProduct, receiveStock } = useInventory();
@@ -155,10 +155,8 @@ export default function AddProductModal({ onClose, onSaved }) {
               textTransform: "capitalize",
             }}
           >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c.charAt(0).toUpperCase() + c.slice(1)}
-              </option>
+            {RAW_CATEGORIES.filter(c => c !== "All Categories").map((c) => (
+              <option key={c} value={c.toLowerCase()}>{c}</option>
             ))}
           </select>
         </div>
