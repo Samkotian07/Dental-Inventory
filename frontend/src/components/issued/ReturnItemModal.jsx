@@ -70,7 +70,7 @@ export default function ReturnItemModal({
 
   // PRINT STICKER FUNCTION
   const handlePrint = () => {
-    const batchVal = item.lotNo || item.batchNo || "—";
+    const size = item.size || item.product_size || "—";
     const productName = item.product || item.productName || "Product";
     const lastStudent = item.student || item.studentName || "—";
     const cycleCount = unitHistory.length;
@@ -154,7 +154,7 @@ export default function ReturnItemModal({
             <div class="qr-box">${qrSvgHtml}</div>
             <div class="info">
               <div class="info-line"><b>Ref:</b> ${item.refNo || qrUnitId || "—"}</div>
-              <div class="info-line"><b>Lot:</b> ${batchVal}</div>
+              <div class="info-line"><b>Size:</b> ${size}</div>
               <div class="info-line"><b>Returned:</b> ${returnDate}</div>
               <div class="info-line"><b>Last:</b> ${lastStudent}</div>
               <div class="info-line"><b>Cycle:</b> ${cycleCount}</div>
@@ -449,6 +449,7 @@ export default function ReturnItemModal({
   // ============================================================
   if (step === "qr") {
     const productName = item.product || item.productName || "Product";
+    const size = item.size || item.product_size || "—";
     const batchVal = item.lotNo || item.batchNo || "—";
 
     return (
