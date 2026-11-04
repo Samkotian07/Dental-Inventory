@@ -47,7 +47,8 @@ function normalizeStock(item) {
     size: item.size || item.groupSize || "",
     lowStockThreshold: item.lowStockThreshold ?? 10,
     isActive: item.isActive !== undefined ? Boolean(item.isActive) : (item.is_active !== undefined ? Boolean(item.is_active) : (item.status !== "inactive")),
-    status: (item.isActive === false || item.is_active === 0 || item.status === "inactive") ? "inactive" : "active",
+    lotStatus: String(item.lotStatus || item.lot_status || item.status || "open").toLowerCase(),
+    status: String(item.lotStatus || item.lot_status || item.status || "open").toLowerCase(),
   };
 }
 

@@ -219,10 +219,10 @@ def issue_unit():
             SET qty_available    = qty_available - %s,
                 qty_fresh        = GREATEST(qty_fresh - %s, 0),
                 qty_issued_total = qty_issued_total + %s,
-                status           = IF(qty_available - %s <= 0, 'depleted', status),
+                status           = IF(qty_available <= 0, 'depleted', status),
                 version          = version + 1
             WHERE lot_id = %s
-        """, (quantity, quantity, quantity, quantity, lot_id))
+        """, (quantity, quantity, quantity, lot_id))
 
         conn.commit()
     except Exception as e:

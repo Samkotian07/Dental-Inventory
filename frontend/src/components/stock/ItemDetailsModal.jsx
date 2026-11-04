@@ -156,9 +156,14 @@ export default function ItemDetailsModal({ item, onClose }) {
                     <tr key={unit.lotId || unit.id}>
                       <td className="unit-id">{unit.lotNo || unit.lotId || unit.id}</td>
                       <td>
-                        <span className={`unit-status-badge ${unit.status === 'active' ? 'active' : 'inactive'}`}>
-                          {unit.status || 'active'}
-                        </span>
+                        {(() => {
+                          const lotStatus = String(unit.lotStatus || unit.status || "open").toLowerCase();
+                          return (
+                            <span className={`unit-status-badge ${lotStatus}`}>
+                              {lotStatus}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td>
                         <span>{Number(unit.freshStock ?? Math.max(0, Number(unit.quantity ?? unit.qty ?? 0) - Number(unit.returnedStock ?? unit.qtyReturned ?? unit.returnedCount ?? (unit.isReturned ? (unit.quantity ?? unit.qty ?? 1) : 0))))} fresh</span>

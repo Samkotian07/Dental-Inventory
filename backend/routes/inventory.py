@@ -311,10 +311,11 @@ def get_inventory():
             'isReturned': bool(int(r.get('qty_returned') or 0) > 0 and int(r.get('qty_fresh') or 0) == 0),
             'totalAvailable': int(r.get('qty_available') or 0),
             'quantity': int(r.get('qty_available') or 0),
-            'stockStatus': r.get('lot_status'),
+            'stockStatus': r.get('lot_status') or 'open',
+            'lotStatus': r.get('lot_status') or 'open',
             'size': r.get('size') or '',
             'isActive': bool(r.get('is_active', 1)),
-            'status': 'active' if r.get('is_active', 1) else 'inactive',
+            'status': r.get('lot_status') or 'open',
         })
     return jsonify({'success': True, 'data': data}), 200
 
@@ -829,10 +830,10 @@ def update_stock_quantity(ref_no):
                     SET qty_received = GREATEST(qty_received - %s, 0),
                         qty_available = GREATEST(qty_available - %s, 0),
                         qty_fresh = GREATEST(qty_fresh - %s, 0),
-                        status = IF(qty_available - %s = 0, 'depleted', status),
+                        status = IF(qty_available <= 0, 'depleted', status),
                         version = version + 1
                     WHERE lot_id = %s
-                """, (take, take, take, take, lot['lot_id']))
+                """, (take, take, take, lot['lot_id']))
 
                 cursor.execute("""
                     INSERT INTO stock_movements
