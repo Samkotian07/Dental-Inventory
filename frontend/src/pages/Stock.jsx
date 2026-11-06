@@ -446,7 +446,7 @@ export default function Stock() {
                             >
                               <Pencil size={16} strokeWidth={2} />
                             </button>
-                            <button
+                            {/* <button
                               className="stock__icon-btn"
                               onClick={() => setRetireItem(row)}
                               aria-label={`Retire ${row.refNo}`}
@@ -454,7 +454,7 @@ export default function Stock() {
                               style={{ color: "#DC2626" }}
                             >
                               <Trash2 size={16} strokeWidth={2} />
-                            </button>
+                            </button> */}
                             <div className="stock__status-control">
                               <ToggleSwitch
                                 isOn={row.status !== "inactive" && row.isActive !== false}
