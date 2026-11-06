@@ -28,7 +28,7 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLo
   const hasValidLots = newLots.length > 0 && newLots.every((lot) =>
     lot.lotNo.trim() && Number.isFinite(Number(lot.quantity)) && Number(lot.quantity) >= 1
   );
-  const canAdjust = numQty >= 1 && reason.trim().length > 0 && !unchanged;
+  const canAdjust = numQty >= 0 && Number.isFinite(numQty) && reason.trim().length > 0 && !unchanged;
   const canSave = !submitting && (!hasLots || hasValidLots) && (canAdjust || hasValidLots);
   const delta = numQty - currentQty;
 
@@ -41,7 +41,7 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLo
   };
 
   const handleStep = (step) => {
-    setQty((prev) => Math.max(1, (Number(prev) || 0) + step));
+    setQty((prev) => Math.max(0, (Number(prev) || 0) + step));
   };
 
   const addLotRow = () => {
@@ -120,14 +120,14 @@ export default function EditItemModal({ item, onClose, onSave, onDelete, onAddLo
                 type="button"
                 className="edit-stock__stepper-btn"
                 onClick={() => handleStep(-1)}
-                disabled={numQty <= 1}
+                disabled={numQty <= 0}
                 aria-label="Decrease quantity"
               >
                 <Minus size={15} strokeWidth={2.5} />
               </button>
               <input
                 type="number"
-                min="1"
+                min="0"
                 className="edit-stock__stepper-input"
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}

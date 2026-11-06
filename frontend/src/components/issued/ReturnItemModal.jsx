@@ -15,12 +15,17 @@ export default function ReturnItemModal({
   onCondemn, 
   onExchange 
 }) {
-  const { stock = [], issuedItems = [] } = useInventory();
+  const { stock = [], issuedItems = [], returnUnusedUnit } = useInventory();
   
   const [returnDate, setReturnDate] = useState(todayISO());
   const [returnCondition, setReturnCondition] = useState("Good");
   const [step, setStep] = useState("confirm");
-  const [actionType, setActionType] = useState("return");
+  const [actionType, setActionType] = useState(() => {
+    const flag = item?.isImplantAbutment || item?.is_implant_abutment || false;
+    const cat = (item?.category || "").toLowerCase();
+    const isImp = flag || cat === "implant" || cat === "abutment";
+    return isImp ? "return_unused" : "return";
+  });
   const [condemnReason, setCondemnReason] = useState("");
   const [exchangeReason, setExchangeReason] = useState("Damaged");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -196,7 +201,7 @@ export default function ReturnItemModal({
               ⚠️ This is an <strong>Implant or Abutment</strong>
             </p>
             <p style={{ margin: "4px 0 0", color: "#92400E", fontSize: "13px" }}>
-              This item cannot be returned to stock. Only <strong>Exchange with Vendor</strong> is available.
+              If completely unused, return directly to <strong>Fresh Stock</strong>. If opened or defective, use <strong>Exchange with Vendor</strong>.
             </p>
           </div>
         )}
@@ -227,24 +232,44 @@ export default function ReturnItemModal({
             )}
 
             {isImplantAbutment && (
-              <button
-                type="button"
-                onClick={() => setActionType("exchange")}
-                style={{
-                  width: "100%",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  textAlign: "left",
-                  border: actionType === "exchange" ? "2px solid #D97706" : "1px solid #D1D5DB",
-                  background: actionType === "exchange" ? "#FEF3C7" : "white",
-                  fontWeight: actionType === "exchange" ? "600" : "400",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  color: actionType === "exchange" ? "#D97706" : "#374151",
-                }}
-              >
-                🔄 Exchange with Vendor (Only Option)
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActionType("return_unused")}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    textAlign: "left",
+                    border: actionType === "return_unused" ? "2px solid #059669" : "1px solid #D1D5DB",
+                    background: actionType === "return_unused" ? "#D1FAE5" : "white",
+                    fontWeight: actionType === "return_unused" ? "600" : "400",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    color: actionType === "return_unused" ? "#059669" : "#374151",
+                  }}
+                >
+                  🌿 Return Unused to Fresh Stock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActionType("exchange")}
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    textAlign: "left",
+                    border: actionType === "exchange" ? "2px solid #D97706" : "1px solid #D1D5DB",
+                    background: actionType === "exchange" ? "#FEF3C7" : "white",
+                    fontWeight: actionType === "exchange" ? "600" : "400",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    color: actionType === "exchange" ? "#D97706" : "#374151",
+                  }}
+                >
+                  🔄 Exchange with Vendor
+                </button>
+              </>
             )}
 
             {!isImplantAbutment && (
@@ -393,6 +418,11 @@ export default function ReturnItemModal({
             ✅ This will generate a QR code and add the item back to inventory.
           </p>
         )}
+        {actionType === "return_unused" && isImplantAbutment && (
+          <p style={{ fontSize: "13px", color: "#059669", marginTop: "8px" }}>
+            🌿 This item was never used on a patient. It will be added back directly to fresh stock.
+          </p>
+        )}
         {actionType === "exchange" && isImplantAbutment && (
           <p style={{ fontSize: "13px", color: "#D97706", marginTop: "8px" }}>
             🔄 This will mark the implant/abutment as exchanged with vendor.
@@ -408,9 +438,20 @@ export default function ReturnItemModal({
           <button className="modal__btn" onClick={onClose}>Cancel</button>
           <button
             className="modal__btn modal__btn--primary"
-            onClick={() => {
+            onClick={async () => {
               if (actionType === "return") {
                 setStep("qr");
+              } else if (actionType === "return_unused" && isImplantAbutment) {
+                setIsProcessing(true);
+                const targetSerial = item.unitId || item.unitSerial || item.issueId;
+                const res = await returnUnusedUnit(targetSerial, returnDate);
+                setIsProcessing(false);
+                if (res.success) {
+                  toast.success("Unused implant/abutment returned to fresh stock");
+                  onClose();
+                } else {
+                  toast.error(res.message || "Failed to return unused item");
+                }
               } else if (actionType === "exchange" && isImplantAbutment) {
                 setIsProcessing(true);
                 onExchange?.(item.issueId, returnDate, exchangeReason);
@@ -437,7 +478,9 @@ export default function ReturnItemModal({
                 ? "Confirm Condemn" 
                 : actionType === "exchange" 
                   ? "Send to Vendor" 
-                  : "Generate QR & Confirm Return"}
+                  : actionType === "return_unused"
+                    ? "Return to Fresh Stock"
+                    : "Generate QR & Confirm Return"}
           </button>
         </div>
       </Modal>

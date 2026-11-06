@@ -356,8 +356,8 @@ def update_lot_quantity(lot_id):
         new_qty = int(data.get('new_quantity'))
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'new_quantity must be a number'}), 400
-    if new_qty < 1:
-        return jsonify({'success': False, 'message': 'Quantity must be at least 1'}), 400
+    if new_qty < 0:
+        return jsonify({'success': False, 'message': 'Quantity cannot be negative'}), 400
     if not reason:
         return jsonify({'success': False, 'message': 'Reason is required'}), 400
 
@@ -366,7 +366,7 @@ def update_lot_quantity(lot_id):
     cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute("""
-            SELECT lot_id, ref_no, qty_available
+            SELECT lot_id, ref_no, qty_available, status
             FROM stock_lots WHERE lot_id = %s FOR UPDATE
         """, (lot_id,))
         lot = cursor.fetchone()
@@ -376,15 +376,16 @@ def update_lot_quantity(lot_id):
         delta = new_qty - current_qty
         user = getattr(request, 'current_user', None)
         user_name = user.name if user else 'Admin'
-        if delta:
+        new_status = 'depleted' if new_qty <= 0 else 'open'
+        if delta or lot.get('status') != new_status:
             cursor.execute("""
                 UPDATE stock_lots
                 SET qty_received = GREATEST(qty_received + %s, 0),
                     qty_available = %s,
                     qty_fresh = GREATEST(qty_fresh + %s, 0),
-                    status = 'open', version = version + 1
+                    status = %s, version = version + 1
                 WHERE lot_id = %s
-            """, (delta, new_qty, delta, lot_id))
+            """, (delta, new_qty, delta, new_status, lot_id))
             cursor.execute("""
                 INSERT INTO stock_movements
                   (unit_serial, lot_id, ref_no, movement_type, from_status, to_status,
@@ -446,6 +447,30 @@ def toggle_product_status(ref_no):
     else:
         db.execute_query("UPDATE products SET is_active = NOT is_active WHERE ref_no = %s", (ref_no,))
     return jsonify({'success': True, 'message': f'Status updated for {ref_no}'}), 200
+
+
+# ---------- Retire Product from Active Stock ----------
+
+@inventory_bp.route('/<ref_no>/retire', methods=['PUT'])
+@token_required
+def retire_product(ref_no):
+    product = Product.find_by_ref_no(ref_no)
+    if not product:
+        return jsonify({'success': False, 'message': f'Product {ref_no} not found'}), 404
+
+    db = StockLot.get_db()
+    db.execute_query("UPDATE products SET is_active = 0, updated_at = NOW() WHERE ref_no = %s", (ref_no,))
+
+    user = getattr(request, 'current_user', None)
+    AuditLog.create(
+        action='RETIRE_PRODUCT',
+        entity_type='PRODUCT',
+        entity_id=ref_no,
+        details=f'Product {ref_no} retired from active inventory',
+        user_id=user.id if user else None,
+        user_name=user.name if user else 'Admin',
+    )
+    return jsonify({'success': True, 'message': f'Product {ref_no} has been retired'}), 200
 
 
 # ---------- Update stock item / low stock threshold ----------
@@ -754,8 +779,8 @@ def update_stock_quantity(ref_no):
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'new_quantity must be a number'}), 400
 
-    if new_qty < 1:
-        return jsonify({'success': False, 'message': 'Quantity must be at least 1'}), 400
+    if new_qty < 0:
+        return jsonify({'success': False, 'message': 'Quantity cannot be negative'}), 400
 
     if not reason:
         return jsonify({'success': False, 'message': 'Reason is required'}), 400
@@ -793,6 +818,9 @@ def update_stock_quantity(ref_no):
         user_name = user.name if user else 'Admin'
 
         if delta == 0:
+            if new_qty == 0:
+                cursor.execute("UPDATE stock_lots SET status = 'depleted', version = version + 1 WHERE ref_no = %s", (ref_no,))
+                conn.commit()
             return jsonify({'success': True, 'message': 'No change', 'data': {'refNo': ref_no, 'newQuantity': new_qty, 'delta': 0}}), 200
 
         if delta > 0:
@@ -803,7 +831,7 @@ def update_stock_quantity(ref_no):
                 SET qty_received = qty_received + %s,
                     qty_available = qty_available + %s,
                     qty_fresh = qty_fresh + %s,
-                    status = IF(status = 'depleted', 'open', status),
+                    status = 'open',
                     version = version + 1
                 WHERE lot_id = %s
             """, (delta, delta, delta, target['lot_id']))
@@ -830,7 +858,7 @@ def update_stock_quantity(ref_no):
                     SET qty_received = GREATEST(qty_received - %s, 0),
                         qty_available = GREATEST(qty_available - %s, 0),
                         qty_fresh = GREATEST(qty_fresh - %s, 0),
-                        status = IF(qty_available <= 0, 'depleted', status),
+                        status = IF(qty_available <= 0, 'depleted', 'open'),
                         version = version + 1
                     WHERE lot_id = %s
                 """, (take, take, take, lot['lot_id']))
@@ -1224,3 +1252,83 @@ def receive_returned_stock():
         'message': f'Added {qty} unit(s) as returned stock',
         'data': {'refNo': ref_no, 'lotNo': lot_no, 'quantity': qty, 'issueId': issue_id}
     }), 201
+
+
+
+# ---------- Move Fresh Stock to In-Use (Returned) ----------
+
+@inventory_bp.route('/lot/<lot_id>/move-to-in-use', methods=['POST'])
+@token_required
+def move_lot_to_in_use(lot_id):
+    data = request.get_json() or {}
+    try:
+        qty = int(data.get('quantity', 0))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Quantity must be a valid number'}), 400
+
+    if qty <= 0:
+        return jsonify({'success': False, 'message': 'Quantity must be greater than 0'}), 400
+
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
+    db = StockLot.get_db()
+    conn = db.get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("START TRANSACTION")
+        cursor.execute("""
+            SELECT lot_id, ref_no, qty_fresh, qty_available, status
+            FROM stock_lots
+            WHERE lot_id = %s
+            FOR UPDATE
+        """, (lot_id,))
+        lot = cursor.fetchone()
+
+        if not lot:
+            conn.rollback()
+            return jsonify({'success': False, 'message': 'Lot not found'}), 404
+
+        if lot['qty_fresh'] < qty:
+            conn.rollback()
+            return jsonify({'success': False, 'message': f"Insufficient fresh stock: lot only has {lot['qty_fresh']} fresh units"}), 400
+
+        cursor.execute("""
+            UPDATE stock_lots
+            SET qty_fresh = qty_fresh - %s,
+                qty_returned = qty_returned + %s,
+                version = version + 1
+            WHERE lot_id = %s
+        """, (qty, qty, lot_id))
+
+        cursor.execute("""
+            INSERT INTO stock_movements (
+                unit_serial, lot_id, ref_no, movement_type, from_status, to_status,
+                quantity_change, moved_by, remarks
+            ) VALUES (
+                NULL, %s, %s, 'status_change', 'fresh', 'returned_good',
+                %s, %s, 'Manually moved to in-use'
+            )
+        """, (lot_id, lot['ref_no'], qty, user_name))
+
+        conn.commit()
+
+        AuditLog.create(
+            action='MOVE_TO_IN_USE',
+            entity_type='STOCK_LOT',
+            entity_id=lot_id,
+            details=f"Moved {qty} units from fresh to in-use in lot {lot_id}",
+            user_id=user.id if user else None,
+            user_name=user_name,
+        )
+
+        return jsonify({'success': True, 'message': f"Successfully moved {qty} unit(s) to in-use stock"}), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except Exception:
+            pass

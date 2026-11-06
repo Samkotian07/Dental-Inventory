@@ -424,6 +424,59 @@ export function InventoryProvider({ children }) {
     }
   };
 
+  const returnUnusedUnit = async (unitSerial, returnDate = null) => {
+    try {
+      const res = await fetch(`${API_URL}/issued/${encodeURIComponent(unitSerial)}/return-unused`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ return_date: returnDate }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchStock(), fetchIssues()]);
+        return { success: true, message: data.message, data: data.data };
+      }
+      return { success: false, message: data.message || "Failed to return unused item" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const retireProduct = async (refNo) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/${encodeURIComponent(refNo)}/retire`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await Promise.all([fetchStock(), fetchProducts()]);
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.message || "Failed to retire product" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
+  const moveStockToInUse = async (lotId, quantity) => {
+    try {
+      const res = await fetch(`${API_URL}/inventory/lot/${encodeURIComponent(lotId)}/move-to-in-use`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ quantity: Number(quantity) }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchStock();
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.message || "Failed to move stock to in-use" };
+    } catch (err) {
+      return { success: false, message: "Network error" };
+    }
+  };
+
   const condemnUnit = async (unitSerial, reason = "Damaged") => {
     try {
       const res = await fetch(`${API_URL}/issued/${encodeURIComponent(unitSerial)}/condemn`, {
@@ -872,6 +925,9 @@ export function InventoryProvider({ children }) {
     issueItem: issueFreshUnit,
     returnUnit,
     returnIssuedItem: returnUnit,
+    returnUnusedUnit,
+    retireProduct,
+    moveStockToInUse,
     condemnUnit,
     condemnIssuedItem: condemnUnit,
     exchangeWithVendor,

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Download, Eye, Pencil, ArrowUpDown } from "lucide-react";
+import { Search, Download, Eye, Pencil, ArrowUpDown, Trash2 } from "lucide-react";
+import Modal from "../components/stock/Modal.jsx";
 import DashboardHeader from "../components/dashboard/DashboardHeader.jsx";
 import Pagination from "../components/Pagination.jsx";
 import ItemDetailsModal from "../components/stock/ItemDetailsModal.jsx";
@@ -52,6 +53,7 @@ export default function Stock() {
   const [detailItem, setDetailItem] = useState(null);
   const [editItem, setEditItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
+  const [retireItem, setRetireItem] = useState(null);
 
   useEffect(() => {
     setQuery(searchParams.get("search") || "");
@@ -181,8 +183,8 @@ export default function Stock() {
 
   const handleSaveEdit = async (item, patch) => {
     const newQty = Number(patch.qty);
-    if (!newQty || newQty < 1) {
-      toast.error("Quantity must be at least 1");
+    if (isNaN(newQty) || newQty < 0) {
+      toast.error("Quantity cannot be negative");
       return;
     }
     if (!patch.reason || !patch.reason.trim()) {
@@ -273,6 +275,18 @@ export default function Stock() {
       toast.error("Failed to move item(s) to Failed Inventory");
     }
     setDeleteItem(null);
+  };
+
+  const handleConfirmRetire = async () => {
+    if (!retireItem) return;
+    const refNo = retireItem.refNo || retireItem.id;
+    const res = await retireProduct(refNo);
+    if (res.success) {
+      toast.success(`Retired ${retireItem.productName || retireItem.product || refNo}`);
+      setRetireItem(null);
+    } else {
+      toast.error(res.message || "Failed to retire product");
+    }
   };
 
   const handleToggleStockStatus = async (row) => {
@@ -432,6 +446,15 @@ export default function Stock() {
                             >
                               <Pencil size={16} strokeWidth={2} />
                             </button>
+                            <button
+                              className="stock__icon-btn"
+                              onClick={() => setRetireItem(row)}
+                              aria-label={`Retire ${row.refNo}`}
+                              title="Retire product"
+                              style={{ color: "#DC2626" }}
+                            >
+                              <Trash2 size={16} strokeWidth={2} />
+                            </button>
                             <div className="stock__status-control">
                               <ToggleSwitch
                                 isOn={row.status !== "inactive" && row.isActive !== false}
@@ -483,6 +506,29 @@ export default function Stock() {
           onClose={() => setDeleteItem(null)}
           onConfirm={handleConfirmDelete}
         />
+      )}
+
+      {retireItem && (
+        <Modal title="Retire Product" onClose={() => setRetireItem(null)} width={460}>
+          <div style={{ padding: "8px 0 16px" }}>
+            <p style={{ margin: "0 0 8px", fontSize: "14px", color: "var(--ink)", lineHeight: 1.5 }}>
+              Retire <strong>{retireItem.productName || retireItem.product || retireItem.refNo}</strong> (Ref: {retireItem.refNo})?
+            </p>
+            <p style={{ margin: 0, fontSize: "13px", color: "var(--ink-soft)", lineHeight: 1.4 }}>
+              It will be removed from active stock but history remains.
+            </p>
+          </div>
+          <div className="modal__actions">
+            <button className="modal__btn" onClick={() => setRetireItem(null)}>Cancel</button>
+            <button
+              className="modal__btn modal__btn--danger"
+              onClick={handleConfirmRetire}
+              style={{ backgroundColor: "#DC2626", color: "#FFFFFF", border: "none" }}
+            >
+              Retire Product
+            </button>
+          </div>
+        </Modal>
       )}
 
     </>

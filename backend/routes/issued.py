@@ -375,6 +375,104 @@ def return_unit(unit_serial):
     }), 200
 
 
+# ---------- Return unused implant/abutment to fresh stock ----------
+
+@issued_bp.route('/<unit_serial>/return-unused', methods=['POST'])
+@token_required
+def return_unused_implant_abutment(unit_serial):
+    data = request.get_json() or {}
+    return_date = data.get('return_date') or date.today().isoformat()
+    user = getattr(request, 'current_user', None)
+    user_name = user.name if user else 'Admin'
+
+    resolved_serial = _resolve_unit_serial(unit_serial)
+
+    db = IssuedUnit.get_db()
+    conn = db.get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("START TRANSACTION")
+
+        cursor.execute("""
+            SELECT unit_serial, lot_id, ref_no, lot_no, status, is_implant_abutment
+            FROM issued_units
+            WHERE unit_serial = %s
+            FOR UPDATE
+        """, (resolved_serial,))
+        unit = cursor.fetchone()
+
+        if not unit:
+            conn.rollback()
+            return jsonify({'success': False, 'message': 'Unit not found'}), 404
+
+        if unit['status'] != 'issued':
+            conn.rollback()
+            return jsonify({'success': False, 'message': f"Unit is not currently issued (status: {unit['status']})"}), 400
+
+        if not unit['is_implant_abutment']:
+            conn.rollback()
+            return jsonify({'success': False, 'message': 'Only implants/abutments can be returned via return-unused route'}), 400
+
+        # Update issued_units
+        cursor.execute("""
+            UPDATE issued_units
+            SET status = 'returned_good',
+                returned_date = %s,
+                return_condition = 'Good',
+                returned_by = %s,
+                version = version + 1
+            WHERE unit_serial = %s
+        """, (return_date, user_name, resolved_serial))
+
+        # Update stock_lots: add to fresh stock
+        cursor.execute("""
+            UPDATE stock_lots
+            SET qty_available = qty_available + 1,
+                qty_fresh = qty_fresh + 1,
+                status = IF(status = 'depleted', 'open', status),
+                version = version + 1
+            WHERE lot_id = %s
+        """, (unit['lot_id'],))
+
+        # Insert movement
+        cursor.execute("""
+            INSERT INTO stock_movements (
+                unit_serial, lot_id, ref_no, movement_type, from_status, to_status,
+                quantity_change, moved_by, remarks
+            ) VALUES (
+                %s, %s, %s, 'return', 'issued', 'returned_good',
+                1, %s, 'Unused implant/abutment returned to fresh stock'
+            )
+        """, (resolved_serial, unit['lot_id'], unit['ref_no'], user_name))
+
+        conn.commit()
+
+        AuditLog.create(
+            action='RETURN_UNUSED',
+            entity_type='ISSUED',
+            entity_id=resolved_serial,
+            details=f'Returned unused implant/abutment {resolved_serial} to fresh stock',
+            user_id=user.id if user else None,
+            user_name=user_name,
+        )
+
+        updated_unit = IssuedUnit.find_by_serial(resolved_serial)
+        return jsonify({
+            'success': True,
+            'message': 'Unused implant/abutment returned to fresh stock',
+            'data': updated_unit.to_dict() if updated_unit else {}
+        }), 200
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+    finally:
+        try:
+            cursor.close()
+            conn.close()
+        except Exception:
+            pass
+
+
 # ---------- Send failed unit to vendor ----------
 
 @issued_bp.route('/<unit_serial>/exchange', methods=['POST'])
