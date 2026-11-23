@@ -102,6 +102,12 @@
   color: var(--ink-soft);
 }
 
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 @media (max-width: 768px) {
   .topbar__menu {
     display: grid;
@@ -111,4 +117,7 @@
   .topbar__search-wrap {
     max-width: none;
   }
+
+  .topbar { gap: 10px; padding: 14px 16px; }
+  .topbar__actions { gap: 7px; }
 }

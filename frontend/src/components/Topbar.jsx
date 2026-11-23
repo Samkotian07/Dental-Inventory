@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, Menu, Package, GraduationCap, ClipboardList, Repeat } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "./NotificationBell.jsx";
+import ReturnStockScanner from "./ReturnStockScanner.jsx";
 import { useInventory } from "../context/InventoryContext.jsx";
 import { useData } from "../context/DataContext.jsx";
 import "./Topbar.css";
@@ -123,7 +124,10 @@ export default function Topbar({ onMenuClick }) {
         )}
       </div>
 
-      <NotificationBell />
+      <div className="topbar__actions">
+        <ReturnStockScanner />
+        <NotificationBell />
+      </div>
     </header>
   );
 }
