@@ -8,8 +8,34 @@ const toUnitId = (value) => {
   const scanned = value.trim();
   if (!scanned) return "";
   const marker = "/unit-history/";
-  if (scanned.includes(marker)) return decodeURIComponent(scanned.split(marker)[1].split(/[?#]/)[0]);
+  if (scanned.includes(marker)) {
+    const unitId = scanned.split(marker)[1].split(/[?#]/)[0];
+    try {
+      return decodeURIComponent(unitId);
+    } catch {
+      return unitId;
+    }
+  }
   return scanned;
+};
+
+const cameraErrorMessage = (error) => {
+  if (!window.isSecureContext) {
+    return "Camera access requires HTTPS. Open the secure (https://) version of this site.";
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return "This browser cannot access a webcam here. Use a current browser, or upload a QR image.";
+  }
+  if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
+    return "Camera permission is blocked. Select the camera icon in your browser address bar, allow this site, then try again.";
+  }
+  if (error?.name === "NotFoundError") {
+    return "No webcam was found. Connect or enable a camera, or upload a QR image.";
+  }
+  if (error?.name === "NotReadableError") {
+    return "Your webcam is being used by another app. Close that app and try again.";
+  }
+  return "Could not start the webcam. Check camera permission, then try again or upload a QR image.";
 };
 
 export default function ReturnStockScanner() {
@@ -60,6 +86,10 @@ export default function ReturnStockScanner() {
     if (!open) return undefined;
     let cancelled = false;
     const startCamera = async () => {
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        setStatus(cameraErrorMessage());
+        return;
+      }
       try {
         setStatus("Scanning… align the QR code inside the frame.");
         const reader = new BrowserQRCodeReader();
@@ -70,8 +100,8 @@ export default function ReturnStockScanner() {
         );
         if (cancelled) controls.stop();
         else controlsRef.current = controls;
-      } catch {
-        setStatus("We couldn't access your camera. Allow camera access, or enter the QR code below.");
+      } catch (error) {
+        setStatus(cameraErrorMessage(error));
       }
     };
     startCamera();
