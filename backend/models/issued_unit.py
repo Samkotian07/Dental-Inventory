@@ -10,6 +10,7 @@ class IssuedUnit:
         self.lot_no = data.get('lot_no')
         self.product_name = data.get('product_name')
         self.category = data.get('category')
+        self.size = data.get('size')
         self.is_implant_abutment = data.get('is_implant_abutment', 0)
         self.status = data.get('status')
         self.issued_date = data.get('issued_date')
@@ -35,7 +36,11 @@ class IssuedUnit:
             return None
         db = cls.get_db()
         rows = db.execute_query(
-            "SELECT * FROM issued_units WHERE unit_serial = %s",
+            """SELECT u.*, pg.size
+               FROM issued_units u
+               LEFT JOIN products p ON p.ref_no = u.ref_no
+               LEFT JOIN product_groups pg ON pg.group_id = p.group_id
+               WHERE u.unit_serial = %s""",
             (unit_serial,)
         )
         return cls(rows[0]) if rows else None
@@ -46,7 +51,12 @@ class IssuedUnit:
             return []
         db = cls.get_db()
         rows = db.execute_query(
-            "SELECT * FROM issued_units WHERE ref_no = %s ORDER BY created_at ASC",
+            """SELECT u.*, pg.size
+               FROM issued_units u
+               LEFT JOIN products p ON p.ref_no = u.ref_no
+               LEFT JOIN product_groups pg ON pg.group_id = p.group_id
+               WHERE u.ref_no = %s
+               ORDER BY u.created_at ASC""",
             (ref_no,)
         )
         return [cls(r) for r in rows]
@@ -57,7 +67,12 @@ class IssuedUnit:
             return []
         db = cls.get_db()
         rows = db.execute_query(
-            "SELECT * FROM issued_units WHERE issue_id = %s ORDER BY created_at ASC",
+            """SELECT u.*, pg.size
+               FROM issued_units u
+               LEFT JOIN products p ON p.ref_no = u.ref_no
+               LEFT JOIN product_groups pg ON pg.group_id = p.group_id
+               WHERE u.issue_id = %s
+               ORDER BY u.created_at ASC""",
             (issue_id,)
         )
         return [cls(r) for r in rows]
@@ -68,8 +83,10 @@ class IssuedUnit:
             return []
         db = cls.get_db()
         rows = db.execute_query(
-            """SELECT u.* FROM issued_units u
+            """SELECT u.*, pg.size FROM issued_units u
                JOIN issue_events e ON e.issue_id = u.issue_id
+               LEFT JOIN products p ON p.ref_no = u.ref_no
+               LEFT JOIN product_groups pg ON pg.group_id = p.group_id
                WHERE e.student_id = %s
                  AND u.status IN ('issued', 'awaiting_vendor')
                ORDER BY u.issued_date DESC""",
@@ -83,9 +100,11 @@ class IssuedUnit:
             return []
         db = cls.get_db()
         rows = db.execute_query(
-            """SELECT u.*, e.student_id, e.student_name, e.issue_date
+            """SELECT u.*, e.student_id, e.student_name, e.issue_date, pg.size
                FROM issued_units u
                LEFT JOIN issue_events e ON e.issue_id = u.issue_id
+               LEFT JOIN products p ON p.ref_no = u.ref_no
+               LEFT JOIN product_groups pg ON pg.group_id = p.group_id
                WHERE u.ref_no = %s AND u.status = 'returned_good'
                ORDER BY u.returned_date DESC, u.created_at DESC""",
             (ref_no,)
@@ -109,6 +128,7 @@ class IssuedUnit:
             'lotNo': self.lot_no,
             'productName': self.product_name,
             'category': self.category,
+            'size': self.size,
             'isImplantAbutment': bool(self.is_implant_abutment),
             'status': self.status,
             'issuedDate': fmt(self.issued_date),

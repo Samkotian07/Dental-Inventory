@@ -39,11 +39,37 @@ export default function ReturnItemModal({
     return flag || isImplantCategory || isAbutmentCategory;
   }, [item]);
 
-  // Match item in stock to get location
+  // Match item in stock to get location and metadata
   const stockMatch = useMemo(() => {
     if (!item) return null;
-    return stock.find((s) => s.id === item.inventoryId || s.unitId === item.unitId);
+    const serial = item.unitSerial || item.unitId || item.inventoryId || "";
+    const extractedRef = serial.includes("-") ? serial.split("-")[0].trim() : "";
+    const targetRef = item.refNo || extractedRef;
+    return stock.find((s) => 
+      (targetRef && s.refNo === targetRef) || 
+      (item.inventoryId && s.id === item.inventoryId) || 
+      (serial && s.unitId === serial)
+    ) || null;
   }, [stock, item]);
+
+  // Multi-tier fallback for Ref No:
+  // item.refNo -> extract prefix from unitSerial/unitId -> stockMatch.refNo -> "—"
+  const resolvedRefNo = useMemo(() => {
+    if (item?.refNo) return item.refNo;
+    const serial = item?.unitSerial || item?.unitId || item?.inventoryId || "";
+    if (serial && serial.includes("-")) {
+      const prefix = serial.split("-")[0].trim();
+      if (prefix) return prefix;
+    }
+    if (stockMatch?.refNo) return stockMatch.refNo;
+    return "—";
+  }, [item, stockMatch]);
+
+  // Multi-tier fallback for Size:
+  // item.size -> stockMatch.size -> "—"
+  const resolvedSize = useMemo(() => {
+    return item?.size || item?.product_size || stockMatch?.size || "—";
+  }, [item, stockMatch]);
 
   const location = useMemo(() => {
     return stockMatch?.freshLocation || stockMatch?.location || "—";
@@ -55,8 +81,8 @@ export default function ReturnItemModal({
 
   // ⭐ Generate QR URL - Use unit_id if available, fallback to ref_no
   const unitId = item?.unitId || item?.inventoryId || "";
-  const qrUnitId = unitId || item?.refNo || "";
-  const scanUrl = `${window.location.origin}/unit-history/${encodeURIComponent(qrUnitId)}`;
+  const qrUnitId = unitId || resolvedRefNo !== "—" ? resolvedRefNo : (item?.refNo || "");
+  const scanUrl = `${window.location.origin}/unit-history/${encodeURIComponent(qrUnitId || resolvedRefNo)}`;
 
   const unitHistory = useMemo(() => {
     const list = (issuedItems || [])
@@ -75,8 +101,9 @@ export default function ReturnItemModal({
 
   // PRINT STICKER FUNCTION
   const handlePrint = () => {
-    const size = item.size || item.product_size || "—";
-    const productName = item.product || item.productName || "Product";
+    const size = resolvedSize;
+    const refNo = resolvedRefNo;
+    const productName = item.product || item.productName || stockMatch?.product || stockMatch?.productName || "Product";
     const lastStudent = item.student || item.studentName || "—";
     const cycleCount = unitHistory.length;
 
@@ -158,7 +185,7 @@ export default function ReturnItemModal({
           <div class="sticker">
             <div class="qr-box">${qrSvgHtml}</div>
             <div class="info">
-              <div class="info-line"><b>Ref:</b> ${item.refNo || qrUnitId || "—"}</div>
+              <div class="info-line"><b>Ref:</b> ${refNo || "—"}</div>
               <div class="info-line"><b>Size:</b> ${size}</div>
               <div class="info-line"><b>Returned:</b> ${returnDate}</div>
               <div class="info-line"><b>Last:</b> ${lastStudent}</div>
@@ -491,9 +518,9 @@ export default function ReturnItemModal({
   // ⭐ STEP 2: QR DISPLAY
   // ============================================================
   if (step === "qr") {
-    const productName = item.product || item.productName || "Product";
-    const size = item.size || item.product_size || "—";
-    const batchVal = item.lotNo || item.batchNo || "—";
+    const productName = item.product || item.productName || stockMatch?.product || stockMatch?.productName || "Product";
+    const size = resolvedSize;
+    const batchVal = item.lotNo || item.batchNo || stockMatch?.lotNo || stockMatch?.batchNo || "—";
 
     return (
       <Modal title="QR Code Generated - Print Sticker" onClose={onClose} width={640}>

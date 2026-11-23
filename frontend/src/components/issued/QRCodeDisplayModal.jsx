@@ -110,7 +110,7 @@ function QRCodeSticker({ unitId, refNo, lotNo, returnDate, lastStudent, cycleCou
           />
         </div>
         <div className="qr-sticker-info">
-          <div className="qr-sticker-line">Ref: {refNo || "—"}</div>
+          <div className="qr-sticker-line">Ref: {refNo || (unitId?.includes("-") ? unitId.split("-")[0] : "") || "—"}</div>
           <div className="qr-sticker-line">Lot: {lotNo || "—"}</div>
           <div className="qr-sticker-line">Returned: {returnDate || "—"}</div>
           <div className="qr-sticker-line">Last Issued: {lastStudent || "—"}</div>
