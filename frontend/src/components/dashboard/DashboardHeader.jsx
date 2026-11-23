@@ -1,6 +1,7 @@
 import { Menu, Boxes, ClipboardList, Repeat } from "lucide-react";
 import { Link } from "react-router-dom";
 import NotificationBell from "../NotificationBell.jsx";
+import ReturnStockScanner from "../ReturnStockScanner.jsx";
 import "./DashboardHeader.css";
 
 const pills = [
@@ -27,7 +28,10 @@ export default function DashboardHeader({ title = "Dashboard", onMenuClick }) {
         ))}
       </div>
 
-      <NotificationBell />
+      <div className="dash-header__actions">
+        <ReturnStockScanner />
+        <NotificationBell />
+      </div>
     </header>
   );
 }

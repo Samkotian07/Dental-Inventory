@@ -38,6 +38,13 @@
   align-items: center;
 }
 
+.dash-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
 .dash-pill {
   display: flex;
   align-items: center;
@@ -96,6 +103,10 @@
 
   .dash-header__pills {
     display: none;
+  }
+
+  .dash-header__actions {
+    gap: 7px;
   }
 
   .notif {
